@@ -875,3 +875,19 @@ Full analysis: docs/INCIDENT_2026-10-23.md. Nothing that trades was changed: run
       - If the score's commit fails all 6 pushes, the next hour scores again from the same data.
       - After it scores, the workflow keeps starting hourly and stops at once. A follow-up on Nov 25 checks the score and turns it off.
       - Hours the PC sampled between the copy and GitHub's first run stay only on the PC.
+- **r62 installed on the PC at 15:33 local.**
+  - **Before:**
+    - paper.db and live.db were copied to backups\*_20261028_192240_predeploy_r62.db (byte-identical).
+    - An earlier attempt with SQLite's backup API failed on the bridge's file mount with "disk I/O error". It left paper_20261028_192219_predeploy_r62.db, now renamed *.incomplete: do not restore from it.
+    - The 25 replaced files are in backups\code_pre_r62\.
+  - **Installed:** 29 files, hashes in backups\MANIFEST_r62.json, all verified.
+  - **Tests on the installed files (the PC's Linux sandbox):** test_gatelook, test_moves, test_veto, test_fix, test_end_to_end, test_settle, test_rainonly, test_lip, test_freshness, test_audit and test_shadow pass.
+  - **The PC's sampling stopped:** research\data\lip\MOVED.txt was written at 15:33, after the PC's 3:20 PM sample.
+- **Repository:**
+  - Commit f7ad0f5: the same files, the three workflows, the .gitignore, and the PC's PLAN5 L data up to the 3:20 PM sample. The one-off station-check workflow is removed.
+  - A run started by hand at 15:35 went through every step. It committed the fill checks for the 2:20 PM sample in the first daily file (4ad6270).
+  - The hourly schedule samples from 4:20 PM.
+- **Follow-ups scheduled:**
+  - Oct 29: the first GitHub scan (set earlier).
+  - Nov 1: compare the two runners, and decide whether the phone page should read GitHub's results.
+  - Nov 25: report PLAN5 L's single score, then turn its hourly workflow off.
