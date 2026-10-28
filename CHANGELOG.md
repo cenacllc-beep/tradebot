@@ -805,3 +805,14 @@ Full analysis: docs/INCIDENT_2026-10-23.md. Nothing that trades was changed: run
   - **Installed:** 16 files, hashes in backups\MANIFEST_r61.json, all verified.
   - **Tests on the installed files (the PC's Linux sandbox):** test_veto, test_fix, test_rainonly, test_audit, test_end_to_end and test_settle pass.
   - **First scan with the veto and the two new cities:** tonight at 8:55 PM. Its scan row in the ledger records VETO_MAX_GAP 0.3.
+
+## 2026-10-28 11:35 (local) - the runner without the laptop: code pushed, blocked by GitHub billing
+- **Pushed to the user's new private repository cenacllc-beep/tradebot** (commit a85430c). It contains:
+  - the code, plus research/results/rain_model.json;
+  - .gitignore: no paper.db, live.db, backups, logs or research/data, and no key files;
+  - trial/ with its own .gitignore;
+  - the two workflows in .github/workflows.
+
+  The scan now runs at 00:55 UTC = 8:55 PM La Paz, as on the PC, and only inside scan_window.py's 8:50 PM-1 AM window (TZ=America/La_Paz). A run started by hand at another time checks the setup and does not scan.
+- **A test run (11:36) never started.** GitHub said: "The job was not started because recent account payments have failed or your spending limit needs to be increased. Please check the 'Billing & plans' section in your settings." Nothing ran and nothing was changed.
+- **Needs the user:** fix the billing in GitHub Settings > Billing & plans, or decide to make the repository public. Public repositories run Actions free. The repository has no keys, but its notes describe the setup.
