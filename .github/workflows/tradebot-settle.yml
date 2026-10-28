@@ -1,0 +1,42 @@
+# Copy to .github/workflows/ in the private "tradebot" repository. Paper trading only, on its own trial database
+# (trial/paper.db). No Kalshi keys exist in the repository, and live.py is never run here.
+name: tradebot afternoon settle (trial)
+on:
+  schedule:
+    - cron: "40 18 * * *"   # 18:40 UTC = 2:40 PM La Paz
+  workflow_dispatch: {}
+concurrency:
+  group: tradebot
+  cancel-in-progress: false
+permissions:
+  contents: write
+jobs:
+  settle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install requests==2.32.3
+      - name: Settle and report (paper only, trial database)
+        working-directory: trial
+        env:
+          TRADEBOT_OFFSITE_BACKUPS: offsite
+          TZ: America/La_Paz
+        run: |
+          if [ ! -f paper.db ]; then echo "no trial database yet: nothing to settle"; exit 0; fi
+          python ../main.py settle
+          python ../shadow.py settle || echo "shadow step failed; the main bot is not affected"
+          python ../main.py report
+          python ../backup.py postsettle || echo "backup failed (the repository history keeps every version anyway)"
+          python ../dashboard.py --no-open || echo "dashboard failed"
+      - name: Save the trial results in the repository (its history is the off-machine backup)
+        if: always()
+        run: |
+          git config user.name "tradebot-runner"
+          git config user.email "tradebot-runner@users.noreply.github.com"
+          git add trial
+          git commit -m "trial settle $(date -u +%F)" || echo "nothing new"
+          git push

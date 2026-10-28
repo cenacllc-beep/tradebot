@@ -1,0 +1,3 @@
+# The runner's own backup copies stay out of git: the repository's history already keeps every version of paper.db.
+backups/
+offsite/

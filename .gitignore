@@ -1,0 +1,14 @@
+# The PC's own data never goes into this repository (paper trading only; the Kalshi key never leaves the PC).
+/paper.db
+/live.db
+/backups/
+/logs/
+/research/data/
+/dashboard.html
+/marks.jsonl
+__pycache__/
+*.pyc
+*.pem
+*.key
+.kalshi/
+/research/results/freshness.*

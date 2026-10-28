@@ -1,0 +1,2 @@
+requests
+cryptography   # live.py only (signs Kalshi requests); installed on the PC 2026-10-14
