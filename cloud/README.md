@@ -1,4 +1,4 @@
-# Always-on runner (prepared 2026-10-14; the user approved setting it up on 2026-10-28)
+# Always-on runner (prepared 2026-10-14; set up on 2026-10-28 in the public repository cenacllc-beep/tradebot)
 
 Why: the scheduled scans need this PC awake with the Claude app open. A free GitHub Actions runner can run the same
 paper bot on a schedule in the cloud. Claude's own cloud sessions cannot reach Kalshi, NWS or IEM, so they cannot run the
@@ -36,3 +36,16 @@ PC's `paper.db`. Paper trading only; no keys or secrets are needed (all data sou
   https://claude.ai/artifact/KNt9PdDMnipsfXZQwzWNWe with the Artifact tool, then publish the new file to that same URL
   without changing its capabilities. Paper trading only; never place orders."
   Use it only if the PC is retired from the routine, so the two do not overwrite each other.
+
+## Updated 2026-10-28, afternoon
+- The repository is public (the user's choice, so Actions run free). Never commit keys, account details or the PC's
+  databases and logs. `cloud/repo.gitignore` is the repository's `.gitignore`.
+- **PLAN5 L moved here:** `cloud/workflows/plan5-lip.yml` samples at :20 every hour, settles, and scores once from
+  2026-11-25. Its data (public Kalshi order books and reward programs) lives in `research/data/lip/` in the repository.
+  The PC's copy holds `research/data/lip/MOVED.txt`, so the PC no longer samples (that file is never committed).
+- The sample runs in its own concurrency group: GitHub keeps one pending run per group, so a queued sample could
+  otherwise cancel a pending scan or settle.
+- Every workflow's save step replays its commit on top of the latest one and retries the push, because the jobs commit
+  to different folders (trial/ and research/data/lip/) at different times.
+- Before the phone page moves to `trial/dashboard.html`, the two runners are compared for a few days (Claude's
+  scheduled follow-up).

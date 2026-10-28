@@ -41,7 +41,7 @@ def rows(c,sql,args=()):
     except sqlite3.Error: return []
 def city(t):
     p=t.split("-")
-    return p[-1] if t.startswith("KXRAIN") else p[0].replace("KXHIGH","")
+    return p[-1] if t.startswith("KXRAIN") else (p[0][7:] if p[0].startswith("KXHIGHT") else p[0].replace("KXHIGH",""))   # KXHIGHTSEA -> SEA
 def mday(t):
     p=t.split("-"); return p[1] if len(p)>1 else "?"
 def bucket(x,edges,labels):

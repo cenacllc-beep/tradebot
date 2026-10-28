@@ -78,18 +78,21 @@ for _ in range(300):
     assert gate.margin(rows)==strategy.margin(rows) and gate.clear(gate.margin(rows))==strategy.clear(strategy.margin(rows))
     mg=(_rng.uniform(-0.1,0.05),_rng.uniform(0,0.05),_rng.randint(1,40)); assert gate.clear(mg)==strategy.clear(mg)
 assert gate.final(strategy.STOP_DATE) and not gate.final(strategy.STOP_DATE-_dt0.timedelta(days=1))
-out=io.StringIO()
+import datetime as _dt
+class _B(_dt.date):   # the day before the stop date, so this check also holds after Nov 11, 2026
+    @classmethod
+    def today(cls): return strategy.STOP_DATE-_dt.timedelta(days=1)
+strategy.date=_B; out=io.StringIO()
 with contextlib.redirect_stdout(out): strategy.report(c)
 lines=[l for l in out.getvalue().splitlines() if "CLEAR" in l or "GATE (" in l]; print("  report:",lines)
 assert "interim, not acted on" in lines[0] and "judged once on" in lines[1], lines
-import datetime as _dt
 class _D(_dt.date):
     @classmethod
     def today(cls): return strategy.STOP_DATE+_dt.timedelta(days=1)
 strategy.date=_D; out=io.StringIO()
 with contextlib.redirect_stdout(out): strategy.report(c)
 lines=[l for l in out.getvalue().splitlines() if "CLEAR" in l or "GATE (" in l]; print("  report after the stop date:",lines)
-assert "final look" in lines[0] and lines[1].endswith("not passed"), lines
+assert "the gate is the single look below" in lines[0] and (lines[1].endswith("not passed") or lines[1].endswith("not judged yet (the single look is pending)")), lines   # single look, stored (2026-10-28)
 strategy.date=_dt.date
 c.close()
 r=subprocess.run([sys.executable,os.path.join(WORK,"dashboard.py"),"--no-open"],capture_output=True,text=True,cwd=OUT,env=dict(os.environ,PYTHONPATH=WORK))

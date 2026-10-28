@@ -1,0 +1,49 @@
+# PLAN5 test L (research only, research/PLAN5.md): the hourly sample of weather markets' order books for the
+# liquidity-reward study. Moved here from the PC on 2026-10-28 so that a sleeping or offline laptop no longer leaves
+# gaps; it carries on from the PC's data (research/data/lip/). Public Kalshi GETs only: it never places, changes or
+# cancels an order, and it never touches the trial database or the PC. Scored once, on or after 2026-11-25.
+name: PLAN5 L hourly sample (research)
+on:
+  schedule:
+    - cron: "20 * * * *"   # :20 every hour, as on the PC. GitHub can start late; each hour is sampled once (hours.json).
+  workflow_dispatch: {}
+concurrency:
+  group: tradebot-lip      # its own group: a queued sample must never cancel a pending scan or settle (one pending run per group)
+  cancel-in-progress: false
+permissions:
+  contents: write
+jobs:
+  sample:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install requests==2.32.3
+      - name: Sample, fill checks and results; the single score from 2026-11-25
+        env:
+          TZ: America/La_Paz
+        run: |
+          if [ -f research/results/plan5_L.json ]; then echo "PLAN5 L is already scored: nothing to do"; exit 0; fi
+          if [ -f research/data/lip/MOVED.txt ]; then echo "this copy is marked as moved: not sampling"; exit 1; fi
+          python research/lip.py sample
+          python research/lip.py settle
+          if python -c "import sys,time; sys.path.insert(0,'research'); import lip; sys.exit(0 if time.time()>=lip.SCORE_FROM else 1)"; then
+            python research/lip.py score
+          fi
+      - name: Save the samples in the repository
+        if: always()
+        run: |
+          git config user.name "tradebot-runner"
+          git config user.email "tradebot-runner@users.noreply.github.com"
+          git add -A research/data/lip research/results
+          git commit -m "PLAN5 L sample $(date -u +%FT%H:%MZ)" || { echo "nothing new"; exit 0; }
+          # the scan and settle commit to trial/ at other times: on a race, replay this commit on top and try again
+          for i in 1 2 3 4 5 6; do
+            git push origin HEAD:main && exit 0
+            sleep $((i * 10))
+            git pull --rebase origin main || { git rebase --abort 2>/dev/null || true; }   # a failed fetch is retried too
+          done
+          exit 1

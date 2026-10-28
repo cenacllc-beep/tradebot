@@ -6,6 +6,7 @@ WORK, OUT = sys.argv[1], sys.argv[2]; os.makedirs(OUT, exist_ok=True); os.chdir(
 os.environ["PAPER_DB"] = os.path.join(OUT, "paper.db"); os.environ["TRADEBOT_OFFSITE_BACKUPS"] = os.path.join(OUT, "off")
 sys.path.insert(0, WORK)
 import core, kalshi, strategy, weather, selector, risk, account_view, shadow, nws
+strategy.STOP_DATE=strategy.date(2099,1,1)   # not a stop-date test (tests/test_gatelook.py is): its markets stay "before the stop date" after Nov 11 too
 
 # 1. The veto is the shadow selector's frozen gap bound, applied to rain trades only
 assert strategy.VETO_MAX_GAP == selector.EXPERIMENTS["accuracy_first.v1"]["max_gap"] == 0.30

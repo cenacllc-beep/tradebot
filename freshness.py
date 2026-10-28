@@ -366,9 +366,13 @@ def checks(root=None, db=None, now=None, offsite=None):
     in_window = start is not None and start <= now < end
     progs = load(os.path.join(lip_dir, "programs.json"), None)
     fetched = _ts(progs.get("fetched")) if isinstance(progs, dict) else None
-    for key, name, last, detail, action in (
+    moved = lip_moved(root)
+    if moved:   # sampling runs elsewhere since 2026-10-28 (GitHub Actions): this copy's age says nothing
+        out.append(check("lip_samples", "PLAN5 L hourly samples", _lip_last(lip_dir), LIMITS["lip_samples"], now,
+                         moved, status="info"))
+    for key, name, last, detail, action in () if moved else (
             ("lip_programs", "PLAN5 L reward programs", fetched, "cached list of liquidity programs", "The hourly job refreshes it; check tasks\\hourly.cmd."),
-            ("lip_samples", "PLAN5 L hourly samples", last_jsonl_ts(os.path.join(lip_dir, "samples.jsonl")),
+            ("lip_samples", "PLAN5 L hourly samples", _lip_last(lip_dir),
              "window %s to %s" % (clock.label(start), clock.label(end)) if start else "", "Missed hours count against the test; check the hourly schedule.")):
         if not in_window:   # outside the window nothing refreshes these, by design
             out.append(check(key, name, last, LIMITS[key], now, detail, status="waiting" if start is None or now < start else "info"))
@@ -411,6 +415,26 @@ def checks(root=None, db=None, now=None, offsite=None):
                          "discovery.md was written before the latest catalogue refresh (%s); the hourly job refreshes without summarizing" % clock.label(d_last),
                          status="info"))
     return out
+
+
+def _lip_last(lip_dir):
+    """The newest sample time: research/lip.py keeps samples.jsonl and, since 2026-10-28, adds one samples-YYYYMMDD.jsonl a day."""
+    try:
+        daily = sorted(f for f in os.listdir(lip_dir) if re.match(r"samples-\d{8}\.jsonl$", f))
+    except OSError:
+        daily = []
+    ts = [last_jsonl_ts(os.path.join(lip_dir, f)) for f in ["samples.jsonl"] + daily[-1:]]
+    ts = [t for t in ts if t]
+    return max(ts) if ts else None
+
+
+def lip_moved(root):
+    """The first line of research/data/lip/MOVED.txt under root, or None (PLAN5 L sampling moved to GitHub on 2026-10-28)."""
+    try:
+        with open(os.path.join(root, "research", "data", "lip", "MOVED.txt"), encoding="utf-8") as fh:
+            return (fh.read().strip().splitlines() or ["sampling moved"])[0]
+    except OSError:
+        return None
 
 
 def _lip_window(root=None):

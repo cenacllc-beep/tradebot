@@ -126,9 +126,11 @@ def research_notes(notes):
 def safety_line(now_ts,lip_samples=None):
     from datetime import date
     d=clock.bot_date(now_ts); stop=date(2026,11,11)
-    lock=("Real money: locked by date until Nov 11 (%d days). After that it also needs your own typed unlock; the gate verdict is shown then, not enforced."%(stop-d).days) if d<stop else \
-         "Real money: the date lock has passed; orders still need your own typed unlock (live.py status shows whether you gave it)."
-    extra=("" if lip_samples is None else " PLAN5 test L: %d market-hours sampled so far (interim, not actionable)."%lip_samples)
+    lock=("Real money: locked by date until Nov 11 (%d days). After that it also needs your own typed unlock, and the rain bot keeps paper trading"
+          " (so live.py has something to copy) only if the gate's single look passes."%(stop-d).days) if d<stop else \
+         "Real money: the date lock has passed; orders still need your own typed unlock (live.py status shows whether you gave it), and the rain bot paper-trades new market days only after a gate look that passed."
+    extra=("" if lip_samples is None else (" PLAN5 test L: %s"%lip_samples if isinstance(lip_samples,str) else
+           " PLAN5 test L: %d market-hours sampled so far (interim, not actionable)."%lip_samples))
     return lock+" live.py copies v3 rain paper trades only; no research strategy can reach it."+extra
 FRESH_TAG={"ok":"won","stale":"exploratory","fail":"lost","waiting":"excluded","info":"rest"}
 FRESH_ORDER={"fail":0,"stale":1,"waiting":2,"info":3,"ok":4}

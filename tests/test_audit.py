@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 WORK,OUT=sys.argv[1],sys.argv[2]; os.makedirs(OUT,exist_ok=True); os.chdir(OUT)
 os.environ["PAPER_DB"]=os.path.join(OUT,"paper.db"); os.environ["TRADEBOT_OFFSITE_BACKUPS"]=os.path.join(OUT,"off"); sys.path.insert(0,WORK)
 import core, strategy, kalshi, audit, registry, calibration, selector, weather
+strategy.STOP_DATE=strategy.date(2099,1,1)   # not a stop-date test (tests/test_gatelook.py is): its markets stay "before the stop date" after Nov 11 too
 now=datetime.now(timezone.utc)
 def ct(h): return (now+timedelta(hours=h)).strftime("%Y-%m-%dT%H:%M:%SZ")
 def mk(t,close_h,bid,ask,**k): return dict(ticker=t,event_ticker=t.rsplit("-",1)[0],close_time=ct(close_h),yes_bid_dollars=bid,yes_ask_dollars=ask,rules_primary="Rule for "+t,**k)

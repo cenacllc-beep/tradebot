@@ -8,7 +8,7 @@ Also shows the shadow tests from shadow.py (research only, never part of the gat
 past-data test summary from research/results/rain_backtest.json when it exists (read-only).
 Python 3.8+, no dependencies.
 (Rebuilt 2026-10-13 after the original project folder was lost; same read-only contract and same gate rules.)"""
-import sqlite3, os, sys, html, webbrowser, json
+import sqlite3, os, sys, html, webbrowser, json, glob
 from datetime import datetime, date, timedelta, timezone
 from pathlib import Path
 try: import config as C
@@ -83,7 +83,9 @@ def when(dt): return "%s, %s"%(dstr(dt),tstr(dt))
 def loc(ts): return datetime.fromtimestamp(ts,BOT_TZ)        # bot time (UTC-4); before 2026-10-23, this PC's zone
 def dstart(d): return datetime(d.year,d.month,d.day,DAY_START_UTC,tzinfo=timezone.utc)
 def days_list(ds): return ", ".join(dstr(d) for d in ds)
-def city(t): return t.split("-")[-1] if t.startswith("KXRAIN") else t.split("-")[0].replace("KXHIGH","")+" "+t.split("-")[-1]
+def city(t):   # Kalshi's renamed daily-high series put a T before the city (KXHIGHTSEA): shown as SEA
+    s=t.split("-")[0]
+    return t.split("-")[-1] if t.startswith("KXRAIN") else (s[7:] if s.startswith("KXHIGHT") else s.replace("KXHIGH",""))+" "+t.split("-")[-1]
 def won(r): return bool(r.get("side")) and r.get("result")==r.get("side")
 def tip(s): return ' data-tip="%s"'%e(s,quote=True)
 def s_(n,word): return "%d %s%s"%(n,word,"" if n==1 else "s")
@@ -106,9 +108,13 @@ def meter(frac,over=False):
     return '<div class=meter><i class="%s" style="width:%.1f%%"></i></div>'%("over" if over else "",max(0,min(1,frac))*100)
 
 # ---------- sections ----------
-def verdict(rg,bf,bm,rain,passed,mg):
+def verdict(rg,bf,bm,rain,passed,mg,look=None):
     n=len(rg)
     if passed: return "All four gate checks pass on paper. Real money still needs your go-ahead, starting tiny."
+    if final() and not look: return ("The gate's single look is pending: it is taken once every market of the test's days has settled,"
+                                     " by the next report or scan. Until then the rain bot opens no paper trades for new market days.")
+    if look: return ("The gate's single look (%s) did not pass: no edge demonstrated. The rain bot opens no new paper trades,"
+                     " so live.py has nothing to copy."%dstr(datetime.fromtimestamp(look[0]["ts"]).date()))
     if n==0:
         pend=sorted({d for d in (mdate(r["ticker"]) for r in rain if r.get("result") not in ("yes","no")) if d})
         if pend:
@@ -429,7 +435,7 @@ def read_db(db=None):
     db=db or DB
     try:
         c=sqlite3.connect(Path(db).resolve().as_uri()+"?mode=ro",uri=True)
-        D={t:load(c,t) for t in ("obs","trades","shadow_orders","shadow_moves","rules_watch","rules_alerts","v4_obs","v4_paper")}
+        D={t:load(c,t) for t in ("obs","trades","shadow_orders","shadow_moves","rules_watch","rules_alerts","v4_obs","v4_paper","gate_look")}
         AU={t:load(c,t) for t in ("scans","scan_ends","decision_events","market_results")}
         # decisions grow by about 300 rows a scan: the page needs the last few days and every trade's own row
         AU["decisions"]=load(c,"decisions","where ts>=? or trade_ref is not null",(datetime.now().timestamp()-4*86400,)) if AU["scans"] else []
@@ -451,8 +457,13 @@ def read_research():
             notes.append((f,os.path.getmtime(p),txt))
         except OSError: pass
     try:
-        with open(os.path.join("research","data","lip","samples.jsonl"),encoding="utf-8") as fh: lip_n=sum(1 for _ in fh)
-    except OSError: pass
+        with open(os.path.join("research","data","lip","MOVED.txt"),encoding="utf-8") as fh:   # sampling moved to GitHub (2026-10-28)
+            lip_n=(fh.read().strip().splitlines() or ["sampled elsewhere"])[0]
+    except OSError:
+        for f in sorted(glob.glob(os.path.join("research","data","lip","samples*.jsonl"))):   # samples.jsonl and the daily files (2026-10-28)
+            try:
+                with open(f,encoding="utf-8") as fh: lip_n=(lip_n or 0)+sum(1 for _ in fh)
+            except OSError: pass
     return sr,notes,lip_n
 def last_scan_line(obs,tr):
     last=max([r["ts"] or 0 for r in obs] or [0])
@@ -543,6 +554,8 @@ def build_page(D,live=False):
     today=sum(r["pnl"] or 0 for r in st if (r.get("settled_ts") or 0)>=now.timestamp()-86400); kill=killed()   # core.killed: KILL, KILL.txt, any case, in this folder
     mg=margin(rg); stopped=today<=-BANK*DLL+1e-9   # the same daily stop as strategy.scan
     passed=final() and len(rg)>=100 and bf is not None and bf<bm and clear(mg) and len(sg)>=50 and pnl>0   # single look on the stop date
+    look=[r for r in D.get("gate_look") or [] if r.get("stop_date")==str(STOP)]
+    if final(): passed=bool(look[0]["passed"]) if look else False   # judged once (2026-10-28): only the look stored by strategy.py decides
     left=(STOP-date.today()).days
     gate,npass=gate_chips(rg,bf,bm,sg,pnl,left,mg)
     nd,todo=plan(obs)
@@ -586,7 +599,7 @@ def build_page(D,live=False):
       '<details><summary>Data by estimator version</summary>%s</details></section>'
       '<p class=fine><b>Read with caution.</b> Early samples are noise. Cities share weather systems, so the effective sample is far smaller than the market count. Paper results ignore slippage and use approximate fees. The shadow tests are research only and never count toward the gate. Not financial advice. Data before Oct 13, 2026 was lost when the project folder was deleted; the test restarted that day.</p>'
       '</div><div id=tip role=tooltip></div>')%(
-      chips,when(datetime.now(BOT_TZ))+" (UTC-4)",acct,verdict(rg,bf,bm,rain,passed,mg),e(GV),npass,gate,calendar(rain,nd),
+      chips,when(datetime.now(BOT_TZ))+" (UTC-4)",acct,verdict(rg,bf,bm,rain,passed,mg,look),e(GV),npass,gate,calendar(rain,nd),
       todo_html,lastline,money,backtest_panel(v4p),results(st),
       dsub,dumbbell(lrows),why,chart_table,
       e(GV),brier_view(bf,bm,len(rg),mg),shadow_view(so,sm,tr,v4,obs),ctl,

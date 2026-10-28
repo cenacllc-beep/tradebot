@@ -78,24 +78,24 @@ def fake(path,params=None,**k):
         return dict(trades=[tr("no",0.44,1,ts)] if k%3==0 else ([tr("yes",0.48,1,ts)] if k%3==1 else []),cursor="")
     raise AssertionError(path)
 P.http=fake
-P.sample(now=P.START-60); assert not os.path.exists(os.path.join(P.DATA,"samples.jsonl"))   # before the window: nothing
-P.sample(now=T0); ss=P.lines(os.path.join(P.DATA,"samples.jsonl"))
+P.sample(now=P.START-60); assert not P.rows_of("samples")   # before the window: nothing
+P.sample(now=T0); ss=P.rows_of("samples")
 H=json.load(open(os.path.join(P.DATA,"hours.json")))[str(int(T0//3600))]
 assert len(ss)==40 and H["universe"]==58 and H["skipped"]=={"not active":1,"closes within 2 hours":1,"settles after the score date":1,"fee type not quadratic":1}, H   # BTC and volume programs never listed
 assert all(s["ticker"].startswith("KXRAIN") for s in ss) and calls["books"]==40
 want=sorted(random.Random(int(T0//3600)).sample(sorted(t for t in MK if t.startswith("KXRAIN") and t not in ("KXRAIN-26OCT20-C59","KXRAIN-26OCT20-C58","KXRAIN-26NOV30-C1")),40))
 assert [s["ticker"] for s in ss]==want   # the hour seeds the draw
-P.sample(now=T0+600); assert len(P.lines(os.path.join(P.DATA,"samples.jsonl")))==40 and calls["programs"]==2   # same hour: not again; programs cached
-assert not os.path.exists(os.path.join(P.DATA,"fills.jsonl"))   # the hour is not over yet
+P.sample(now=T0+600); assert len(P.rows_of("samples"))==40 and calls["programs"]==2   # same hour: not again; programs cached
+assert not P.rows_of("fills")   # the hour is not over yet
 real_fake=fake
 def fake_c(path,params=None,**k):   # candles fail for one market: its fills are still recorded
     if path.endswith("/candlesticks") and "C0/" in path: raise RuntimeError("HTTP 500 (test)")
     return real_fake(path,params,**k)
 P.http=fake_c
-P.sample(now=T0+3700); assert not os.path.exists(os.path.join(P.DATA,"fills.jsonl"))   # 7 more minutes for the 5-minute check
-P.sample(now=T0+4100); fl=P.lines(os.path.join(P.DATA,"fills.jsonl"))
-assert len(fl)==40 and len(P.lines(os.path.join(P.DATA,"samples.jsonl")))==80, len(fl)
-P.sample(now=T0+4200); assert len(P.lines(os.path.join(P.DATA,"fills.jsonl")))==40   # each hour checked once
+P.sample(now=T0+3700); assert not P.rows_of("fills")   # 7 more minutes for the 5-minute check
+P.sample(now=T0+4100); fl=P.rows_of("fills")
+assert len(fl)==40 and len(P.rows_of("samples"))==80, len(fl)
+P.sample(now=T0+4200); assert len(P.rows_of("fills"))==40   # each hour checked once
 P.http=real_fake
 c0=[r for r in fl if r["ticker"]=="KXRAIN-26OCT20-C0"]
 if c0: assert c0[0]["candles_failed"] and c0[0]["fill_10"]=={"yes":10,"no":0} and c0[0]["adverse_10"]["yes"]=={"60":None,"300":None}, c0
@@ -111,7 +111,7 @@ assert r2["reward_10"]==[s for s in ss if s["ticker"]==r2["ticker"]][0]["quote"]
 # settle: results when markets close; score once, not early
 for t in MK: MK[t].update(result="yes" if int(t[-1]) % 2 else "no") if t.startswith("KXRAIN") else None
 P.settle(now=T0+6*86400); res=json.load(open(os.path.join(P.DATA,"results.json")))
-assert len(res)==len({s["ticker"] for s in P.lines(os.path.join(P.DATA,"samples.jsonl"))}) and calls["single"]==len(HIDE & set(res)), (len(res),calls)
+assert len(res)==len({s["ticker"] for s in P.rows_of("samples")}) and calls["single"]==len(HIDE & set(res)), (len(res),calls)
 try: P.score(now=T0); raise SystemExit("scored early")
 except SystemExit as e: assert "2026-11-25" in str(e), e
 P.score(now=P.SCORE_FROM+1); R=json.load(open(os.path.join(P.OUT,"plan5_L.json")))

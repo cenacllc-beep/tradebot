@@ -49,6 +49,7 @@ REASONS={
  "EXCHANGE_STATE_UNSAFE":"The market or exchange state is not normal (closed, halted, settled).",
  "LIMIT_PRICE_INVALID":"The limit price would be outside 1-99 cents.",
  "AUDIT_UNAVAILABLE":"The audit ledger could not be written, so no trade was opened (fail closed).",
+ "GATE_NOT_PASSED":"A market day from the stop date (2026-11-11) on: v3 rain trades it only after the gate's single look has passed (pre-committed 2026-10-28).",
 }
 TABLES={
  "audit_meta":"create table audit_meta(key text primary key,value text)",

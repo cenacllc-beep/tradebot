@@ -6,13 +6,14 @@ def _p(m,k):
     if v is not None: return float(v)
     v=m.get(k); return None if v is None else float(v)/100
 def markets(limit=1000,pages=6,series=None):
-    """Open markets closing within MAX_HOURS_TO_CLOSE, asked for by series: KXRAIN plus KXHIGH<city> for the cities the
-    temperature estimator knows (the same markets the estimators can price). Fixed 2026-10-14: this used to read the
+    """Open markets closing within MAX_HOURS_TO_CLOSE, asked for by series: KXRAIN plus the daily-high series of the cities
+    the temperature estimator knows (the same markets the estimators can price). Fixed 2026-10-14: this used to read the
     first 6,000 of ALL open markets, which are now mostly multivariate combos (40,000+), so it could return no weather
-    markets at all."""
+    markets at all. Fixed 2026-10-28: Kalshi renamed most daily-high series (KXHIGHNY, KXHIGHT<city>), so the names now
+    come from weather.TEMP_SERIES instead of "KXHIGH"+city (temperature is logged, not traded)."""
     if series is None:
         import weather
-        series=["KXRAIN"]+["KXHIGH"+c for c in weather.CITY]
+        series=["KXRAIN"]+list(weather.TEMP_SERIES.values())
     out=[]
     for s in series:
         cur=None

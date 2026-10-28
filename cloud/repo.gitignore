@@ -1,0 +1,19 @@
+# The PC's own data never goes into this repository (paper trading only; the Kalshi key never leaves the PC).
+# This file is the repository's .gitignore (kept here as cloud/repo.gitignore so the PC's copy documents it).
+/paper.db
+/live.db
+/backups/
+/logs/
+# research data stays on the PC, except PLAN5 L's samples: GitHub Actions collects them here since 2026-10-28 (public
+# Kalshi market data only). The PC's "moved" marker never goes in: it would stop the hourly job.
+/research/data/*
+!/research/data/lip/
+/research/data/lip/MOVED.txt
+/dashboard.html
+/marks.jsonl
+__pycache__/
+*.pyc
+*.pem
+*.key
+.kalshi/
+/research/results/freshness.*

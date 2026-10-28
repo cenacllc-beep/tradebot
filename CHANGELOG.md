@@ -819,3 +819,59 @@ Full analysis: docs/INCIDENT_2026-10-23.md. Nothing that trades was changed: run
 - **11:45: the user made the repository public** (Actions are free there). A test run by hand at 11:45 went through every step: checkout, Python 3.12, requests, the scan step and the save step. Outside the 8:50 PM-1 AM window it did not scan, as designed, so nothing was committed.
 - **First real runs:** the settle at 2:40 PM today does nothing yet (no trial database). The first scan is tonight at 8:55 PM La Paz (00:55 UTC). GitHub can start scheduled runs late; the scan still runs if it starts before 1 AM.
 - The repository holds no keys and no account email, but its notes (CLAUDE.md, CHANGELOG.md) are now readable by anyone.
+
+## 2026-10-28 afternoon (local) - r62: the recommendations (user: "intelligently implement all your recommendations")
+- **Stop date single look (strategy.py; pre-committed before the verdict, CLAUDE.md section 11):**
+  - The gate is judged once, on the test's own 28 market days only: at the first report or scan on or after Nov 11 when every v3 rain market and trade of those days has its result. A market that never settles (for example a voided one) keeps the look pending, so v3 stays closed. A cutoff after which such markets are left out (strategy.LOOK_DEADLINE) is the user's decision and is not set. The look is stored in paper.db (new table gate_look, one row, created only then, after a backup) and never recomputed.
+  - v3 rain paper-trades market days from Nov 11 on only after a stored look that passed. Otherwise the market is logged and the decision ledger records GATE_NOT_PASSED (new reason). Pending look, failed look or an error: no trade (fail closed). The Nov 10 evening scan therefore opens no trades for Nov 11 markets, which lie outside the test's 28 days.
+  - The limit-order ledger (shadow.py) follows the same rule. live.py copies only new paper trades, so after a failed look it has nothing to copy. Its own locks, the $25 cap and the typed unlock are unchanged.
+  - Before Nov 11, report() states the interim numbers with the same formula as before (gate_ok(gate_inputs), checked against the old code on 300 random cases). From Nov 11 its verdict is the look's only: "not judged yet" while the look is pending. It prints a "GATE LOOK" line, which live.py status and unlock show. The dashboard and the control center show the stored look (or "pending").
+  - Unchanged: the gate's thresholds, the clear-margin rule, v3, the limits and the kill switch.
+- **Temperature series (logged, not traded):** Kalshi renamed 10 of the 14 daily-high series the scan asked for (KXHIGHNY, KXHIGHT<city>). weather.TEMP_SERIES now names the current ones, and kalshi.markets() asks for them. The estimator and the rules watch map each series to its city. NYC, PHX, SEA, BOS, HOU and MIN are logged again (about 12 more temperature markets a day). STL, MKE, PVD and IND have no daily-high series now.
+- **PLAN5 L sampling moved to GitHub Actions:**
+  - Storage (logistics; the rows are unchanged): new rows of samples, fills and sample_log go to one file per UTC day (samples-YYYYMMDD.jsonl). Every reader takes the original file first, then the daily ones in order. The hourly commit therefore rewrites a small file, not one that would reach about 40 MB by Nov 20 (63 KB a sampled hour, measured on the PC).
+  - cloud/workflows/plan5-lip.yml samples at :20 every hour, settles, and scores once from Nov 25, in the repository. It uses its own concurrency group.
+  - Same code and rules (research/PLAN5.md logistics note). The PC's samples were copied into the repository at the cutover.
+  - The PC's research\data\lip\MOVED.txt stops research\lip.py there (no sample, settle or score), and run.bat's hourly job no longer runs it. freshness.py and the dashboard show "moved" instead of stale.
+  - cloud/repo.gitignore (the repository's .gitignore) lets research/data/lip/ in (public Kalshi market data) but never MOVED.txt.
+  - The scan and settle workflows now replay their commit and retry the push on a race. This was tested on a shallow clone.
+- **Detroit and West Palm Beach:** NWS station coordinates (KDTW 42.2314,-83.3308; KDJT 26.6851,-80.0992), read on GitHub's runner from api.weather.gov on Oct 28. Both fall in the same NWS grid cells as the earlier values, so the forecasts are the same.
+- **Re-check of the fixes (same reviewer): no MUST or SHOULD left.** NOTES:
+  - The deadline needed the user's OK, so it was left unset (above).
+  - report() reads the date once, so a run crossing midnight on Nov 11 cannot fail.
+  - The dashboard counts the daily sample files.
+  - Left as they are:
+    - A cutoff, if set, would not tell a voided market from settles that failed for a week.
+    - live.py's read-only status can show a look worked out but not yet stored. It is the same 28 days, so it matches the one that will be stored.
+- **Tests:**
+  - New: tests/test_gatelook.py and tests/test_moves.py.
+  - test_schedule now checks run.bat's CRLF line endings.
+  - test_shadow, test_audit, test_veto and test_fix no longer depend on the real date being before Nov 11.
+  - The full suite passes, 36 of 36. A copy with the stop date moved into the past fails only where tests assert the stop date itself.
+- **Independent review (agents/code-reviewer.md, fresh agent): 2 MUST, 5 SHOULD, 10 NOTES.**
+  - **MUST (both fixed):**
+    - M1: the stored look counted every resolved market and settled trade. A look delayed by a failed settle would have included days from Nov 11 on. The look now counts only market days before Nov 11, so it is the same whenever it is taken. It records the first and last day, and a test proves it.
+    - M2: an edit had turned run.bat's line endings into LF. cmd's goto label search is unreliable without CRLF. Restored, and test_schedule now checks it.
+  - **SHOULD:**
+    - S1 (fixed): while the look was pending, report(), live.py unlock and the dashboard could show "passed" from the current numbers. From Nov 11 they now show only the look's verdict, or "not judged yet".
+    - S2 (left to the user): a test-day market that never settles keeps the look pending forever, so v3 stays closed (fail closed) and report says "not judged yet". A cutoff, for example Nov 18, after which such markets are left out and listed, is coded but unset (LOOK_DEADLINE=None). The reviewer's re-check advised the user's explicit OK before adding a new gate detail, so the user is asked.
+    - S3 (fixed): three older tests (and one check in test_fix) would have failed after Nov 11 because of the real date.
+    - S4 (fixed): see the daily files above.
+    - S5 (followed in the deploy order): the repository's .gitignore goes in with the workflow; the repository's lip.py, tbcommon and fees.py match this release; on the PC, r62 goes in before MOVED.txt.
+  - **NOTES:**
+    - Fixed:
+      - paper.db is backed up before the new table, and never for a read-only look.
+      - A failed store rolls back.
+      - "Stored by the next report or scan" wording.
+      - Labels after the stop date ("every market day so far").
+      - The extension path is noted.
+      - Open test-day trades keep the look pending.
+      - SEA rather than TSEA in the dashboard and learn.py.
+      - A failed fetch in the push retry is retried.
+      - run.bat's stale comment.
+    - Left as they are:
+      - The dashboard's gate chips keep showing the numbers for every market day after the look. The verdict line shows the look.
+      - TEMP_STATION does not list the 6 re-added cities: the rules watch records their stations but cannot flag a change.
+      - If the score's commit fails all 6 pushes, the next hour scores again from the same data.
+      - After it scores, the workflow keeps starting hourly and stops at once. A follow-up on Nov 25 checks the score and turns it off.
+      - Hours the PC sampled between the copy and GitHub's first run stay only on the PC.

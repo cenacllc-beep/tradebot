@@ -1,4 +1,4 @@
-import time, json
+import time, json, sqlite3, os, sys, subprocess
 from datetime import date, datetime, timedelta, timezone
 from config import *
 import core, kalshi, weather, nws
@@ -60,6 +60,7 @@ def _ctx_fields(m,t,raw,bid,ask):
                 day_start_ts=(close-timedelta(hours=24)).timestamp() if close else None,bid=bid,ask=ask,p_model=raw,station=st,inputs=inputs)
 def scan(c):
     if core.killed(): return print("KILL file present: halted")
+    after=_after_stop_allowed(c)   # the stop date's single look (pre-committed 2026-10-28); stores it once it can be taken
     ready=audit.ensure(c) if audit else False
     if not ready: print("TRADES BLOCKED: the audit ledger is unavailable. Markets are logged as before, but no paper trade can open without its decision record")
     sid=None
@@ -110,6 +111,7 @@ def scan(c):
         if not t.startswith("KXRAIN"): R.abstain(m,"STRATEGY_DISABLED",**ctx); continue   # temperature: logged, not traded (user decision 2026-10-14, research/PLAN2.md result)
         if q-price<MIN_EDGE: R.abstain(m,"INSUFFICIENT_EDGE",**ctx); continue
         if abs(raw-mid)>VETO_MAX_GAP+1e-9: R.abstain(m,"ANOMALOUS_MODEL_MARKET_GAP",**ctx); continue   # veto since 2026-10-28 (user)
+        if not after and not before_stop(t): R.abstain(m,"GATE_NOT_PASSED",**ctx); continue   # market days from the stop date on need a passed look
         n=int(core.kelly_stake(q,price,cash)//price)
         if n<1: R.abstain(m,"SIZE_BELOW_ONE",**ctx); continue
         f=core.fee(price,n); cost=n*price
@@ -222,7 +224,114 @@ def tcrit(days):
     """Student-t 97.5% critical value for the day means (df = days - 1), never below the old 2.0 (2026-10-14, user approved)."""
     return max(2.0,T975.get(days-1,2.0))
 def clear(mg): return mg is not None and mg[0]<0 and -mg[0]>=tcrit(mg[2])*mg[1]
-def final(): return date.today()>=STOP_DATE   # the gate is judged once, on the stop date (2026-10-14, user approved)
+def final(today=None): return (today or date.today())>=STOP_DATE   # the gate is judged once, on the stop date (2026-10-14, user approved)
+def gate_inputs(c,until=None):
+    """The numbers the gate is judged on, from the same rows report() prints: resolved v3 rain markets with their Brier
+    scores and clear-margin statistic, and settled v3 rain trades with their net P&L. With until (a date), only market
+    days before it count: the single look uses until=STOP_DATE, so it judges the test's own 28 days whenever it is taken."""
+    o=c.execute("select ticker,fc,mid,result from obs where result is not null and version='v3' and market_type='rain'").fetchall()
+    tr=c.execute("select pnl,ticker from trades where status='settled' and version='v3' and ticker like 'KXRAIN%'").fetchall()
+    if until is not None:
+        o=[x for x in o if _day_before(x[0],until)]; tr=[x for x in tr if _day_before(x[1],until)]
+    b=[x[1:] for x in o]
+    return dict(markets=len(o),brier_fc=_brier(b,0) if b else None,brier_mkt=_brier(b,1) if b else None,
+                trades=len(tr),pnl=sum(r[0] for r in tr),margin=margin(o))
+def gate_ok(g,today=None):
+    """The gate (CLAUDE.md section 5): on or after the stop date, at least 100 resolved v3 rain markets, forecast Brier
+    below market Brier by a clear margin, at least 50 settled v3 rain trades and net P&L above zero."""
+    return bool(final(today) and g["trades"]>=50 and g["pnl"]>0 and g["brier_fc"] is not None and g["brier_fc"]<g["brier_mkt"]
+                and clear(g["margin"]) and g["markets"]>=100)
+# The stop date's single look (pre-committed by the user on 2026-10-28, before the verdict; CLAUDE.md section 11):
+# - the gate is judged once, on the test's own market days (before STOP_DATE) only: at the first report or scan on or
+#   after STOP_DATE when every v3 rain market and trade of those days has its result. That look is stored in paper.db
+#   (table gate_look, one row, after a backup) and is never recomputed;
+# - v3 rain opens paper trades for market days from STOP_DATE on only after a look that passed. So after a failed look
+#   it opens none (markets are still logged), the limit-order ledger, which mirrors the bot, places none, and live.py,
+#   which copies only new paper trades, has nothing to copy. While the look is pending, none either (fail closed);
+# - this only adds a stop: live.py's locks, the $25 cap and the user's typed unlock are unchanged.
+GATE_LOOK_TABLE="create table if not exists gate_look(stop_date text primary key,ts real not null,passed integer not null,detail text not null)"
+def market_day(t):
+    try: return datetime.strptime(t.split("-")[1],"%y%b%d").date()
+    except (AttributeError,IndexError,ValueError): return None
+def _day_before(t,until):
+    d=market_day(t); return d is not None and d<until
+def before_stop(t):
+    """True for a market of the test's own days (before STOP_DATE). An unreadable day counts as after (fail closed)."""
+    return _day_before(t,STOP_DATE)
+# No cutoff (2026-10-28): a test-day market that never gets a yes/no result (for example a voided one) keeps the look
+# pending, so v3 stays closed to new market days (fail closed). A cutoff date after which such markets are left out and
+# listed is the user's decision (asked 2026-10-28); set LOOK_DEADLINE to that date only on the user's explicit word.
+LOOK_DEADLINE=None
+def _writable(c):
+    """True when c can write (live.py status opens paper.db read-only). Probes with a rolled-back savepoint."""
+    try:
+        c.execute("savepoint gate_probe")
+        try: c.execute("create table if not exists gate_probe(x)"); return True
+        finally: c.execute("rollback to gate_probe"); c.execute("release gate_probe")
+    except sqlite3.Error: return False
+def _backup_first():
+    """paper.db is backed up before its first new table, as for the audit and shadow tables (CLAUDE.md section 3)."""
+    here=os.path.dirname(os.path.abspath(__file__))
+    for k in range(2):   # backup names have one-second resolution and are never overwritten: a clash is retried once
+        if subprocess.run([sys.executable,os.path.join(here,"backup.py"),"pregatelook"]).returncode in (0,3): return True
+        time.sleep(1.2)
+    return False
+def _pending(c,today=None):
+    """v3 rain markets of the test's days still without a result, and open v3 rain trades on those days (tickers)."""
+    o=[t for (t,) in c.execute("select ticker from obs where result is null and version='v3' and market_type='rain'")]
+    tr=[t for (t,) in c.execute("select ticker from trades where status='open' and version='v3' and ticker like 'KXRAIN%'")]
+    return sorted({t for t in o+tr if market_day(t) is None or market_day(t)<STOP_DATE})   # an unreadable day waits too (fail closed)
+def gate_look(c,today=None,record=True):
+    """None before the stop date. After it, a dict: passed True or False with the numbers it was judged on (recorded=True
+    once stored), or passed None with pending=N while N v3 rain markets of the test's days have no result yet."""
+    if not final(today): return None
+    try: row=c.execute("select ts,passed,detail from gate_look where stop_date=?",(str(STOP_DATE),)).fetchone()
+    except sqlite3.OperationalError: row=None   # no table yet: no look stored
+    if row:
+        d=json.loads(row[2]); d.update(passed=bool(row[1]),ts=row[0],recorded=True); return d
+    pend=_pending(c)
+    if pend and (LOOK_DEADLINE is None or (today or date.today())<LOOK_DEADLINE): return dict(passed=None,pending=len(pend),recorded=False)
+    g=gate_inputs(c,until=STOP_DATE); ok=gate_ok(g,today)
+    days=sorted({market_day(t) for (t,) in c.execute("select ticker from obs where result is not null and version='v3' and market_type='rain'")
+                 if _day_before(t,STOP_DATE)})
+    d=dict(g,margin=list(g["margin"]) if g["margin"] else None,first_day=str(days[0]) if days else None,last_day=str(days[-1]) if days else None,
+           unresolved=pend)
+    if record and _writable(c):   # never on live.py's read-only connection: worked out, not stored
+        try:
+            if not c.execute("select 1 from sqlite_master where type='table' and name='gate_look'").fetchone() and not _backup_first():
+                raise sqlite3.OperationalError("the backup before the new table failed")
+            c.execute(GATE_LOOK_TABLE)
+            c.execute("insert or ignore into gate_look(stop_date,ts,passed,detail) values(?,?,?,?)",(str(STOP_DATE),time.time(),int(ok),json.dumps(d)))
+            c.commit()
+            return gate_look(c,today,record=False)   # the stored row decides, even if another run stored it first
+        except sqlite3.Error as ex:
+            print("GATE LOOK not stored (%s); the next report or scan tries again"%ex)
+            try: c.rollback()
+            except sqlite3.Error: pass
+    d.update(passed=ok,ts=time.time(),recorded=False); return d
+def _after_stop_allowed(c,today=None,record=True):
+    """May v3 rain trade a market day on or after STOP_DATE? Only after a stored look that passed. Any error: no."""
+    if not final(today): return False
+    try:
+        lk=gate_look(c,today,record)
+        if lk.get("passed") is not True or not lk.get("recorded"): print(look_line(lk))
+        return lk.get("passed") is True and bool(lk.get("recorded"))
+    except Exception as ex:
+        print("GATE LOOK: could not be worked out (%s): no v3 rain paper trades for market days from %s on"%(ex,STOP_DATE)); return False
+def look_line(lk):
+    """One line for report() and live.py status (its filter keeps lines that start with GATE)."""
+    if lk is None:
+        return ("GATE LOOK (pre-committed 2026-10-28): judged once from %s. Only a look that passes lets v3 rain paper-trade market days from %s on;"
+                " if it does not pass, no edge was demonstrated and live.py gets nothing to copy."%(STOP_DATE,STOP_DATE))
+    if lk.get("error"): return "GATE LOOK: could not be worked out (%s): v3 rain opens no paper trades for market days from %s on"%(lk["error"],STOP_DATE)
+    if lk.get("passed") is None:
+        return ("GATE LOOK: waiting for %d v3 rain markets or trades of the test's days to settle%s; until then v3 rain opens"
+                " no paper trades for market days from %s on"%(lk.get("pending",0),(" (at most until %s)"%LOOK_DEADLINE) if LOOK_DEADLINE else "",STOP_DATE))
+    when=time.strftime("%Y-%m-%d %H:%M",time.localtime(lk["ts"]))
+    head="GATE LOOK (single look, stored %s): "%when if lk.get("recorded") else "GATE LOOK (worked out now, stored by the next report or scan): "
+    if lk["passed"]: return head+"passed on paper. v3 rain keeps paper trading; real money still needs your own typed unlock, starting tiny."
+    return head+("not passed: no edge demonstrated. v3 rain opens no new paper trades (markets are still logged), so live.py has nothing to copy."
+                 " Changing that needs your explicit decision.")
 def report(c):
     try:
         import registry; registry.log_states(c); c.commit()   # append-only history of each strategy's lifecycle state
@@ -247,11 +356,19 @@ def report(c):
     if not n3: print("TRADES v3 rain: none settled yet [GATE]")
     mg=margin(c.execute("select ticker,fc,mid,result from obs where result is not null and version='v3' and market_type='rain'").fetchall())
     nd=len({t.split("-")[1] for (t,) in c.execute("select ticker from obs where result is not null and version='v3' and market_type='rain'")})
-    when="final look" if final() else f"interim, not acted on; judged once on {STOP_DATE}"
+    when="every market day so far; the gate is the single look below" if final() else f"interim, not acted on; judged once on {STOP_DATE}"
     if mg is None: print(f"CLEAR MARGIN (gate): needs 5+ resolved market days ({nd} so far); judged once on {STOP_DATE}")
     else: print(f"CLEAR MARGIN (gate, {when}): forecast minus market Brier {mg[0]:+.4f} per market day, needs a lead of {tcrit(mg[2]):.2f} SE over {mg[2]} days = {tcrit(mg[2])*mg[1]:.4f}: "+("clear" if clear(mg) else "not clear"))
-    ok=final() and n3>=50 and pnl3>0 and bf is not None and bf<bm and clear(mg) and no>=100
-    print("GATE (v3 rain only):",("passed (paper only)" if ok else "not passed") if final() else f"judged once on {STOP_DATE} (single look); the numbers above are interim")
+    ok=gate_ok(gate_inputs(c))   # the same rule as before: final() and n3>=50 and pnl3>0 and bf<bm and clear(mg) and no>=100
+    lk=None; fin=final()   # read once: a run that crosses midnight on the stop date stays on one side of it
+    if fin:   # judged once (2026-10-28): from the stop date the verdict is the single look's, never today's numbers
+        try: lk=gate_look(c)
+        except Exception as ex: lk=dict(passed=None,error=str(ex)[:200])
+        ok=lk.get("passed") is True
+        verdict="passed (paper only)" if ok else ("not passed" if lk.get("passed") is False else "not judged yet (the single look is pending)")
+    print("GATE (v3 rain only):",verdict if fin else f"judged once on {STOP_DATE} (single look); the numbers above are interim")
+    print(look_line(lk))
     left=(STOP_DATE-date.today()).days
     print(f"STOP DATE: {STOP_DATE} ({left} days left). If not clearly passed by then: no edge demonstrated, no live trading.")
-    if no>=100 and clear(mg) and n3<50: print("NOTE: Brier looks good but <50 settled v3 trades: no live money; the user decides on an extension.")
+    if no>=100 and clear(mg) and n3<50: print("NOTE: Brier looks good but <50 settled v3 trades: no live money; the user decides on an extension"
+                                               " (after a failed look v3 opens no paper trades, so an extension needs the user's explicit rule change).")

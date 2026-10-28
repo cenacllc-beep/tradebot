@@ -8,8 +8,14 @@ CITY={"NYC":(40.78,-73.97),"CHI":(41.79,-87.75),"PHX":(33.43,-112.01),"SEA":(47.
 "LAX":(33.94,-118.41),"DEN":(39.86,-104.67),"STL":(38.75,-90.37),"MIA":(25.79,-80.29),"HOU":(29.65,-95.28),
 "MKE":(42.95,-87.90),"PVD":(41.72,-71.43),"IND":(39.72,-86.29),"MIN":(44.88,-93.22)}
 TEMP_STATION={"CHI":"CLIMDW","DEN":"CLIDEN","LAX":"CLILAX","MIA":"CLIMIA"}   # from KXHIGH rules_primary, audited 2026-10-13
+# Kalshi's daily-high series for the cities above (checked 2026-10-28 against the PC's market catalogue). Kalshi renamed
+# most of them (KXHIGHNY, KXHIGHT<city>), so asking for "KXHIGH"+city found only CHI, DEN, LAX and MIA after that.
+# STL, MKE, PVD and IND have no daily-high series now. Logging only: temperature is not traded (2026-10-14).
+TEMP_SERIES={"NYC":"KXHIGHNY","CHI":"KXHIGHCHI","PHX":"KXHIGHTPHX","SEA":"KXHIGHTSEA","BOS":"KXHIGHTBOS",
+ "LAX":"KXHIGHLAX","DEN":"KXHIGHDEN","MIA":"KXHIGHMIA","HOU":"KXHIGHTHOU","MIN":"KXHIGHTMIN"}
+SERIES_CITY={v:k for k,v in TEMP_SERIES.items()}
 # Rain (v3): key = KXRAIN ticker suffix -> (station named in the market's rules_primary, lat, lon from NWS station metadata;
-# DTW and WPB, added 2026-10-28, from the Iowa Environmental Mesonet's station records)
+# DTW and WPB, added 2026-10-28, checked the same day against api.weather.gov's KDTW and KDJT station records)
 RAIN={"ABQ":("CLIABQ",35.0417,-106.6147),
  "ATL":("CLIATL",33.6403,-84.4269),
  "AUS":("CLIAUS",30.183,-97.6799),
@@ -20,7 +26,7 @@ RAIN={"ABQ":("CLIABQ",35.0417,-106.6147),
  "DAL":("CLIDFW",32.8974,-97.022),
  "DC":("CLIDCA",38.8483,-77.0342),
  "DEN":("CLIDEN",39.8466,-104.6562),
- "DTW":("CLIDTW",42.23,-83.33),   # added 2026-10-28 (user): Detroit Metro; IEM station DTW (api.weather.gov blocked from Claude's tools)
+ "DTW":("CLIDTW",42.2314,-83.3308),   # added 2026-10-28 (user): Detroit Metro, NWS station KDTW
  "EWR":("CLIEWR",40.6825,-74.1694),
  "HOU":("CLIHOU",29.6375,-95.2825),
  "IND":("CLIIND",39.7252,-86.2816),
@@ -44,7 +50,7 @@ RAIN={"ABQ":("CLIABQ",35.0417,-106.6147),
  "STL":("CLISTL",38.7525,-90.3736),
  "TPA":("CLITPA",27.9614,-82.5403),
  "TTN":("CLITTN",40.2764,-74.8164),
- "WPB":("CLIDJT",26.6847,-80.0994)}   # added 2026-10-28 (user): West Palm Beach, the airport re-coded PBI -> DJT in July 2026; IEM station DJT
+ "WPB":("CLIDJT",26.6851,-80.0992)}   # added 2026-10-28 (user): West Palm Beach, the airport re-coded PBI -> DJT in July 2026; NWS station KDJT
 _c={}
 def _daily(city):
     if city not in _c or time.time()-_c[city][0]>1800:
@@ -86,7 +92,7 @@ def estimator(m):
     except ValueError: return None
     rain=p[0]=="KXRAIN"; high=p[0].startswith("KXHIGH")
     if rain: return _rain_v3(m,p[2]) if p[2] in RAIN else None
-    city=p[0][6:]
+    city=SERIES_CITY.get(p[0],p[0][6:])   # KXHIGHTSEA -> SEA; older names (KXHIGHCHI) still read as before
     if not high or city not in CITY: return None
     d=_daily(city)
     if date not in d["time"]: return None

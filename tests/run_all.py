@@ -34,6 +34,8 @@ TESTS=[("test_fix.py",[],"daily loss stop, migration, clear margin, single-look 
        ("test_schedule.py",[],"scheduled runs: evening scan window, job lock, battery and missed-run settings in the installer"),
        ("test_settle.py",[],"settle survives network errors: one unreachable market never loses the others' results"),
        ("test_veto.py",[],"no rain trade when forecast and market are 30+ points apart; Detroit and West Palm Beach priced"),
+       ("test_gatelook.py",[],"stop date: the gate judged once and stored; no v3 paper trades after a failed look"),
+       ("test_moves.py",[],"renamed temperature series; PLAN5 L sampling moved to GitHub, the PC's copy stops"),
        ("test_learn.py",[],"learning report: pattern screen, read-only"),
        ("test_markets.py",[],"Kalshi vs Polymarket research: retries, fees, prices"),
        ("test_ui.py",[],"every dashboard button and tab (needs Playwright)")]

@@ -25,6 +25,7 @@ def read(rel):
     return b.decode("ascii").split("\r\n")
 
 
+read("run.bat")   # cmd's goto/call label search is unreliable in LF-only batch files, and run.bat dispatches every command by goto
 # ---- the three task files: no redirect (jobs.py writes the log a line at a time), one call, its exit code ----
 for job in ("evening", "settle", "hourly"):
     L = read("tasks/%s.cmd" % job)

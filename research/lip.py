@@ -2,11 +2,13 @@
 Follows research/PLAN5.md. Read-only: Kalshi public API GETs only (same domain and User-Agent as kalshi.py); it never
 places, changes or cancels an order and never opens paper.db or live.db. Python 3.8+, needs requests.
   python research/lip.py sample   one hourly sample (2026-10-24 .. 2026-11-20 local): up to 40 markets' order books
-                                  -> data/lip/samples.jsonl; trade lists and candles for earlier samples -> fills
+                                  -> data/lip/samples*.jsonl; trade lists and candles for earlier samples -> fills
   python research/lip.py settle   results of sampled markets that have closed -> data/lip/results.json
   python research/lip.py score    scored once, on or after 2026-11-25 -> results/plan5_L.md and .json
-Each step is safe to rerun: a sample hour is taken once, a failed request is retried on the next run."""
-import os, sys, time, random
+Each step is safe to rerun: a sample hour is taken once, a failed request is retried on the next run.
+Where it runs: on the PC until 2026-10-28, then hourly on GitHub Actions in the repository (.github/workflows/plan5-lip.yml),
+which carries on from the PC's data. The PC's copy holds data/lip/MOVED.txt, so there it neither samples nor scores."""
+import os, sys, time, random, re
 from datetime import datetime, timezone, timedelta
 HERE=os.path.dirname(os.path.abspath(__file__)); ROOT=os.path.dirname(HERE)
 if ROOT not in sys.path: sys.path.insert(0,ROOT)
@@ -26,6 +28,23 @@ SCORE_FROM=datetime(2026,11,25,0,0,tzinfo=LOCAL).timestamp()
 UNITS={"1/10,000 dollar (used)":1e-4,"cent":1e-2,"1/1,000,000 dollar":1e-6}
 
 def http(path,params=None,tries=6): return CLIENT.get(path,params,tries=tries)
+# Storage (logistics, 2026-10-28; the rows are unchanged): the three growing files keep their original name.jsonl, and
+# rows added from now on go to one file per UTC day, name-YYYYMMDD.jsonl, so the hourly commit on GitHub rewrites one
+# small file instead of a file that grows to about 40 MB. Every reader takes the original file, then the daily ones in order.
+def rows_of(name):
+    """All rows of samples, fills or sample_log: name.jsonl first, then the daily name-YYYYMMDD.jsonl files in date order."""
+    try: daily=sorted(f for f in os.listdir(DATA) if re.match(re.escape(name)+r"-\d{8}\.jsonl$",f))
+    except OSError: daily=[]
+    return lines(os.path.join(DATA,name+".jsonl"))+[r for f in daily for r in lines(os.path.join(DATA,f))]
+def add_rows(name,rows,now):
+    """Append rows to today's (UTC) file of samples, fills or sample_log."""
+    append(os.path.join(DATA,"%s-%s.jsonl"%(name,time.strftime("%Y%m%d",time.gmtime(now)))),rows)
+def moved():
+    """The first line of data/lip/MOVED.txt, or None. That file marks a copy whose sampling moved elsewhere (the PC's
+    since 2026-10-28), so this copy neither samples, settles nor scores: nothing is collected twice."""
+    try:
+        with open(os.path.join(DATA,"MOVED.txt"),encoding="utf-8") as fh: return (fh.read().strip().splitlines() or ["moved"])[0]
+    except OSError: return None
 def series_of(t): return (t or "").split("-")[0]
 def weather(t): return series_of(t).startswith(SERIES)
 
@@ -119,8 +138,9 @@ def markets(tickers):
         for m in (http("/markets",dict(tickers=",".join(ts[i:i+50]),limit=1000)).get("markets") or []): out[m.get("ticker")]=m
     return out
 def sample(now=None):
+    mv=moved()
+    if mv: return print("lip sample: not sampled here. "+mv)
     now=now or time.time(); hour=int(now//3600)
-    S=os.path.join(DATA,"samples.jsonl"); L=os.path.join(DATA,"sample_log.jsonl")
     took=load(os.path.join(DATA,"hours.json"),{})
     if START<=now<END and str(hour) not in took:
         progs=[x for x in programs(now) if (rts(x["start_date"]) or 1e18)<=now<(rts(x["end_date"]) or 0)]
@@ -148,8 +168,8 @@ def sample(now=None):
             if qt is None: why[skip]=why.get(skip,0)+1; continue
             rows.append(dict(ts=round(now,1),hour=hour,ticker=t,series=series_of(t),close=rts((ms.get(t) or {}).get("close_time")),
                              program={k:by[t][k] for k in ("start_date","end_date","period_reward","target_size_fp","discount_factor_bps")},book=b,quote=qt))
-        append(S,rows); took[str(hour)]=dict(ts=now,universe=len(uni),sampled=len(rows),skipped=why); save(os.path.join(DATA,"hours.json"),took)
-        append(L,[dict(ts=now,universe=len(uni),sampled=len(rows),skipped=why)])
+        add_rows("samples",rows,now); took[str(hour)]=dict(ts=now,universe=len(uni),sampled=len(rows),skipped=why); save(os.path.join(DATA,"hours.json"),took)
+        add_rows("sample_log",[dict(ts=now,universe=len(uni),sampled=len(rows),skipped=why)],now)
         print("lip sample: %d markets in the universe, %d sampled, skipped %s"%(len(uni),len(rows),why))
     elif not (START<=now<END): print("lip sample: outside the sampling window (2026-10-24 .. 2026-11-20 local); nothing sampled")
     else: print("lip sample: this hour was already sampled")
@@ -194,8 +214,8 @@ def fill_step(now):
     reward prorated to the time before each side filled, and the mid 1 and 5 minutes after each fill. Each sample once;
     a failed trade list is retried on the next run. Candles only feed the adverse-selection check: if they fail, the
     fills are still recorded, with that check left empty. Each record is written as soon as it is worked out."""
-    F=os.path.join(DATA,"fills.jsonl"); have={(r["hour"],r["ticker"]) for r in lines(F)}
-    todo=[s for s in lines(os.path.join(DATA,"samples.jsonl")) if s["ts"]+3600+420<=now and (s["hour"],s["ticker"]) not in have]
+    have={(r["hour"],r["ticker"]) for r in rows_of("fills")}
+    todo=[s for s in rows_of("samples") if s["ts"]+3600+420<=now and (s["hour"],s["ticker"]) not in have]
     n=0
     for s in todo:
         try:
@@ -221,11 +241,13 @@ def fill_step(now):
         elif cs:
             try: rec["candle_check"]=candle_check(cs,{sd:w10[sd] for sd in adv},now)   # descriptive, never scored
             except Exception as ex: print("  candle check skipped",s["ticker"],str(ex)[:120])
-        append(F,[rec]); n+=1
+        add_rows("fills",[rec],now); n+=1
     if n: print("lip fills: %d sample hours checked"%n)
 def settle(now=None):
+    mv=moved()
+    if mv: return print("lip settle: not here. "+mv)
     now=now or time.time(); p=os.path.join(DATA,"results.json"); res=load(p,{})
-    ss=lines(os.path.join(DATA,"samples.jsonl"))
+    ss=rows_of("samples")
     todo=sorted({s["ticker"] for s in ss if s["ticker"] not in res and (s.get("close") or 0)<=now})
     got=markets(todo)
     for t in todo:
@@ -255,6 +277,7 @@ def ratio_se(units):
 def score(now=None):
     now=now or time.time()
     out=os.path.join(OUT,"plan5_L.json")
+    if moved(): sys.exit("This copy of the PLAN5 L data stopped when sampling moved (%s); score it where the data lives."%moved())
     if os.path.exists(out): sys.exit("plan5_L.json exists: PLAN5 scores each test once.")
     if now<SCORE_FROM: sys.exit("Test L is scored on or after 2026-11-25 (PLAN5).")
     try:
@@ -262,7 +285,7 @@ def score(now=None):
     except ImportError: eligible,confirmed=False,None
     try: rewards_apply=bool(eligible and confirmed and datetime.fromisoformat(str(confirmed)).replace(tzinfo=LOCAL).timestamp()<END)
     except ValueError: rewards_apply=False; confirmed="unreadable: %r"%(confirmed,)
-    ss=lines(os.path.join(DATA,"samples.jsonl")); fl={(r["hour"],r["ticker"]):r for r in lines(os.path.join(DATA,"fills.jsonl"))}
+    ss=rows_of("samples"); fl={(r["hour"],r["ticker"]):r for r in rows_of("fills")}
     res=load(os.path.join(DATA,"results.json"),{}); left={"no fill check":0,"market not settled":0,"day with under 12 sampled hours":0}
     hours_by_day={}
     for s in ss: hours_by_day.setdefault(datetime.fromtimestamp(s["ts"],LOCAL).date().isoformat(),set()).add(s["hour"])

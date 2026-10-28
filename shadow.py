@@ -57,6 +57,19 @@ def _state(c):
     lost=c.execute("select coalesce(sum(pnl),0) from shadow_orders where status='settled' and settle_ts>=?",(time.time()-86400,)).fetchone()[0]
     return BANKROLL+pnl-opn,opn,lost      # resting orders reserve cash and count toward the cap, like real ones would
 
+def _after_stop_allowed(c):
+    """The main bot's rule (strategy.py, pre-committed 2026-10-28): market days from the stop date on only after the gate's
+    stored single look passed. Read only here (the main scan, which runs first, stores the look). Any error: no."""
+    try:
+        import strategy
+        return strategy._after_stop_allowed(c,record=False)
+    except Exception as ex:
+        print("shadow maker: the gate look could not be read (%s): no orders for market days from the stop date on"%ex); return False
+def _before_stop(t):
+    try:
+        import strategy
+        return strategy.before_stop(t)
+    except Exception: return False   # fail closed: treated as a market day from the stop date on
 def scan(c):
     if core.killed(): return print("shadow: KILL file present: halted")
     tables(c)
@@ -66,6 +79,7 @@ def scan(c):
     except Exception as ex: print("v4 station forecast skipped (the main bot is not affected): %r"%ex)
     cash,opn,lost=_state(c)
     if lost<=-DAILY_LOSS_LIMIT*BANKROLL: return print("shadow maker: daily loss limit hit, no new orders")
+    after=_after_stop_allowed(c)   # mirrors the main bot: market days from the stop date on only after a passed gate look
     fc={t:p for t,p in c.execute("select ticker,fc from obs where version=? and fc is not null",(VERSION,))}
     done={r[0] for r in c.execute("select ticker from shadow_orders where strategy=?",(STRATEGY,))}
     k=seen=0
@@ -93,6 +107,7 @@ def scan(c):
         side,price,q,imp=max(opts,key=lambda x:x[2]-x[1])
         ctx=dict(market_type="rain",p_model=fc[t],p_fair=fair,p_win=q,price=price,bid=bid,ask=ask,close_ts=w0+86400,day_start_ts=w0,detail=dict(improved=bool(imp),order="limit"))
         if q-price<MIN_EDGE: R.abstain(m,"INSUFFICIENT_EDGE",side=side,**ctx); continue
+        if not after and not _before_stop(t): R.abstain(m,"GATE_NOT_PASSED",side=side,**ctx); continue
         if not 0<price<1: R.abstain(m,"LIMIT_PRICE_INVALID",side=side,**ctx); continue
         n=int(core.kelly_stake(q,price,cash)//price)
         if n<1: R.abstain(m,"SIZE_BELOW_ONE",side=side,**ctx); continue
@@ -129,7 +144,7 @@ def rules_check(c,markets):
         if len(p)<3: continue
         s=p[0]; st=re.search(r"\b(CLI[A-Z]{3})\b",m.get("rules_primary") or ""); st=st.group(1) if st else None
         if s=="KXRAIN": city=p[2]; want=weather.RAIN.get(city,(None,))[0]
-        elif s.startswith("KXHIGH"): city=s[6:]; want=weather.TEMP_STATION.get(city)
+        elif s.startswith("KXHIGH"): city=weather.SERIES_CITY.get(s,s[6:]); want=weather.TEMP_STATION.get(city)
         else: continue
         tm.setdefault((s,"wording:"+(m.get("strike_type") or "")),set()).add(_template(m))
         if st: seen[(s,"station:"+city)]=st

@@ -221,3 +221,13 @@ Guidance for Test S from the same review (Test S is not built yet): build its st
 before reading any price, and fetch Polymarket's price history first, since about 60 days are kept and each day lost
 shortens the test.
 
+
+## Logistics on 2026-10-28 (no rule changed; after Test L samples had begun)
+- **Where Test L is sampled:** from the next hour after the cutover, GitHub Actions in the repository runs `lip.py sample`
+  and `lip.py settle` at :20 every hour (cloud/workflows/plan5-lip.yml), instead of the PC's hourly job. Reason: the
+  laptop missed hours while asleep or offline. The code, window, universe, market choice per hour, fill rule and score
+  are unchanged; the workflow carries on from the PC's files (research/data/lip/ copied into the repository at the
+  cutover), so each hour is still sampled at most once.
+- **The PC's copy** is marked research/data/lip/MOVED.txt: there lip.py neither samples, settles nor scores, so nothing
+  is collected twice and the PC's partial copy is never scored.
+- **The single score** runs in the same workflow, on its first run on or after 2026-11-25, and is committed with the data.

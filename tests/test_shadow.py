@@ -8,6 +8,7 @@ os.environ["PAPER_DB"]=os.path.join(OUT,"paper.db"); os.environ["TRADEBOT_OFFSIT
 sys.path.insert(0,WORK)
 import requests
 import config, core, kalshi, shadow
+import strategy; strategy.STOP_DATE=strategy.date(2099,1,1)   # not a stop-date test (tests/test_gatelook.py is): its markets stay "before the stop date" after Nov 11 too
 NOW=_time.time()
 def iso(ts): return datetime.fromtimestamp(ts,timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 W0=int(NOW//60*60)+4*3600          # day starts in 4 hours
