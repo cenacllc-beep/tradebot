@@ -1,0 +1,37 @@
+# One-off, run by hand: reads NWS station metadata for stations the rain table uses and reports, as annotations,
+# whether a table coordinate lands in the same NWS forecast grid cell as the station itself. Read-only; writes nothing.
+name: station check (read-only)
+on:
+  workflow_dispatch: {}
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Station metadata and grid cells (api.weather.gov, User-Agent tradebot-paper-research/1.0)
+        run: |
+          python3 - <<'PY'
+          import json, urllib.request, time
+          UA = {"User-Agent": "tradebot-paper-research/1.0", "Accept": "application/geo+json"}
+          def get(u):
+              for k in range(3):
+                  try:
+                      return json.load(urllib.request.urlopen(urllib.request.Request(u, headers=UA), timeout=30))
+                  except Exception as ex:
+                      err = ex; time.sleep(3)
+              raise err
+          TABLE = {"KDTW": (42.23, -83.33), "KDJT": (26.6847, -80.0994)}
+          for st, (la, lo) in TABLE.items():
+              try:
+                  g = get("https://api.weather.gov/stations/%s" % st)
+                  slo, sla = g["geometry"]["coordinates"][:2]
+                  p1 = get("https://api.weather.gov/points/%.4f,%.4f" % (sla, slo))["properties"]
+                  p2 = get("https://api.weather.gov/points/%s,%s" % (la, lo))["properties"]
+                  c1 = (p1["gridId"], p1["gridX"], p1["gridY"]); c2 = (p2["gridId"], p2["gridX"], p2["gridY"])
+                  print("::notice title=%s::station %s name=%s lat=%.4f lon=%.4f station_cell=%s table=%s,%s table_cell=%s same_cell=%s"
+                        % (st, st, g["properties"].get("name"), sla, slo, c1, la, lo, c2, c1 == c2))
+              except Exception as ex:
+                  print("::warning title=%s::lookup failed: %s" % (st, str(ex)[:200]))
+          PY
