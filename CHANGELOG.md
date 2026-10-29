@@ -1031,3 +1031,19 @@ Full analysis: docs/INCIDENT_2026-10-23.md. Nothing that trades was changed: run
   - UNC paths are refused;
   - the tests cover every rule.
 - **Left as is:** a raw copy of paper.db could be torn during a commit. The Nov 11 task copies it while no job runs, checks it with pragma quick_check, and confirms the gate_look row before running the report.
+
+## 2026-10-29 14:30 (local) - "Data checks: 2 out of date": a stale phone page and a Windows Update restart (user: "intelligently investigate and resolve")
+- **What the chip showed.** The phone page was the Oct 28, 3:20 PM version. It flagged the evening scan and the JSON export, because the Oct 27 evening scan was missed: the laptop was in standby from that evening until 2:25 AM on Oct 28, and the 2:31 AM make-up run only settled. The Oct 28 8:56 PM scan fixed both checks. But the 9:25 PM evening report did not republish the page, so the old warning stayed on it.
+- **A new gap found while checking.** Windows Update restarted the PC at 4:59 AM and again at 5:03 AM on Oct 29 (System log events 1074: a planned service-pack restart, then an OS upgrade restart). Nobody signed in again until 1:28 PM.
+  - The three Tradebot tasks run only while the user is signed in. install_schedules.ps1 stores no password, by design.
+  - So the hourly job missed 9 runs, from 5:20 AM to 1:20 PM. Task Scheduler did not make them up after sign-in.
+  - The PLAN4 PS chain was killed mid-pcopies at 4:59 AM.
+  - The settle and evening jobs were not due during the gap, so the paper test lost nothing.
+- **Done:**
+  - The 2:20 PM hourly run brought every check current (FRESHNESS: all current, 17 checks), and the phone page was republished from it (version 17).
+  - The PS chain's status was marked interrupted, its .started flag set aside (plan4_go_PS.started-1.txt) and a new flag set. The 2:20 PM hourly job restarted it under the new one-copy lock: pselect was skipped (frozen) and pcopies resumed.
+- **Found too:** the phone page's file storage holds only the Oct 14 JSON backup. The evening report's nightly upload (CLAUDE.md section 10, step 4) has not landed since then. Today's copy was uploaded by hand (tradebot-paper-2026-10-29.json). Tonight's evening report is checked to see whether its publish and upload work unattended.
+- **Not changed (the user's decision, and Windows settings Claude does not change):**
+  - letting the jobs run after an update restart without sign-in, either through Windows' option to finish setting up after an update with the user's sign-in info, or through the tasks' "run whether the user is signed in or not";
+  - Windows Update active hours.
+- No code, rule or threshold changed.
