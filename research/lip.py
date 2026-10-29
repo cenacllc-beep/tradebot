@@ -5,9 +5,12 @@ places, changes or cancels an order and never opens paper.db or live.db. Python 
                                   -> data/lip/samples*.jsonl; trade lists and candles for earlier samples -> fills
   python research/lip.py settle   results of sampled markets that have closed -> data/lip/results.json
   python research/lip.py score    scored once, on or after 2026-11-25 -> results/plan5_L.md and .json
+  python research/lip.py merge DIR  add the hours only the second copy (DIR, its data/lip folder) took, before the score
+  python research/lip.py merge-none REASON  record that no second copy exists (the score of the primary copy needs one of the two)
 Each step is safe to rerun: a sample hour is taken once, a failed request is retried on the next run.
 Where it runs: on the PC until 2026-10-28, then hourly on GitHub Actions in the repository (.github/workflows/plan5-lip.yml),
-which carries on from the PC's data. The PC's copy holds data/lip/MOVED.txt, so there it neither samples nor scores."""
+which carries on from the PC's data; from 2026-10-29 on the PC too (GitHub started too few runs). The PC's copy holds
+data/lip/SECONDARY.txt: it samples and settles, its hours are merged into the repository's copy, and only that is scored."""
 import os, sys, time, random, re
 from datetime import datetime, timezone, timedelta
 HERE=os.path.dirname(os.path.abspath(__file__)); ROOT=os.path.dirname(HERE)
@@ -31,14 +34,86 @@ def http(path,params=None,tries=6): return CLIENT.get(path,params,tries=tries)
 # Storage (logistics, 2026-10-28; the rows are unchanged): the three growing files keep their original name.jsonl, and
 # rows added from now on go to one file per UTC day, name-YYYYMMDD.jsonl, so the hourly commit on GitHub rewrites one
 # small file instead of a file that grows to about 40 MB. Every reader takes the original file, then the daily ones in order.
-def rows_of(name):
-    """All rows of samples, fills or sample_log: name.jsonl first, then the daily name-YYYYMMDD.jsonl files in date order."""
-    try: daily=sorted(f for f in os.listdir(DATA) if re.match(re.escape(name)+r"-\d{8}\.jsonl$",f))
+def rows_of(name,data=None):
+    """All rows of samples, fills or sample_log: name.jsonl first, then the daily name-YYYYMMDD.jsonl files in date order.
+    data: another copy's folder (merge); this copy's by default."""
+    data=data or DATA
+    try: daily=sorted(f for f in os.listdir(data) if re.match(re.escape(name)+r"-\d{8}\.jsonl$",f))
     except OSError: daily=[]
-    return lines(os.path.join(DATA,name+".jsonl"))+[r for f in daily for r in lines(os.path.join(DATA,f))]
+    return lines(os.path.join(data,name+".jsonl"))+[r for f in daily for r in lines(os.path.join(data,f))]
 def add_rows(name,rows,now):
     """Append rows to today's (UTC) file of samples, fills or sample_log."""
     append(os.path.join(DATA,"%s-%s.jsonl"%(name,time.strftime("%Y%m%d",time.gmtime(now)))),rows)
+# Two samplers (2026-10-29): on its first evening GitHub's scheduler started almost none of the hourly runs, so the PC
+# samples again as well. Each copy samples the hours it can; before the single score, `lip.py merge PC_COPY` adds to the
+# repository's copy (data/lip/PRIMARY.txt) every hour that only the PC took; the repository's copy keeps any hour it has
+# rows for. The PC's copy holds data/lip/SECONDARY.txt, so it is never scored itself.
+def secondary():
+    """The first line of data/lip/SECONDARY.txt, or None: a copy that samples but is merged into another before scoring."""
+    try:
+        with open(os.path.join(DATA,"SECONDARY.txt"),encoding="utf-8") as fh: return (fh.read().strip().splitlines() or ["secondary"])[0]
+    except OSError: return None
+def primary():
+    """True in the copy that is scored (the repository's): data/lip/PRIMARY.txt. Committed with the data, so a wiped or
+    re-copied PC folder can never become the scored copy by accident (fail closed)."""
+    return os.path.exists(os.path.join(DATA,"PRIMARY.txt"))
+def merge(src,none_reason=None):
+    """Add the sample hours that only the copy in folder src took (src: that copy's data/lip folder, which holds
+    SECONDARY.txt): their samples, fill records, sample-log row and hours.json entry; results.json gains src's settled
+    results. An hour this copy already has sample rows for is never touched; an hour it took with no rows (all skipped)
+    gives way to src's rows. Everything is read and checked before anything is written, rows already here are never
+    added again, and a second merge changes nothing. Writes data/lip/merged.json, which the score of the primary copy
+    requires (taken after the window ends). Order before the score: merge, push, one run of the hourly job (fill checks
+    and results for merged hours), then score.
+    none_reason: no second copy exists (for example the PC folder was lost): records that instead, merging nothing."""
+    if secondary(): sys.exit("lip merge: this copy is the secondary one (%s); merge into the primary copy instead."%secondary())
+    mark=os.path.join(DATA,"merged.json")
+    if none_reason is not None:
+        save(mark,dict(ts=time.time(),src=None,reason=none_reason,hours_added=[])); print("lip merge: recorded that there is no second copy (%s)"%none_reason); return []
+    if not (os.path.isdir(src) and os.path.exists(os.path.join(src,"hours.json"))):
+        sys.exit("lip merge: %s is not a PLAN5 L data folder (no hours.json); give the other copy's research/data/lip folder."%src)
+    if not os.path.exists(os.path.join(src,"SECONDARY.txt")):
+        sys.exit("lip merge: %s has no SECONDARY.txt, so it is not the second sampler's copy; nothing was changed."%src)
+    if os.path.realpath(src)==os.path.realpath(DATA): sys.exit("lip merge: the source is this copy itself.")
+    other=load(os.path.join(src,"hours.json"),{})
+    if not other: sys.exit("lip merge: %s has no sampled hours; nothing was changed."%src)
+    took=load(os.path.join(DATA,"hours.json"),{})
+    mine=rows_of("samples"); have=set((r["hour"],r["ticker"]) for r in mine); rowhours=set(r["hour"] for r in mine)
+    theirs={}
+    for name in ("samples","fills","sample_log"): theirs[name]=rows_of(name,src)
+    try:
+        src_rowhours=set(int(r["hour"]) for r in theirs["samples"])
+        keys=[(int(r["hour"]),r["ticker"]) for r in theirs["samples"]]
+        if len(keys)!=len(set(keys)): sys.exit("lip merge: %s holds the same market-hour twice; nothing was changed."%src)
+        fk=[(int(r["hour"]),r["ticker"]) for r in theirs["fills"]]
+        if len(fk)!=len(set(fk)): sys.exit("lip merge: %s holds the same market-hour's fill record twice; nothing was changed."%src)
+        for r in theirs["sample_log"]: float(r["ts"])
+    except (KeyError,TypeError,ValueError) as ex: sys.exit("lip merge: a row in %s is unreadable (%r); nothing was changed."%(src,ex))
+    # an hour counts as taken here when this copy has sample rows for it, or took it with no rows and src has none either
+    new=sorted((h for h in other if int(h) not in rowhours and (h not in took or int(h) in src_rowhours)),key=int)
+    hs=set(int(h) for h in new)
+    fill_have=set((r["hour"],r["ticker"]) for r in rows_of("fills"))
+    log_have=set(int(r["ts"]//3600) for r in rows_of("sample_log"))
+    add={"samples":[r for r in theirs["samples"] if int(r["hour"]) in hs and (int(r["hour"]),r["ticker"]) not in have],
+         "fills":[r for r in theirs["fills"] if int(r["hour"]) in hs and (int(r["hour"]),r["ticker"]) not in fill_have],
+         "sample_log":[r for r in theirs["sample_log"] if int(float(r["ts"])//3600) in hs and int(float(r["ts"])//3600) not in log_have]}
+    when={"samples":lambda r:r["ts"],"fills":lambda r:int(r["hour"])*3600,"sample_log":lambda r:float(r["ts"])}
+    res=load(os.path.join(DATA,"results.json"),{}); theirs_res=load(os.path.join(src,"results.json"),{})
+    differ=sorted(t for t,r in theirs_res.items() if t in res and res[t]!=r)
+    for name in ("fills","sample_log","samples"):   # samples last: a re-run after an interruption still adds the rest
+        days={}
+        for r in add[name]: days.setdefault(time.strftime("%Y%m%d",time.gmtime(when[name](r))),[]).append(r)
+        for day,rs in sorted(days.items()): append(os.path.join(DATA,"%s-%s.jsonl"%(name,day)),rs)
+    for h in new: took[h]=other[h]
+    save(os.path.join(DATA,"hours.json"),took)
+    n0=len(res)
+    for t,r in theirs_res.items(): res.setdefault(t,r)
+    save(os.path.join(DATA,"results.json"),res)
+    if differ: print("lip merge: WARNING %d markets have different results in the two copies (this copy's kept): %s"%(len(differ),", ".join(differ[:10])))
+    save(mark,dict(ts=time.time(),src=os.path.realpath(src),hours_added=new,samples_added=len(add["samples"]),fills_added=len(add["fills"]),
+                   results_added=len(res)-n0,results_differ=differ))
+    print("lip merge: %d hours added from %s (%d sample rows, %d fill records); %d results added"%(len(new),src,len(add["samples"]),len(add["fills"]),len(res)-n0))
+    return new
 def moved():
     """The first line of data/lip/MOVED.txt, or None. That file marks a copy whose sampling moved elsewhere (the PC's
     since 2026-10-28), so this copy neither samples, settles nor scores: nothing is collected twice."""
@@ -278,6 +353,14 @@ def score(now=None):
     now=now or time.time()
     out=os.path.join(OUT,"plan5_L.json")
     if moved(): sys.exit("This copy of the PLAN5 L data stopped when sampling moved (%s); score it where the data lives."%moved())
+    if secondary(): sys.exit("This copy is merged into the repository's copy before the score (%s); score it there, after lip.py merge."%secondary())
+    if not primary():   # two samplers (2026-10-29): only the repository's copy (PRIMARY.txt) is ever scored (fail closed)
+        sys.exit("This copy has no PRIMARY.txt, so it is not the copy to score (the repository's research/data/lip is).")
+    if True:   # and only after the second copy's hours are merged in, once the window has ended
+        m=load(os.path.join(DATA,"merged.json"),None)
+        if not isinstance(m,dict) or (m.get("ts") or 0)<END:
+            sys.exit("Merge the PC's copy first, after the window ends: lip.py merge <its data/lip folder> (or lip.py merge-none REASON if it is lost),"
+                     " then let the hourly job run once for fill checks and results, then score.")
     if os.path.exists(out): sys.exit("plan5_L.json exists: PLAN5 scores each test once.")
     if now<SCORE_FROM: sys.exit("Test L is scored on or after 2026-11-25 (PLAN5).")
     try:
@@ -348,4 +431,6 @@ if __name__=="__main__":
     if cmd=="sample": sample()
     elif cmd=="settle": settle()
     elif cmd=="score": score()
+    elif cmd=="merge" and len(sys.argv)==3: merge(sys.argv[2])
+    elif cmd=="merge-none" and len(sys.argv)>=3: merge(None,none_reason=" ".join(sys.argv[2:]))
     else: sys.exit(__doc__)

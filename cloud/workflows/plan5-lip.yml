@@ -1,7 +1,9 @@
 # PLAN5 test L (research only, research/PLAN5.md): the hourly sample of weather markets' order books for the
 # liquidity-reward study. Moved here from the PC on 2026-10-28 so that a sleeping or offline laptop no longer leaves
 # gaps; it carries on from the PC's data (research/data/lip/). Public Kalshi GETs only: it never places, changes or
-# cancels an order, and it never touches the trial database or the PC. Scored once, on or after 2026-11-25.
+# cancels an order, and it never touches the trial database or the PC. Since 2026-10-29 the PC samples too (GitHub
+# started too few runs); before the single score (on or after 2026-11-25) the PC's hours are merged into this copy
+# with `python research/lip.py merge <PC copy>` and the score is run then, by hand, once. This job never scores.
 name: PLAN5 L hourly sample (research)
 on:
   schedule:
@@ -20,21 +22,21 @@ jobs:
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: main   # the newest commit when the job starts: a run that waited its turn sees the run before it (2026-10-29)
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
       - run: pip install requests==2.32.3
-      - name: Sample, fill checks and results; the single score from 2026-11-25
+      - name: Sample, fill checks and results (the single score is run by hand, after merging the PC's hours)
         env:
           TZ: America/La_Paz
         run: |
           if [ -f research/results/plan5_L.json ]; then echo "PLAN5 L is already scored: nothing to do"; exit 0; fi
           if [ -f research/data/lip/MOVED.txt ]; then echo "this copy is marked as moved: not sampling"; exit 1; fi
+          if [ ! -f research/data/lip/PRIMARY.txt ]; then echo "research/data/lip/PRIMARY.txt is missing: this must be the scored copy"; exit 1; fi
           python research/lip.py sample
           python research/lip.py settle
-          if python -c "import sys,time; sys.path.insert(0,'research'); import lip; sys.exit(0 if time.time()>=lip.SCORE_FROM else 1)"; then
-            python research/lip.py score
-          fi
       - name: Save the samples in the repository
         if: always()
         run: |

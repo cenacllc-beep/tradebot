@@ -5,10 +5,12 @@
 /backups/
 /logs/
 # research data stays on the PC, except PLAN5 L's samples: GitHub Actions collects them here since 2026-10-28 (public
-# Kalshi market data only). The PC's "moved" marker never goes in: it would stop the hourly job.
+# Kalshi market data only). The PC's markers never go in: MOVED.txt would stop the hourly job, and SECONDARY.txt would
+# stop the score. PRIMARY.txt (this copy is the scored one) and merged.json do go in.
 /research/data/*
 !/research/data/lip/
-/research/data/lip/MOVED.txt
+/research/data/lip/MOVED.txt*
+/research/data/lip/SECONDARY.txt
 /dashboard.html
 /marks.jsonl
 __pycache__/

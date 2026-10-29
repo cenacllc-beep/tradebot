@@ -3,7 +3,9 @@
 name: tradebot afternoon settle (trial)
 on:
   schedule:
-    - cron: "40 18 * * *"   # 18:40 UTC = 2:40 PM La Paz
+    # 18:40 UTC = 2:40 PM La Paz, then once an hour until 22:40 UTC (2026-10-29: GitHub started the first one four hours
+    # late). Settling is safe to repeat: results already recorded are not looked up again.
+    - cron: "40 18-22 * * *"
   workflow_dispatch: {}
 concurrency:
   group: tradebot
@@ -16,6 +18,8 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: main   # the newest commit when the job starts: a run that waited its turn sees the run before it (2026-10-29)
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"

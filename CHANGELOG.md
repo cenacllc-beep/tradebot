@@ -896,3 +896,45 @@ Full analysis: docs/INCIDENT_2026-10-23.md. Nothing that trades was changed: run
 - **What happened:** on its first evening GitHub started the hourly :20 sample only once in four hours (the 23:20 UTC run started at 00:04 UTC), and the trial settle due at 18:40 UTC started at 22:48 UTC. Hours 21, 22 and 23 UTC were not sampled.
 - **Change (logistics only):** plan5-lip.yml now starts at :05, :20, :35 and :50. The first run in an hour takes that hour's sample. hours.json keeps it to one per hour, so the rules are unchanged. The other runs only do the fill checks and results, and commit only when something changed.
 - **Also changed:** test_moves checks the new schedule. cloud/README.md is updated.
+
+## 2026-10-29 00:30 (local) - r63: GitHub's scheduler started almost nothing (user: "investigate and resolve all issues")
+- **What happened, from GitHub's run list (Oct 28-29):**
+  - The 00:55 UTC trial scan was never started by GitHub. At 03:56 UTC it was started by hand. It scanned inside the window and logged 55 markets (35 rain, 20 temperature, all 10 daily-high series). It opened 3 paper trades (ABQ yes @0.06, MKE yes @0.62, WPB no @0.43), against the PC's 1 at 8:55 PM. The difference comes from timing: prices had three hours to move.
+  - The trial settle due at 18:40 UTC started at 22:48 UTC.
+  - PLAN5 L: one of 16 scheduled runs started (00:04 UTC). Hours 21, 22, 23 and 01 UTC were missed; 02 and 03 UTC were taken by runs started by hand.
+  - All three workflows show "active". The runs carry the repository owner as actor, and runs started by hand begin at once. So this is GitHub's scheduler dropping or delaying scheduled runs, which its documentation allows under load, not a fault in the workflows.
+  - The PC ran every job on time (FRESHNESS: all current).
+- **Fixes (logistics only; no rule, threshold or verdict changed):**
+  - **PLAN5 L, two samplers:**
+    - The PC's hourly job runs lip.py sample and settle again, and GitHub keeps sampling.
+    - New `lip.py merge DIR` adds to the repository's copy the hours only the other copy took, with their samples, fill records, log row, hours.json entry and settled results. The repository's copy keeps any hour both took. A second merge changes nothing.
+    - The PC's copy holds research\data\lip\SECONDARY.txt, so it is never scored. The workflow no longer scores by itself; the single score runs by hand after the merge (the Nov 25 follow-up). PLAN5.md logistics note.
+    - On the PC, research\data\lip\MOVED.txt is renamed (not deleted) to MOVED.txt.off-2026-10-29.
+  - **Trial scan:** it starts at 00:55 UTC and then every half hour until 04:25 UTC. The first run that gets going scans; later ones stop when check.py reports tonight's markets as logged (one scan an evening).
+  - **Trial settle:** it starts hourly from 18:40 to 22:40 UTC.
+- **Tests:** test_moves covers the merge (only the other copy's own hours, shared hours kept, idempotent), the secondary marker, run.bat sampling again, no score step, and the scan's start times and one-scan check.
+- **Independent review (agents/code-reviewer.md, fresh agent): 1 MUST, 4 SHOULD, 8 NOTES.**
+  - **MUST, fixed:** a scheduled run that waited for another in its concurrency group checked out the commit from when GitHub created it. It would then not see the previous run's push, so check.py could miss tonight's scan, the run would scan a second time, and its push would conflict and fail. All three workflows now check out `ref: main` at job start.
+  - **SHOULD, all fixed:**
+    - merge reads and checks everything before writing. It never adds a market-hour, fill or log row twice, including on a re-run after an interrupted merge, and refuses a source holding the same market-hour twice.
+    - merge refuses a folder without hours.json or SECONDARY.txt, the copy itself, an empty source, and merging into the secondary copy.
+    - The repository's copy holds research/data/lip/PRIMARY.txt. Its score requires data/lip/merged.json, written by a merge taken after the window ends (or `lip.py merge-none REASON` if the PC copy is lost). The order is written down: merge, push, one hourly run for fill checks and results, then score.
+    - repo.gitignore keeps MOVED.txt* and SECONDARY.txt out of the repository.
+  - **NOTES:**
+    - Fixed:
+      - merge prints any market whose result differs between the copies.
+      - PLAN5 wording: the copies can hold different markets for an hour. The choice of copy is fixed in advance. Overlapping fill windows are noted.
+      - An hour taken here with no rows gives way to the PC's rows.
+      - Freshness and the dashboard on the PC say it samples alongside GitHub.
+      - Stale text.
+      - New tests: merge edge cases, check.py from a trial folder, the checkout ref, the second-sampler freshness row.
+    - Left as they are:
+      - Scan and settle share one concurrency group, so a late settle could cancel a pending last scan (04:25 UTC).
+      - The settle commits up to 5 times a day.
+      - check.py counts temperature rows too, as on the PC.
+- **Re-check of the fixes (same reviewer): 1 SHOULD and 4 NOTES, all fixed.**
+  - `score()` now refuses any copy without PRIMARY.txt, not only one marked secondary. An unmarked copy (a rebuilt PC folder, or a repository missing the marker) can never be scored. test_lip's scoring uses a primary, merged copy. The hourly workflow fails at once if the repository's PRIMARY.txt is missing.
+  - merge writes fills and log rows first, samples next and hours.json last, so a re-run after an interruption finishes the job.
+  - merge refuses a source with the same fill record twice.
+  - On the PC, freshness flags the PLAN5 L sampler only after a day inside the window without a sample. A missed hour can be taken on GitHub, but a sampler that has stopped is still caught.
+  - tests/test_marks.py: an occasional failure, not from r63, came from whole-second rounding of a snapshot time stored to 0.1 s (x.5 rounds either way). It now compares within 0.2 s.

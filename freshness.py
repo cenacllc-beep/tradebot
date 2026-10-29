@@ -367,10 +367,20 @@ def checks(root=None, db=None, now=None, offsite=None):
     progs = load(os.path.join(lip_dir, "programs.json"), None)
     fetched = _ts(progs.get("fetched")) if isinstance(progs, dict) else None
     moved = lip_moved(root)
+    second = os.path.exists(os.path.join(lip_dir, "SECONDARY.txt")) and not moved
+    if second:   # since 2026-10-29 this PC samples alongside GitHub: an hour missed here can be taken there, so only a
+        # sampler that has stopped altogether (nothing for a day inside the window) is flagged
+        detail = ("this PC samples alongside GitHub Actions; the two copies are merged before the single score, so an hour"
+                  " missed here (laptop asleep) can still be taken there")
+        last = _lip_last(lip_dir)
+        base = last if (last and start and last >= start) else start   # inside the window, age counts from its start
+        out.append(check("lip_samples", "PLAN5 L hourly samples (this PC)", base if in_window else last, 24 * H, now, detail,
+                         "Nothing sampled here for a day: check tasks\\hourly.cmd and logs\\tasks.log.",
+                         status=None if in_window else "info"))
     if moved:   # sampling runs elsewhere since 2026-10-28 (GitHub Actions): this copy's age says nothing
         out.append(check("lip_samples", "PLAN5 L hourly samples", _lip_last(lip_dir), LIMITS["lip_samples"], now,
                          moved, status="info"))
-    for key, name, last, detail, action in () if moved else (
+    for key, name, last, detail, action in () if (moved or second) else (
             ("lip_programs", "PLAN5 L reward programs", fetched, "cached list of liquidity programs", "The hourly job refreshes it; check tasks\\hourly.cmd."),
             ("lip_samples", "PLAN5 L hourly samples", _lip_last(lip_dir),
              "window %s to %s" % (clock.label(start), clock.label(end)) if start else "", "Missed hours count against the test; check the hourly schedule.")):

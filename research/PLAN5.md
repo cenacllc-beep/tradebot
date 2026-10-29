@@ -231,3 +231,24 @@ shortens the test.
 - **The PC's copy** is marked research/data/lip/MOVED.txt: there lip.py neither samples, settles nor scores, so nothing
   is collected twice and the PC's partial copy is never scored.
 - **The single score** runs in the same workflow, on its first run on or after 2026-11-25, and is committed with the data.
+
+## Logistics on 2026-10-29 (no rule changed)
+- On its first evening GitHub's scheduler started 1 of 16 scheduled sample runs (hours 21, 22, 23 and 01 UTC were missed;
+  02 and 03 UTC were sampled by runs started by hand).
+- **Both copies now sample:** the PC's hourly job runs `lip.py sample` and `settle` again, and GitHub keeps sampling. The
+  PC's copy holds research/data/lip/SECONDARY.txt and is never scored itself.
+- **Each hour counts once:** before the single score, `lip.py merge <PC copy>` adds to the repository's copy every hour that
+  only the PC took (samples, fill records, log row, hours.json entry) and the PC's settled results. For an hour both
+  has sample rows for, the repository's copy is kept; an hour it took with no rows gives way to the PC's rows. Both
+  copies apply the same rules, but their universes can differ by the minute of sampling (markets closing within 2 hours
+  are left out) and by each copy's cached program list, so for an hour both took they may hold different markets. The
+  choice of copy is fixed here, in advance, and never looks at outcomes.
+- **Overlapping fill windows:** the PC samples at :20 and GitHub at :05 to :50, so consecutive merged hours can have fill
+  windows that overlap for the same market and count some trades twice. The score's event-clustered standard error
+  already covers correlated market-hours; this is noted, not corrected.
+- **Order before the score (procedure, not a rule):** after the window ends, `lip.py merge <PC copy>` (it checks the
+  folder, refuses the wrong direction, never adds a market-hour twice and records data/lip/merged.json), push, let the
+  hourly job run once (fill checks and results for merged hours), then `lip.py score`. The repository's copy holds
+  data/lip/PRIMARY.txt and its score refuses to run without a merge taken after the window (or `lip.py merge-none
+  REASON` if the PC copy is lost).
+- **The score** runs once, by hand, after that merge, on or after 2026-11-25. The workflow no longer scores by itself.

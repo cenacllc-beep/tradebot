@@ -3,7 +3,12 @@
 name: tradebot evening scan (trial)
 on:
   schedule:
-    - cron: "55 0 * * *"   # 00:55 UTC = 8:55 PM La Paz, as on the PC. GitHub can start scheduled runs late; the scan runs if it starts before 1:00 AM.
+    # 00:55 UTC = 8:55 PM La Paz, as on the PC, then every half hour while the window is open (2026-10-29: on the first
+    # evening GitHub never started the 00:55 run). The first run that gets going scans; later ones see check.py report
+    # SCANNED and stop. The scan runs only inside the 8:50 PM to 1:00 AM La Paz window (scan_window.py).
+    - cron: "55 0 * * *"
+    - cron: "25,55 1-3 * * *"
+    - cron: "25 4 * * *"
   workflow_dispatch: {}
 concurrency:
   group: tradebot
@@ -16,6 +21,8 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: main   # the newest commit when the job starts: a run that waited its turn sees the run before it (2026-10-29)
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
@@ -29,6 +36,8 @@ jobs:
           # the same evening window as the PC (scan_window.py): 8:50 PM to 1:00 AM La Paz. A run started outside it (a late
           # GitHub start, or a test run by hand) does not scan, so the trial keeps the designed evening snapshot.
           if ! python ../scan_window.py; then echo "outside the scan window: not scanning (a test run checks the setup only)"; exit 0; fi
+          # one scan an evening: a later run (or one started by hand) stops if tonight's markets are already logged
+          if [ -f paper.db ] && python ../check.py; then echo "tonight's scan already ran (or the kill switch is on): nothing to do"; exit 0; fi
           python ../backup.py prescan || echo "no trial database yet"
           # up to 3 tries, 5 minutes apart (as jobs.py on the PC): a retried scan is safe, obs keeps each market's first snapshot
           ok=0

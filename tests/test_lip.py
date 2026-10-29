@@ -7,6 +7,9 @@ WORK,OUT=sys.argv[1],sys.argv[2]; shutil.rmtree(OUT,ignore_errors=True); os.make
 sys.path.insert(0,os.path.join(WORK,"research")); sys.path.insert(0,WORK)
 import lip as P
 P.DATA=os.path.join(OUT,"data"); P.OUT=os.path.join(OUT,"results")
+def scored_copy():   # since 2026-10-29 only the primary copy, after a merge taken once the window ended, is scored
+    os.makedirs(P.DATA,exist_ok=True); open(os.path.join(P.DATA,"PRIMARY.txt"),"w").write("scored copy\n")
+    P.save(os.path.join(P.DATA,"merged.json"),dict(ts=P.END+60,src=None,reason="test",hours_added=[]))
 def boom(*a,**k): raise AssertionError("no network in tests: %s"%(a[:1],))
 P.http=boom
 # ---- the reward rule ----
@@ -112,6 +115,12 @@ assert r2["reward_10"]==[s for s in ss if s["ticker"]==r2["ticker"]][0]["quote"]
 for t in MK: MK[t].update(result="yes" if int(t[-1]) % 2 else "no") if t.startswith("KXRAIN") else None
 P.settle(now=T0+6*86400); res=json.load(open(os.path.join(P.DATA,"results.json")))
 assert len(res)==len({s["ticker"] for s in P.rows_of("samples")}) and calls["single"]==len(HIDE & set(res)), (len(res),calls)
+try: P.score(now=P.SCORE_FROM+1); raise SystemExit("scored an unmarked copy")
+except SystemExit as e: assert "no PRIMARY.txt" in str(e), e   # only the repository's copy is scored (2026-10-29)
+open(os.path.join(P.DATA,"PRIMARY.txt"),"w").write("scored copy\n")
+try: P.score(now=P.SCORE_FROM+1); raise SystemExit("scored before the merge")
+except SystemExit as e: assert "Merge the PC's copy first" in str(e), e
+scored_copy()
 try: P.score(now=T0); raise SystemExit("scored early")
 except SystemExit as e: assert "2026-11-25" in str(e), e
 P.score(now=P.SCORE_FROM+1); R=json.load(open(os.path.join(P.OUT,"plan5_L.json")))
@@ -135,7 +144,7 @@ def world(edge,usd=None,unsettled=0):
                 fl.append(dict(hour=int(ts//3600),ticker=t,fill_1={"yes":min(1,f["yes"]),"no":0},fill_10=f,fill_100=f)); res[t]="yes" if yes else "no"
     for t in sorted(res)[:unsettled]: del res[t]
     P.append(os.path.join(P.DATA,"samples.jsonl"),ss); P.append(os.path.join(P.DATA,"fills.jsonl"),fl); P.save(os.path.join(P.DATA,"results.json"),res)
-    P.score(now=P.SCORE_FROM+1); return json.load(open(os.path.join(P.OUT,"plan5_L.json")))
+    scored_copy(); P.score(now=P.SCORE_FROM+1); return json.load(open(os.path.join(P.OUT,"plan5_L.json")))
 G=world(0.15); B=world(-0.30)
 assert G["spread_only"]["verdict"]=="PASS" and G["with_rewards"]["verdict"]=="PASS" and G["totals"]["filled"]>=100 and G["events_with_fills"]>=20, (G["spread_only"],G["with_rewards"],G["totals"])
 assert G["with_rewards"]["applies"] is False and G["headline_return_per_dollar_hour"]==G["spread_only"]["mean_return_per_dollar_hour"]   # not eligible: the spread-only figure is the headline

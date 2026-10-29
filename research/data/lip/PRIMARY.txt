@@ -1,0 +1,2 @@
+This is the copy of PLAN5 L that is scored (once, on or after 2026-11-25), after the PC's copy (SECONDARY.txt) is merged in
+with `python research/lip.py merge <PC copy>` taken after the sampling window ends (research/PLAN5.md, logistics of 2026-10-29).

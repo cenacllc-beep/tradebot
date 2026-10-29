@@ -1,6 +1,6 @@
 """Did the evening scan log the next market day's markets? Read-only (opens paper.db with mode=ro).
 python check.py  ->  prints SCANNED (exit 0), HALTED when the kill switch is on (exit 0: no scan is wanted), or
-NOT SCANNED (exit 3). Used by the backup scheduled scan.
+NOT SCANNED (exit 3). Used by the GitHub trial scan (cloud/workflows/tradebot-scan.yml) to scan once an evening.
 The next market day is today's UTC date before 05:00 UTC (when Eastern markets start their Kalshi day), else tomorrow's."""
 import sqlite3, sys
 from datetime import datetime, timezone, timedelta

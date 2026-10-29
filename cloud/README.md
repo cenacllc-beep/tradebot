@@ -49,3 +49,13 @@ PC's `paper.db`. Paper trading only; no keys or secrets are needed (all data sou
   to different folders (trial/ and research/data/lip/) at different times.
 - Before the phone page moves to `trial/dashboard.html`, the two runners are compared for a few days (Claude's
   scheduled follow-up).
+
+## Updated 2026-10-29
+- On the first evening GitHub's scheduler started almost no scheduled run. The 00:55 UTC trial scan had not started by
+  03:56 UTC, when it was started by hand; 1 of 16 PLAN5 L runs started.
+- **Trial scan:** `tradebot-scan.yml` now starts at 00:55 UTC and then every half hour until 04:25 UTC. The first run that
+  gets going scans. Later ones stop when `check.py` says tonight's markets are already logged, so it is still one scan an
+  evening. A run started by hand does the same.
+- **Trial settle:** `tradebot-settle.yml` starts hourly from 18:40 to 22:40 UTC. Settling again is safe.
+- **PLAN5 L:** the PC samples again as well as GitHub (research/PLAN5.md, logistics of 2026-10-29). The workflow no longer
+  scores. The score runs once, by hand, after `python research/lip.py merge <PC copy>`.

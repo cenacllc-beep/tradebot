@@ -56,7 +56,7 @@ assert [round(x["ts"],1) for x in rm]==[round(old,1),round(now-600,1),round(now-
 conn=sqlite3.connect(os.environ["PAPER_DB"]); conn.row_factory=sqlite3.Row
 tr=[dict(r) for r in conn.execute("select * from trades")]; so=[dict(r) for r in conn.execute("select * from shadow_orders")]
 L=AV.main_ledger(tr,25.0,t0); pts,last=AV.mark_points(L,rm,"main",now)
-assert last==now-300 and [round(p[0]) for p in pts]==[round(now-600),round(now-300)], pts
+assert abs(last-(now-300))<0.2 and len(pts)==2 and all(abs(p[0]-e)<0.2 for p,e in zip(pts,[now-600,now-300])), (last,pts)   # within 0.2 s (2026-10-29: whole-second rounding of a stored x.5 flipped either way)
 u1=(1.65-1.20)+(0.76-0.60)+(0.0-0.50)+(0.75-0.50); u2=(1.80-1.20)+(0.70-0.60)+(0.0-0.50)+(0.80-0.50)   # main:3 keeps its earlier mark
 assert abs(pts[0][1]-u1)<1e-9 and abs(pts[1][1]-u2)<1e-9, (pts,u1,u2)
 # a trade that settles after a price snapshot drops out at once (never counted twice)
