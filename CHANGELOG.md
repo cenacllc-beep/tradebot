@@ -992,3 +992,42 @@ Full analysis: docs/INCIDENT_2026-10-23.md. Nothing that trades was changed: run
   - the refusal note can no longer fail the exit code.
 - **Left as is:** the chains started before this change hold no lock, so they are checked by hand until they finish.
 - No PLAN4 rule, window, threshold or scorer changed.
+
+## 2026-10-29 05:00 (local) - PLAN6: what the Nov 11 report shows next to the gate (user: "we can't move the november 11th deadline. do whats needed without weakening the test. use historical data and patterns")
+- **No change to the bot, v3, the gate, the stop date, the single look, live.py or any limit.**
+- **What was found:**
+  - In the first 16 market days the PC logged only 5 full days, plus 4 markets of Oct 24. The other evenings it was asleep, off or offline: the 8:55 PM job wakes it only on AC power.
+  - The bot opens about one trade per scanned night, so the gate's 50-trade check cannot be met by Nov 11. Even every night scanned would give about 28 trades. So the stored look is expected to fail on that check.
+- **Past data cannot fill the gap without weakening the test:**
+  - Kalshi's rain markets begin on Jul 15, and Jul 15 to Oct 12 was PLAN.md's holdout, already scored once.
+  - v3's hourly NWS gridpoint inputs are not archived. The public NDFD archive keeps 12-hour chances, which would make a different estimator.
+- **New research/PLAN6.md, written before the last 12 market days.** Its author did not look at the interim Brier numbers; the trade count and the 5 settled trades' net (-$1.67) were seen. It fixes what the Nov 11 report shows next to the stored look, which stays the only verdict:
+  - **A:** the gate's own day-clustered Brier statistic, with a fixed three-way reading and its interval in plain words. An expected-precision statement, made before the data, says "no clear difference" is the likely reading.
+  - **B (secondary):** the same, with whole days the PC missed taken from the GitHub trial copy. Only when it ran a model version the PC ran, and its scan began in the 00:50 to 05:00 UTC window.
+  - **C:** the paper trades, descriptive. Split at the veto by open time; total net per contract; no standard error.
+  - **D:** past results, quoted.
+- **New research/nov11.py:**
+  - read-only (sqlite mode=ro, no network, never computes a look);
+  - writes research/results/nov11.md and .json;
+  - a damaged trial copy loses only B;
+  - a pending run never replaces a finished report.
+- New tests/test_nov11.py: the real schema, the real strategy.gate_look, sockets blocked.
+- tests/test_marks.py: a timestamp tolerance of 0.2 s, fixing a flake.
+- **Independent statistics review (agents/statistician.md), two rounds: 2 MUST, 6 SHOULD; then 0 MUST, 2 SHOULD.** All applied:
+  - the real-money wording: live.py's unlock leaves the decision to the user after a failed look, so the report says the rules say no real money and live.py has nothing to copy, rather than "locked";
+  - the limits that go with "clearly more accurate";
+  - the precision statement;
+  - the interval as Brier-score error, measured against the day-averaged market Brier and capped at 100% lower;
+  - B's model and window rules, hash and commit;
+  - the veto split by open time;
+  - per-contract P&L as total over total.
+  - Checked, hashes only: PC and trial both ran v3@ecb9ddc276bf on Oct 29.
+- **Independent code review (agents/code-reviewer.md), three rounds.** The first two MUSTs followed the plan's revision. All findings applied:
+  - B survives any trial error;
+  - the window is judged at scan start, as in scan_window.py;
+  - the model check excludes later MARKET_STARTED rows;
+  - the JSON is written first and fsynced, and a pending copy keeps the finished report (exit 3);
+  - missing stored numbers show as n/a;
+  - UNC paths are refused;
+  - the tests cover every rule.
+- **Left as is:** a raw copy of paper.db could be torn during a commit. The Nov 11 task copies it while no job runs, checks it with pragma quick_check, and confirms the gate_look row before running the report.

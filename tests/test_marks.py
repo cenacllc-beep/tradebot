@@ -64,7 +64,7 @@ tr2=[dict(r) for r in tr]
 for r in tr2:
     if r["id"]==1: r.update(status="settled",result="yes",pnl=1.75,settled_ts=now-200)
 L2=AV.main_ledger(tr2,25.0,t0); pts2,_=AV.mark_points(L2,rm,"main",now)
-assert [round(p[0]) for p in pts2]==[round(now-600),round(now-300),round(now-200)] and abs(pts2[-1][1]-(u2-(1.80-1.20)))<1e-9, pts2
+assert len(pts2)==3 and all(abs(p[0]-e)<=0.2 for p,e in zip(pts2,(now-600,now-300,now-200))) and abs(pts2[-1][1]-(u2-(1.80-1.20)))<1e-9, pts2   # 0.2 s tolerance: snapshot times are stored rounded to 0.1 s (as on line 58)
 v=AV.value_at(L2,now)+pts2[-1][1]; v_cost=AV.value_at(L2,now)
 assert abs(v-(v_cost+u2-0.60))<1e-9
 html=AV.section(tr,so,25.0,t0,now,marks=rm,live=True)
