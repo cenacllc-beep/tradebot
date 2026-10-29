@@ -34,6 +34,8 @@ goto finish
 echo All three schedules are set: they run on battery too, and a run missed while the PC was off is made up.
 echo The 8:55 PM scan also wakes the PC if the power plan allows wake timers (see the INFO lines above).
 :finish
+echo Re-creating the schedules makes them run only while you are signed in. To let them run whether or not you
+echo are signed in (for example after a Windows Update restart), run run_signed_out.cmd: it asks for administrator permission.
 echo If the 8:55 PM run was missed tonight, double-click evening.cmd in this folder between 8:50 PM and 1:00 AM.
 pause
 exit /b 0

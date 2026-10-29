@@ -37,8 +37,18 @@ steps:
 - **Applies install_schedules.ps1's settings by itself**, from the hourly job: once, and again whenever the script
   changes (logs\schedules_applied.txt keeps the script's fingerprint).
 
+Since 2026-10-29 (the user's request, after a Windows Update restart at 4:59 AM left the PC signed out until 1:28 PM and no job ran):
+- **The three jobs run whether or not you are signed in.** tasks\run_signed_out.cmd switched them to Task Scheduler's
+  "Run whether user is logged on or not" with "Do not store password" (S4U).
+  - Same account, normal rights (not administrator), no password stored; Windows asked for administrator permission once to make the change.
+  - They run in the background with no window, also at the sign-in screen after a restart.
+  - They reach the internet as before, but not shared network folders (the bot uses none).
+- **Re-running install_schedules.cmd makes them "only while signed in" again;** run run_signed_out.cmd after it.
+- **Undo:** in PowerShell, from the tradebot folder: `.\tasks\run_signed_out.cmd undo`. logs\signed_out.txt shows the last result.
+- **install_schedules.ps1 now only reads a task whose settings are already as wanted,** so the hourly job's check also works on these tasks without administrator rights. A task that does need a change, after it switched to whether-or-not-signed-in, needs administrator permission; the hourly job then says "not applied yet" in logs\tasks.log. Right-click install_schedules.cmd, choose Run as administrator, then run run_signed_out.cmd.
+
 Not changed:
-- The PC must be on and you must be signed in.
+- The PC must be on (or asleep, for the 8:55 PM scan, which can wake it).
 - Only the 8:55 PM Evening scan may wake a sleeping PC (since 2026-10-25), and only if the power plan allows wake
   timers; logs\schedules_settings.txt says whether it does, and the first night's logs\tasks.log shows whether it
   worked (an evening start line at 8:55 PM while the laptop was asleep). This laptop never sleeps when plugged in, so
@@ -47,8 +57,8 @@ Not changed:
   Shut it down or hibernate it before packing it, or set the power plan's Allow wake timers "On battery" to Disable.
   To stop the wake altogether: Task Scheduler, Tradebot, Evening scan, Conditions, clear "Wake the computer to run this
   task" (it comes back if install_schedules.cmd is run again or install_schedules.ps1 changes).
-- Nothing needs a password or administrator rights. If schtasks answers "Access is denied", right-click the file and
-  choose Run as administrator.
+- Nothing needs a password. Only run_signed_out.cmd needs administrator permission (Windows asks). If schtasks answers
+  "Access is denied", right-click the file and choose Run as administrator.
 
 Remove them: `schtasks /Delete /F /TN "Tradebot\Evening scan"` (and the same for the other two).
 

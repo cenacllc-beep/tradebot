@@ -15,8 +15,10 @@
 #     Conditions, clear "Wake the computer to run this task". The other two tasks never wake the PC.
 # What each task runs, when, and whether it is enabled stay as they are (changed in place, review 2026-10-24). It stores
 # no password, needs no administrator rights and changes no Windows setting: whether Windows honours wake timers is a
-# power-plan setting ("Allow wake timers"), which this script only reads and reports. Runs happen only while you are
-# signed in.
+# power-plan setting ("Allow wake timers"), which this script only reads and reports. Since 2026-10-29 the tasks may
+# run whether or not you are signed in (run_signed_out.ps1, which needs administrator permission). So a task whose
+# settings already read back as wanted is left untouched: this script then only reads, which also works without
+# administrator rights.
 # Exit code: 0 when all three tasks were updated and read back correctly, otherwise the number that failed.
 $ErrorActionPreference = 'Stop'
 $folder = '\Tradebot\'
@@ -30,12 +32,17 @@ foreach ($j in $jobs) {
     try {
         # The task's own settings, changed in place: whether you disabled it, and anything else you set, stays as it is.
         $t = Get-ScheduledTask -TaskPath $folder -TaskName $j.Name   # stops here if schtasks did not create it
+        $c = $t.Settings; $lim = $null
+        try { $lim = [System.Xml.XmlConvert]::ToTimeSpan($c.ExecutionTimeLimit) } catch { $lim = $null }
+        $same = (-not $c.DisallowStartIfOnBatteries) -and (-not $c.StopIfGoingOnBatteries) -and $c.StartWhenAvailable -and ($lim -eq [TimeSpan]::FromHours($j.Hours)) -and ([bool]$c.WakeToRun -eq [bool]$j.Wake)
+        if (-not $same) {   # only a task that differs is changed (an unchanged one, perhaps S4U, is only read)
         $t.Settings.DisallowStartIfOnBatteries = $false
         $t.Settings.StopIfGoingOnBatteries = $false
         $t.Settings.StartWhenAvailable = $true
         $t.Settings.ExecutionTimeLimit = 'PT{0}H' -f $j.Hours
         $t.Settings.WakeToRun = [bool]$j.Wake
         Set-ScheduledTask -InputObject $t | Out-Null
+        }
         $s = (Get-ScheduledTask -TaskPath $folder -TaskName $j.Name).Settings
         if ($s.DisallowStartIfOnBatteries -or $s.StopIfGoingOnBatteries -or -not $s.StartWhenAvailable -or [System.Xml.XmlConvert]::ToTimeSpan($s.ExecutionTimeLimit) -ne [TimeSpan]::FromHours($j.Hours) -or [bool]$s.WakeToRun -ne [bool]$j.Wake) {
             throw 'the new settings did not read back'

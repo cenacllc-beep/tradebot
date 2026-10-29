@@ -383,4 +383,27 @@ if os.name == "nt":   # the system's cmd.exe (ComSpec), never a cmd file in the 
 else:
     assert cmdline == ["run.bat", "settle"], cmdline
 assert J.main([]) == 2
+
+# ---- run_signed_out (2026-10-29, the user's request): the three jobs run whether or not the user is signed in ----
+so = "\n".join(read("tasks/run_signed_out.ps1")); soc = "\n".join(ln for ln in so.split("\n") if not ln.lstrip().startswith("#"))
+assert "$names = @('Evening scan', 'Afternoon settle', 'Hourly research')" in soc and "$folder = '\\Tradebot\\'" in soc, "only the three Tradebot tasks"
+assert "$want = if ($Undo) { 'Interactive' } else { 'S4U' }" in soc, "S4U (no password stored), or back to only-while-signed-in"
+assert "New-ScheduledTaskPrincipal -UserId $t.Principal.UserId -LogonType $want -RunLevel Limited" in soc, "the same account, never administrator rights"
+assert "Set-ScheduledTask -TaskPath $folder -TaskName $n -Principal $p" in soc and soc.count("Set-ScheduledTask") == 1, "only the principal is set"
+for k in ("-Password", "Register-ScheduledTask", "Unregister-ScheduledTask", "New-ScheduledTaskSettingsSet", "-Action", "-Trigger", "Highest",
+          "-RunLevel Highest", "Password", "powercfg", "Set-ExecutionPolicy", "Read-Host"):
+    assert k not in soc, k
+assert "[string]$r.Principal.LogonType -ne $want" in soc and "[string]$r.Principal.RunLevel -ne 'Limited'" in soc, "read back"
+assert "($before -join '|') -ne ($after -join '|')" in soc and "$s0.WakeToRun" in soc and "$s1.StartWhenAvailable" in soc, "other settings unchanged"
+assert "IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)" in soc and "exit $failed" in soc and "logs\\signed_out.txt" in soc
+assert "UserId" not in soc.split("$out")[-1] and "$t.Principal.UserId" not in "".join(ln for ln in soc.split("\n") if "$out.Add" in ln), "the account name is never written to the log"
+soc2 = read("tasks/run_signed_out.cmd")
+run = [i for i, ln in enumerate(soc2) if ln.startswith('"%PS%" ')]
+assert len(run) == 1 and "Start-Process -FilePath '%PS%' -Verb RunAs -Wait" in soc2[run[0]] and "run_signed_out.ps1" in soc2[run[0]] and "%U%" in soc2[run[0]]
+assert 'set "PS=%SystemRoot%\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"' in soc2, "Windows PowerShell by its full path"
+assert soc2.index('del "%D%..\\logs\\signed_out.txt" 2>nul') < run[0], "the old result is removed before the new run"
+assert not any(ln.lstrip().lower().startswith("powershell") for ln in soc2), "never a bare powershell"
+# the settings script only reads a task whose settings already read back as wanted (it may be S4U, which needs administrator rights to change)
+assert "if (-not $same) {" in code and code.index("if (-not $same) {") < code.index("Set-ScheduledTask -InputObject $t") and "($lim -eq [TimeSpan]::FromHours($j.Hours))" in code
+assert 'if /i "%~1"=="undo" set "U=,\'-Undo\'"' in soc2 and soc2.count("pause") == 1 and any("signed_out.txt" in ln and ln.startswith("if exist") for ln in soc2)
 print("schedules and scan window: all checks passed")
