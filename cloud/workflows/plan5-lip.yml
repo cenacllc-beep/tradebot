@@ -5,7 +5,9 @@
 name: PLAN5 L hourly sample (research)
 on:
   schedule:
-    - cron: "20 * * * *"   # :20 every hour, as on the PC. GitHub can start late; each hour is sampled once (hours.json).
+    # Four chances an hour (2026-10-28 evening): on the first day GitHub started only 1 of 4 hourly :20 runs, hours late.
+    # The first run in an hour takes that hour's sample (hours.json); the others only do the fill checks and results.
+    - cron: "5,20,35,50 * * * *"
   workflow_dispatch: {}
 concurrency:
   group: tradebot-lip      # its own group: a queued sample must never cancel a pending scan or settle (one pending run per group)

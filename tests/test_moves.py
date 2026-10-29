@@ -109,7 +109,7 @@ print("dashboard: the safety line says where PLAN5 L is sampled: ok")
 bat = open(os.path.join(WORK, "run.bat"), encoding="utf-8").read()
 assert "lip.py" not in re.sub(r"(?m)^rem .*$", "", bat), "run.bat must not run research\\lip.py any more"
 wf = open(os.path.join(WORK, "cloud", "workflows", "plan5-lip.yml"), encoding="utf-8").read()
-assert '- cron: "20 * * * *"' in wf and "python research/lip.py sample" in wf and "python research/lip.py settle" in wf
+assert '- cron: "5,20,35,50 * * * *"' in wf and "python research/lip.py sample" in wf and "python research/lip.py settle" in wf
 assert "group: tradebot-lip" in wf and "main.py" not in wf and "live.py" not in wf and "MOVED.txt" in wf and "plan5_L.json" in wf
 for f in ("plan5-lip.yml", "tradebot-scan.yml", "tradebot-settle.yml"):
     s = open(os.path.join(WORK, "cloud", "workflows", f), encoding="utf-8").read()

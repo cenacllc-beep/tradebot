@@ -891,3 +891,8 @@ Full analysis: docs/INCIDENT_2026-10-23.md. Nothing that trades was changed: run
   - Oct 29: the first GitHub scan (set earlier).
   - Nov 1: compare the two runners, and decide whether the phone page should read GitHub's results.
   - Nov 25: report PLAN5 L's single score, then turn its hourly workflow off.
+
+## 2026-10-28 20:50 (local) - PLAN5 L: four chances an hour on GitHub
+- **What happened:** on its first evening GitHub started the hourly :20 sample only once in four hours (the 23:20 UTC run started at 00:04 UTC), and the trial settle due at 18:40 UTC started at 22:48 UTC. Hours 21, 22 and 23 UTC were not sampled.
+- **Change (logistics only):** plan5-lip.yml now starts at :05, :20, :35 and :50. The first run in an hour takes that hour's sample. hours.json keeps it to one per hour, so the rules are unchanged. The other runs only do the fill checks and results, and commit only when something changed.
+- **Also changed:** test_moves checks the new schedule. cloud/README.md is updated.

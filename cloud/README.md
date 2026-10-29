@@ -40,7 +40,7 @@ PC's `paper.db`. Paper trading only; no keys or secrets are needed (all data sou
 ## Updated 2026-10-28, afternoon
 - The repository is public (the user's choice, so Actions run free). Never commit keys, account details or the PC's
   databases and logs. `cloud/repo.gitignore` is the repository's `.gitignore`.
-- **PLAN5 L moved here:** `cloud/workflows/plan5-lip.yml` samples at :20 every hour, settles, and scores once from
+- **PLAN5 L moved here:** `cloud/workflows/plan5-lip.yml` samples once an hour (it starts at :05, :20, :35 and :50, because GitHub starts scheduled runs late or not at all; the first run in an hour samples), settles, and scores once from
   2026-11-25. Its data (public Kalshi order books and reward programs) lives in `research/data/lip/` in the repository.
   The PC's copy holds `research/data/lip/MOVED.txt`, so the PC no longer samples (that file is never committed).
 - The sample runs in its own concurrency group: GitHub keeps one pending run per group, so a queued sample could
