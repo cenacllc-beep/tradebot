@@ -371,3 +371,13 @@ and amounts, no outcomes). The Kalshi series listing was stopped before anything
 - **Kalshi listing.** The listing passed 2.5 million markets and 1.5 GB of memory, so it now runs in two passes (above).
   It was stopped before anything was saved.
 
+
+## Finishing on 2026-10-29 (logistics only; no rule, window or threshold changed)
+- **Where things stood:**
+  - The Polymarket chain stopped on Oct 15 at pselect: the format check counted 12 REDEEMABLE_LOST rows as missing that the scored walks list as CLOSED. That check was corrected before any selection (CHANGELOG, Oct 22). It reuses the format-check snapshots saved on Oct 15, so the corrected check reads the same rows.
+  - The Kalshi trade lists were complete on Oct 16. Nothing has been selected or scored.
+- **Remaining steps** run as two detached chains on the laptop (research/plan4_run.ps1):
+  - KS: scoreK, then the descriptive kquotes.
+  - PS: pselect, pcopies twice, then scoreP.
+- **Scoring:** each scorer runs only after every earlier step in its chain succeeded. It refuses (nothing saved) on any of the guards above, and each test is still scored once.
+- **Dates:** all windows are fixed dates (formation, evaluation to Oct 1, resolved by Oct 14, K1 markets closing by Oct 13). Fetching two weeks later changes no window. Resolutions are looked up fresh at scoring, as written.

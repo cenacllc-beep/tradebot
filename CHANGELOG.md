@@ -938,3 +938,16 @@ Full analysis: docs/INCIDENT_2026-10-23.md. Nothing that trades was changed: run
   - merge refuses a source with the same fill record twice.
   - On the PC, freshness flags the PLAN5 L sampler only after a day inside the window without a sample. A missed hour can be taken on GitHub, but a sampler that has stopped is still caught.
   - tests/test_marks.py: an occasional failure, not from r63, came from whole-second rounding of a snapshot time stored to 0.1 s (x.5 rounds either way). It now compares within 0.2 s.
+
+## 2026-10-29 01:50 (local) - PLAN4: finishing the copy-trading tests (user: "intelligently continue until the next 29 steps are completed")
+- **State found on the PC:**
+  - The Polymarket chain had stopped on Oct 15 at pselect's format check: 12 REDEEMABLE_LOST rows listed as CLOSED, a check fixed on Oct 22 before any selection.
+  - The Kalshi K1 trade lists were complete on Oct 16 (9.7 GB).
+  - Nothing has been selected or scored.
+- **These steps need Kalshi's and Polymarket's APIs from the laptop itself.** Its Linux sandbox and the cloud container cannot reach them.
+- **research/plan4_run.ps1 has two finishing chains:**
+  - KS: scoreK, then kquotes.
+  - PS: pselect, pcopies twice, then scoreP.
+  
+  They are started detached with one PowerShell line (in the file). The scorers run only after every earlier step succeeded. Each refuses (nothing saved) on PLAN4's data guards, and each test is scored once.
+- **PLAN4.md:** dated logistics note added. No rule, window or threshold changed.
