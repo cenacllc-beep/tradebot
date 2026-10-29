@@ -951,3 +951,21 @@ Full analysis: docs/INCIDENT_2026-10-23.md. Nothing that trades was changed: run
   
   They are started detached with one PowerShell line (in the file). The scorers run only after every earlier step succeeded. Each refuses (nothing saved) on PLAN4's data guards, and each test is scored once.
 - **PLAN4.md:** dated logistics note added. No rule, window or threshold changed.
+- **02:00: the chains start themselves (user: "we need to intelligently complete all steps").**
+  - New research/plan4_launch.py runs first in the hourly job. It starts a finishing chain from a flag file (research\results\plan4_go_KS.txt or plan4_go_PS.txt), once, detached from the job, and returns at once.
+  - So the hours-long fetches never hold the job lock that the 8:55 PM scan needs, and nobody has to type a command.
+  - Only the chains KS and PS can be started this way. A chain whose status file shows a step still running is not started again.
+  - New test: tests/test_plan4launch.py.
+  - **Independent review (agents/code-reviewer.md): 0 MUST, 4 SHOULD, 5 NOTES.**
+    - Fixed:
+      - The chain gets its own hidden console. DETACHED_PROCESS would have cancelled CREATE_NO_WINDOW and left a visible window for each step.
+      - PowerShell is called by its full System32 path.
+      - A flag that cannot be renamed is retried next hour, instead of stopping the launcher.
+      - The test now checks the Windows path's handles and that the parent's pipe is released at once.
+      - The status line is shown when a chain is still running.
+      - plan4_run.ps1 skips a step whose single result already exists (pselect, scoreK, scoreP), so a failed chain can be started again.
+      - Each finishing run writes its own log names.
+      - A flag next to an earlier start is set aside, so it is logged once rather than every hour.
+    - Left as they are:
+      - Whether the chain survives the task ending is checked on the PC after the first launch.
+      - The chain holds no stay-awake request. The laptop never sleeps on AC power.

@@ -133,6 +133,8 @@ exit /b 0
 
 :hourly
 rem Read-only research and prices: nothing here places orders, so it runs even while the kill switch is on.
+rem PLAN4 (2026-10-29): starts a finishing chain once from research\results\plan4_go_KS.txt or _PS.txt, detached; returns at once.
+"%PY%" research\plan4_launch.py
 rem PLAN5 L: GitHub Actions samples it too since 2026-10-28; this copy (research\data\lip\SECONDARY.txt) is merged into
 rem the repository's before the single score, so an hour either one takes counts once.
 "%PY%" research\lip.py sample

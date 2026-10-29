@@ -21,10 +21,15 @@ elseif ($chain -eq "KS") { $steps = @("scoreK","kquotes") }
 elseif ($chain -eq "PS") { $steps = @("pselect","pcopies","pcopies","scoreP") }
 else { Write-Output "usage: plan4_run.ps1 P|K|KS|PS"; exit 1 }
 $status = "research\results\plan4_status_$chain.txt"
+$stamp = Get-Date -Format "yyyyMMdd_HHmmss"
+# a step whose single result already exists is skipped, so a finishing chain can be started again after a failure
+$doneIf = @{ "pselect" = "research\results\plan4_selected.json"; "scoreP" = "research\results\plan4_P.json"; "scoreK" = "research\results\plan4_K.json" }
 $n = 0
 foreach ($s in $steps) {
     $n += 1
+    if ($chain -in @("KS","PS") -and $doneIf.ContainsKey($s) -and (Test-Path $doneIf[$s])) { Add-Content $status ("{0} skip {1} (its result exists)" -f (Get-Date -Format s), $s); continue }
     $out = "research\results\plan4_log_${s}_$n.txt"; $err = "research\results\plan4_log_${s}_${n}_err.txt"
+    if ($chain -in @("KS","PS")) { $out = "research\results\plan4_log_${chain}_${stamp}_${s}_$n.txt"; $err = "research\results\plan4_log_${chain}_${stamp}_${s}_${n}_err.txt" }
     Add-Content $status ("{0} start {1}" -f (Get-Date -Format s), $s)
     $p = Start-Process -FilePath $py -ArgumentList @("-u","research\plan4.py",$s) -NoNewWindow -Wait -PassThru -RedirectStandardOutput $out -RedirectStandardError $err
     Add-Content $status ("{0} end {1} exit {2}" -f (Get-Date -Format s), $s, $p.ExitCode)
