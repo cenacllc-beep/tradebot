@@ -21,6 +21,22 @@ elseif ($chain -eq "KS") { $steps = @("scoreK","kquotes") }
 elseif ($chain -eq "PS") { $steps = @("pselect","pcopies","pcopies","scoreP") }
 else { Write-Output "usage: plan4_run.ps1 P|K|KS|PS"; exit 1 }
 $status = "research\results\plan4_status_$chain.txt"
+# One copy of a chain at a time (2026-10-29, after KS and PS were each started twice at 02:21): the runner holds
+# research\results\plan4_lock_<chain>.txt open with no sharing until it exits (Windows closes it even after a crash);
+# a second copy cannot open it, so it stops before writing anything to the status file. The handle is inheritable, so
+# a python step started below holds the lock too and keeps it if only this runner is ended. A short clash (antivirus,
+# the search indexer) is retried for 5 seconds. The absolute path matters: .NET resolves relative paths against the
+# process directory, not Set-Location.
+$lockPath = Join-Path $root "research\results\plan4_lock_$chain.txt"
+$lock = $null; $why = ""
+for ($try = 1; $try -le 5 -and $lock -eq $null; $try++) {
+    try { $lock = [System.IO.File]::Open($lockPath, [System.IO.FileMode]::OpenOrCreate, [System.IO.FileAccess]::ReadWrite, ([System.IO.FileShare]::None -bor [System.IO.FileShare]::Inheritable)) }
+    catch { $why = $_.Exception.Message; if ($try -lt 5) { Start-Sleep -Seconds 1 } }
+}
+if ($lock -eq $null) {
+    try { Add-Content (Join-Path $root "research\results\plan4_refused.txt") ("{0} chain {1} not started: its lock is held by another copy, or cannot be opened ({2})" -f (Get-Date -Format s), $chain, $why) } catch { }
+    exit 3
+}
 $stamp = Get-Date -Format "yyyyMMdd_HHmmss"
 # a step whose single result already exists is skipped, so a finishing chain can be started again after a failure
 $doneIf = @{ "pselect" = "research\results\plan4_selected.json"; "scoreP" = "research\results\plan4_P.json"; "scoreK" = "research\results\plan4_K.json" }

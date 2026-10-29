@@ -8,7 +8,8 @@ would hold up the evening scan. Instead the hourly job runs this script, which o
   powershell -NoProfile -ExecutionPolicy Bypass -File research\\plan4_run.ps1 <CHAIN>, detached from the job
 
 Each flag starts its chain once. The chain writes its own progress (research/results/plan4_status_<CHAIN>.txt) and logs.
-A chain whose status file shows it still running (a start line with no end or stop after it) is not started again.
+A chain that is still running (its lock file is held, or its status file ends with a start line) is not started again,
+and plan4_run.ps1 itself refuses to run a second copy of a chain (the lock), whoever starts it.
 Python 3.8+, standard library only."""
 import os, sys, subprocess
 HERE = os.path.dirname(os.path.abspath(__file__)); ROOT = os.path.dirname(HERE); RESULTS = os.path.join(HERE, "results")
@@ -24,9 +25,27 @@ def last_line(chain, results=RESULTS):
     return lines[-1] if lines else ""
 
 
+def locked(chain, results=RESULTS):
+    """True when a copy of the chain holds research/results/plan4_lock_<CHAIN>.txt (plan4_run.ps1 keeps it open with no
+    sharing until it exits, so on Windows nobody else can open it). Elsewhere there is no such lock: False."""
+    if os.name != "nt":
+        return False
+    p = os.path.join(results, "plan4_lock_%s.txt" % chain)
+    if not os.path.exists(p):
+        return False
+    try:
+        open(p, "a").close()
+    except PermissionError:
+        return True
+    except OSError:
+        return False
+    return False
+
+
 def running(chain, results=RESULTS):
-    """True when the chain's status file ends with a 'start' line (a step began and has not ended)."""
-    return " start " in last_line(chain, results)
+    """True when a copy of the chain holds its lock, or its status file ends with a 'start' line (a step began and has
+    not ended; chains started before the lock existed show only this)."""
+    return locked(chain, results) or " start " in last_line(chain, results)
 
 
 def powershell():
@@ -61,8 +80,9 @@ def main(results=RESULTS, root=ROOT, popen=subprocess.Popen):
         flag = os.path.join(results, "plan4_go_%s.txt" % chain)
         if not os.path.exists(flag):
             continue
-        if running(chain, results):
-            print("plan4: chain %s is still running (%s); flag kept for later" % (chain, last_line(chain, results)))
+        held = locked(chain, results); last = last_line(chain, results)
+        if held or " start " in last:   # the same test as running(), probed once so the message matches the decision
+            print("plan4: chain %s is still running (%s); flag kept for later" % (chain, "its lock is held" if held else last))
             continue
         done = os.path.join(results, "plan4_go_%s.started.txt" % chain)
         if os.path.exists(done):

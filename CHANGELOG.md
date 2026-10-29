@@ -969,3 +969,26 @@ Full analysis: docs/INCIDENT_2026-10-23.md. Nothing that trades was changed: run
     - Left as they are:
       - Whether the chain survives the task ending is checked on the PC after the first launch.
       - The chain holds no stay-awake request. The laptop never sleeps on AC power.
+
+## 2026-10-29 02:40 (local) - PLAN4: each finishing chain ran twice; one-copy lock (research only)
+- **What happened.** Both finishing chains were started twice, at 02:21:52 and again at 02:21:58. Neither start came from the hourly launcher: its flags were still unclaimed, and at 02:22 it reported both chains as running. Nothing in the folder starts plan4_run.ps1 apart from the launcher, so this was almost certainly Claude's own direct start, run twice.
+  - **PS:** the first copy crashed at 02:26:43 in pselect. The two copies wrote the same cache file (plan4.py save() uses path + ".tmp"), giving a PermissionError. The second copy carried on normally. Cache files are replaced whole, so nothing was left half written.
+  - **KS:** two scoreK copies ran side by side. scoreK reads only the frozen trade files and uses a fixed random seed, so both work out the same verdict; the result is checked when they finish.
+  - The crashed copy's "stopped at pselect" line ended the PS status file while the other copy was still running. The next hourly run would therefore have taken the flag and started a third copy.
+  - **02:37:** both flags were renamed to plan4_go_*.started.txt by hand, with a note, so nothing starts another copy.
+- **Fix (for any later start):**
+  - research/plan4_run.ps1 holds research\results\plan4_lock_<chain>.txt open with no sharing for its whole run. The handle can be inherited, so a python step started by the runner holds the lock too.
+  - A second copy retries for 5 seconds. It then stops (exit 3) before writing to the status file and notes why in research\results\plan4_refused.txt.
+  - research/plan4_launch.py also counts a held lock as "still running", probed once per chain.
+  - tests/test_plan4launch.py covers the lock, including a real exclusive handle when run on Windows.
+  - cloud/repo.gitignore ignores the lock files.
+- **Independent review (agents/code-reviewer.md): nothing must be fixed; 3 SHOULD and 5 nits.** Applied:
+  - the inheritable handle, so ending only the runner does not free the lock while its step runs;
+  - retries, plus the real reason in the refusal note;
+  - the real-handle Windows test;
+  - one probe per chain;
+  - the test wording;
+  - the gitignore entry;
+  - the refusal note can no longer fail the exit code.
+- **Left as is:** the chains started before this change hold no lock, so they are checked by hand until they finish.
+- No PLAN4 rule, window, threshold or scorer changed.

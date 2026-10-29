@@ -65,4 +65,39 @@ assert b"launched" in r.stdout and time.time() - t0 < 5, (r.stdout, time.time() 
 # the runner can be started again after a failure: a step whose single result exists is skipped; each run has its own logs
 ps = open(os.path.join(WORK, "research", "plan4_run.ps1"), encoding="utf-8").read()
 assert '"pselect" = "research\\results\\plan4_selected.json"' in ps and '"scoreK" = "research\\results\\plan4_K.json"' in ps and "${stamp}" in ps
-print("plan4 launcher: a flag starts its chain once, detached; a running chain is left alone; only KS and PS: ok")
+# one copy at a time (2026-10-29): the runner holds an exclusive lock for its whole run and a second copy stops at once,
+# before touching the status file; the launcher treats a held lock as running even when the status file says otherwise
+i = ps.index("$lockPath = Join-Path $root"); assert ps.index("$status = ") < i < ps.index("foreach ($s in $steps)"), "lock before any step"
+blk = ps[i:ps.index("$stamp =")]
+assert "[System.IO.FileShare]::None -bor [System.IO.FileShare]::Inheritable" in blk and "$try -le 5" in blk and "exit 3" in blk and "Add-Content $status" not in blk
+assert "$_.Exception.Message" in blk and blk.index("[System.IO.File]::Open(") < blk.index("exit 3")
+open(os.path.join(R, "plan4_lock_PS.txt"), "w").close(); status("PS", "x start pselect", "x end pselect exit 1", "stopped at pselect (see its log)")
+assert not L.running("PS", R), "a lock file nobody holds means nothing"
+real = L.os.name; L.os.name = "nt"
+def held(path, mode="r", *a, **k):
+    if path.endswith("plan4_lock_PS.txt"): raise PermissionError(32, "The process cannot access the file because it is being used by another process")
+    return open(path, mode, *a, **k)
+try:
+    L.open = held
+    assert L.locked("PS", R) and L.running("PS", R) and not L.locked("KS", R)
+    flag("PS"); calls.clear()
+    assert L.main(results=R, root=WORK, popen=popen) == [] and calls == [] and os.path.exists(os.path.join(R, "plan4_go_PS.txt")), "a held lock keeps the flag"
+    del L.open   # released: the lock file exists but opens normally, so only the status file decides
+    assert not L.locked("PS", R) and not L.running("PS", R)
+finally:
+    L.os.name = real
+    if "open" in vars(L): del L.open
+# on Windows itself (.\run test): a real handle opened with no sharing, as plan4_run.ps1 opens it, reads as held; closed, as free
+if os.name == "nt":
+    import ctypes
+    from ctypes import wintypes
+    k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    k32.CreateFileW.restype = wintypes.HANDLE
+    k32.CreateFileW.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD, wintypes.LPVOID, wintypes.DWORD, wintypes.DWORD, wintypes.HANDLE]
+    k32.CloseHandle.argtypes = [wintypes.HANDLE]
+    h = k32.CreateFileW(os.path.join(R, "plan4_lock_PS.txt"), 0xC0000000, 0, None, 4, 0x80, None)   # read/write, no sharing, open always
+    assert h not in (None, wintypes.HANDLE(-1).value), ctypes.get_last_error()
+    try: assert L.locked("PS", R) and L.running("PS", R), "a real exclusive handle must read as held"
+    finally: k32.CloseHandle(h)
+    assert not L.locked("PS", R), "released"
+print("plan4 launcher: a flag starts its chain once, detached; a running chain (lock or status) is left alone; only KS and PS: ok")

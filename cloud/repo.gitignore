@@ -19,3 +19,5 @@ __pycache__/
 *.key
 .kalshi/
 /research/results/freshness.*
+# PLAN4 chain locks on the PC (held open while a chain runs; git could not read them)
+/research/results/plan4_lock_*.txt
