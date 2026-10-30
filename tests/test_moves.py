@@ -159,31 +159,34 @@ for m in re.finditer(r'- cron: "([\d,]+) ([\d,-]+) \* \* \*"', bs):   # every ow
     for h in hours:
         for mi in mins:
             assert SW.inside((h - 4) % 24, mi), ("cron outside the window", h, mi)
-# the script itself, with stand-ins for python3 (the two guards) and gh (the runs and the start)
-import subprocess, textwrap
-script = textwrap.dedent(run[len("run: |"):].split("\n", 1)[1])
-BS = os.path.join(OUT, "backstop"); BIN = os.path.join(BS, "bin"); os.makedirs(os.path.join(BS, "trial")); os.makedirs(BIN)
-open(os.path.join(BIN, "python3"), "w").write('#!/bin/bash\ncase "$1" in ../scan_window.py) exit $WIN;; ../check.py) exit $CHK;; esac\nexit 9\n')
-open(os.path.join(BIN, "gh"), "w").write('#!/bin/bash\nif [ "$2" = "-X" ]; then echo POST >> "$LOG"; exit 0; fi\necho "$GH_COUNT"\n')
-for f in ("python3", "gh"): os.chmod(os.path.join(BIN, f), 0o755)
-LOG = os.path.join(BS, "posts.txt")
-def backstop(win=0, chk=3, count="0", now="0200", test="", db=True):
-    if os.path.exists(LOG): os.remove(LOG)
-    pdb = os.path.join(BS, "trial", "paper.db")
-    if db: open(pdb, "w").close()
-    elif os.path.exists(pdb): os.remove(pdb)
-    env = dict(os.environ, PATH=BIN + os.pathsep + os.environ["PATH"], WIN=str(win), CHK=str(chk), GH_COUNT=count, NOW_UTC=now,
-               TEST=test, LOG=LOG, GITHUB_REPOSITORY="x/y")
-    r = subprocess.run(["bash", "-eo", "pipefail", "-c", script], cwd=os.path.join(BS, "trial"), env=env, capture_output=True, text=True)
-    return r.returncode, (open(LOG).read().count("POST") if os.path.exists(LOG) else 0), r.stdout
-assert backstop(win=1)[:2] == (0, 0), "outside the window: nothing"
-assert backstop(now="0450")[:2] == (0, 0) and backstop(now="0439")[:2] == (0, 1), "not in the last 20 minutes before 1 AM"
-assert backstop(chk=0)[:2] == (0, 0), "tonight already scanned (or the kill switch is on): nothing"
-assert backstop(count="1")[:2] == (0, 0), "a scan or settle queued or running: nothing"
-assert backstop(count="null")[:2] == (1, 0) and backstop(count="")[:2] == (1, 0), "an unreadable answer starts nothing (fails closed)"
-assert backstop()[:2] == (0, 1) and backstop(db=False)[:2] == (0, 1), "all clear: exactly one start"
-assert backstop(win=1, now="0450", test="true")[:2] == (0, 1), "test=true skips only the window and the late-start checks"
-print("both copies sample; the workflow never scores; several start times with one scan an evening; pushes retry; the backstop starts a missed trial scan: ok")
+# the workflow's own script, with stand-ins for python3 (the two guards) and gh (the runs and the start). It needs bash,
+# so it runs where the workflow runs (Linux); on the Windows PC only the text checks above run
+BACKSTOP_RUN = os.name == "posix" and shutil.which("bash") is not None
+if BACKSTOP_RUN:
+    import subprocess, textwrap
+    script = textwrap.dedent(run[len("run: |"):].split("\n", 1)[1])
+    BS = os.path.join(OUT, "backstop"); BIN = os.path.join(BS, "bin"); os.makedirs(os.path.join(BS, "trial")); os.makedirs(BIN)
+    open(os.path.join(BIN, "python3"), "w").write('#!/bin/bash\ncase "$1" in ../scan_window.py) exit $WIN;; ../check.py) exit $CHK;; esac\nexit 9\n')
+    open(os.path.join(BIN, "gh"), "w").write('#!/bin/bash\nif [ "$2" = "-X" ]; then echo POST >> "$LOG"; exit 0; fi\necho "$GH_COUNT"\n')
+    for f in ("python3", "gh"): os.chmod(os.path.join(BIN, f), 0o755)
+    LOG = os.path.join(BS, "posts.txt")
+    def backstop(win=0, chk=3, count="0", now="0200", test="", db=True):
+        if os.path.exists(LOG): os.remove(LOG)
+        pdb = os.path.join(BS, "trial", "paper.db")
+        if db: open(pdb, "w").close()
+        elif os.path.exists(pdb): os.remove(pdb)
+        env = dict(os.environ, PATH=BIN + os.pathsep + os.environ["PATH"], WIN=str(win), CHK=str(chk), GH_COUNT=count, NOW_UTC=now,
+                   TEST=test, LOG=LOG, GITHUB_REPOSITORY="x/y")
+        r = subprocess.run(["bash", "-eo", "pipefail", "-c", script], cwd=os.path.join(BS, "trial"), env=env, capture_output=True, text=True)
+        return r.returncode, (open(LOG).read().count("POST") if os.path.exists(LOG) else 0), r.stdout
+    assert backstop(win=1)[:2] == (0, 0), "outside the window: nothing"
+    assert backstop(now="0450")[:2] == (0, 0) and backstop(now="0439")[:2] == (0, 1), "not in the last 20 minutes before 1 AM"
+    assert backstop(chk=0)[:2] == (0, 0), "tonight already scanned (or the kill switch is on): nothing"
+    assert backstop(count="1")[:2] == (0, 0), "a scan or settle queued or running: nothing"
+    assert backstop(count="null")[:2] == (1, 0) and backstop(count="")[:2] == (1, 0), "an unreadable answer starts nothing (fails closed)"
+    assert backstop()[:2] == (0, 1) and backstop(db=False)[:2] == (0, 1), "all clear: exactly one start"
+    assert backstop(win=1, now="0450", test="true")[:2] == (0, 1), "test=true skips only the window and the late-start checks"
+print("both copies sample; the workflow never scores; several start times with one scan an evening; pushes retry; the backstop starts a missed trial scan%s: ok" % ("" if BACKSTOP_RUN else " (its script test needs bash; skipped here)"))
 # merge: the hours only the other copy took come over (samples, fills, log, hours.json), the target keeps any hour it has
 # rows for, results are united, a second merge changes nothing, and wrong folders or directions are refused
 A = os.path.join(OUT, "repo_lip"); B = os.path.join(OUT, "pc_lip"); os.makedirs(A); os.makedirs(B)
