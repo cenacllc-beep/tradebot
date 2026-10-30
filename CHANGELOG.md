@@ -1056,3 +1056,12 @@ Full analysis: docs/INCIDENT_2026-10-23.md. Nothing that trades was changed: run
 - **A sturdier report prompt is not applied.** It would copy files to the run's scratchpad first and report exact errors. Changing a scheduled task's prompt needs the user's approval, which was not given, so it stays as it is.
 - **Tonight's scan:** 55 markets logged; 3 paper trades opened (Oct 30 rain: SEA, DAL and WPB, all NO); FRESHNESS all current.
 - The switch to running whether or not signed in waits for the user to run tasks\run_signed_out.cmd (it needs administrator permission). A try without that permission was refused by Windows, and nothing changed.
+
+## 2026-10-29 23:20 (local) - the trial scan was started by hand again
+- **GitHub missed every scheduled start again.** None of the tradebot-scan.yml starts (00:55 UTC, then every half hour to 04:25) ran by 03:16 UTC. Only two PLAN5 L samples ran in that time.
+- **Started by hand at 03:16 UTC (11:16 PM La Paz):** `gh api .../tradebot-scan.yml/dispatches`.
+  - The trial copy logged 35 Oct 30 rain markets, starting at 03:16 UTC, inside the window.
+  - It ran model v3@ecb9ddc276bf, the same as the PC's, so the day is usable for PLAN6 B.
+  - It opened 1 paper trade (SEA NO).
+- **The PC's own scan ran at 8:56 PM:** 55 markets, 3 trades, FRESHNESS all current.
+- **Not set up (needs the user's approval):** a nightly cloud scheduled task that starts the trial scan when GitHub has not started it by 9:12 PM. Creating scheduled tasks was not approved.
