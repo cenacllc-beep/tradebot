@@ -1065,3 +1065,15 @@ Full analysis: docs/INCIDENT_2026-10-23.md. Nothing that trades was changed: run
   - It opened 1 paper trade (SEA NO).
 - **The PC's own scan ran at 8:56 PM:** 55 markets, 3 trades, FRESHNESS all current.
 - **Not set up (needs the user's approval):** a nightly cloud scheduled task that starts the trial scan when GitHub has not started it by 9:12 PM. Creating scheduled tasks was not approved.
+
+## 2026-10-30 07:45 (local) - PLAN4 scored: K1 FAIL, Polymarket not scored (research only)
+- **K1 (copying large Kalshi trades): FAIL.** -2.2c a contract after fees over 37,669 copies on 92 market dates (t -0.49; 95% interval about -11c to +7c). No edge shown.
+- **P1, P2 and P2c (copying Polymarket wallets): NOT SCORED.** 11 of 100 checked wallets failed the pre-set 98% position-coverage check, and the rule allows at most 10. Final: no re-run, no re-check, no relaxed threshold.
+- **Independent statistics review (agents/statistician.md): both verdicts correct.** Recorded in research/PLAN4.md "Results":
+  - K1's SE is the null floor per market date, about 4.5c, so the power table's 3-4c never applied (about 15c detectable).
+  - P2c is left unscored with P1 and P2 (an interpretation).
+  - The duplicate runs and the restart changed no output. The coverage snapshots were written only by the surviving pselect copy.
+  - The coverage pattern is descriptive only; its cause is unknown.
+- **registry.py:** copy_trading.kalshi_large.plan4 is FAILED; copy_trading.polymarket.plan4 is RETIRED (not testable with this data).
+- pcopies finished at 05:28: 64,564 candidate copies in 29,664 markets, no trade list failed.
+- No bot code, rule or threshold changed. The PLAN4 data stays on the PC.

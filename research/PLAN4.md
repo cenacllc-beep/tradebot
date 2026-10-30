@@ -381,3 +381,26 @@ and amounts, no outcomes). The Kalshi series listing was stopped before anything
   - PS: pselect, pcopies twice, then scoreP.
 - **Scoring:** each scorer runs only after every earlier step in its chain succeeded. It refuses (nothing saved) on any of the guards above, and each test is still scored once.
 - **Dates:** all windows are fixed dates (formation, evaluation to Oct 1, resolved by Oct 14, K1 markets closing by Oct 13). Fetching two weeks later changes no window. Resolutions are looked up fresh at scoring, as written.
+
+## Results (scored once; recorded 2026-10-30)
+- **K1, large trades on Kalshi: FAIL** (scored 2026-10-29 04:17).
+  - -2.2c a contract after fees over 37,669 copies on 92 market dates; t -0.49 against the 2.5 bar. The 95% interval is about -11c to +7c.
+  - **What it shows:** no edge. It rules out an average copy edge above about +7c on these 40 series (sports and 15-minute crypto and commodities, Jul 15 to Oct 13). It cannot tell a small gain from a small loss.
+  - **Descriptive only:**
+    - the large orders' own excess was -0.8c before fees;
+    - copying orders under $50 the same way gave -2.1c;
+    - 6% of large orders had no later order to copy;
+    - the quote check (300 sampled copies) found a median ask minus copy price of 0.0.
+- **P1, P2 and P2c, Polymarket wallets: NOT SCORED** (2026-10-30 05:28).
+  - 11 of the 100 checked wallets covered less than 98% of their buys. The rule above says P1 and P2 are not scored if more than 10% fail. P2c copies the same selected wallets, so it is left unscored with them; that is an interpretation, recorded here.
+  - The result says nothing either way. There is no re-run, re-check or relaxed threshold: the outcome sits at the threshold, so a re-check would be a forking path. A new idea needs its own plan.
+- **Statistics review (agents/statistician.md, 2026-10-30):**
+  - Both verdicts are correct applications of the rules.
+  - **K1's power was over-stated.** K1's standard error is the plan's null floor per market date (0.431/sqrt(92), about 4.5c). It does not shrink with more copies: the 303,369 under-$50 copies have the same SE. The power table's 3-4c never applied; the smallest edge the test could detect was about 15c. Future plans must work out power from the SE the code actually uses.
+  - The format check could not tell whether total_pnl includes fees (fee_adjust 0); this matters only if P had been scored.
+  - The coverage failures are mostly 2-10% shortfalls in the evaluation window; one wallet is at 0.27. That pattern fits a data-source gap, but it is descriptive and the cause is not known. One code point is unverified: coverage() counts combo buys in its denominator.
+- **Logistics (no rule changed):**
+  - On 2026-10-29 both finishing chains were started twice by mistake, at 02:21:52 and 02:21:58.
+    - The two scoreK and two kquotes copies printed identical results (deterministic from frozen files with a fixed seed); plan4_K.json is the second write.
+    - One pselect copy crashed at 02:26 on a shared .tmp file in the split/merge activity cache, before the coverage step. Every coverage snapshot was written after that, by the surviving copy (02:43 to 03:33), so the open-walk-first order held.
+  - A Windows Update restart at 04:59 cut pcopies off after the selection was frozen. It resumed from saved files at 14:20.
