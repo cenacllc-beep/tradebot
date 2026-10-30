@@ -1077,3 +1077,20 @@ Full analysis: docs/INCIDENT_2026-10-23.md. Nothing that trades was changed: run
 - **registry.py:** copy_trading.kalshi_large.plan4 is FAILED; copy_trading.polymarket.plan4 is RETIRED (not testable with this data).
 - pcopies finished at 05:28: 64,564 candidate copies in 29,664 markets, no trade list failed.
 - No bot code, rule or threshold changed. The PLAN4 data stays on the PC.
+
+## 2026-10-30 13:40 (local) - a backstop for the trial scan on GitHub (logistics, paper only)
+- **Why.** On Oct 28 and Oct 29 GitHub's scheduler started none of tradebot-scan.yml's scheduled runs inside the evening window, and both nights the trial scan was started by hand. Other workflows did run in that window (the PLAN5 L sample). Creating a cloud scheduled task to do the restart was not approved, so this lives inside the repository instead.
+- **New workflow cloud/workflows/trial-scan-backstop.yml** (copied to .github/workflows/). It never scans, trades, commits or touches a database. It only starts "tradebot evening scan (trial)" (workflow_dispatch) when all of these hold:
+  - it is inside the 8:50 PM to 1 AM La Paz window (scan_window.py), and not in the last 20 minutes before 1 AM (05:00 UTC, when the Eastern markets start);
+  - tonight's markets are not logged in trial/paper.db yet, and the kill switch is off (check.py);
+  - no trial scan or settle is queued or running (they share one concurrency group, so a second start could replace a pending run). If GitHub's answer cannot be read, it starts nothing (fails closed).
+- **When it checks:** right after every PLAN5 L sample run finishes (workflow_run, which has no scheduler delay), and on its own schedule at :10 and :40 past 1, 2 and 3 AM UTC plus 4:10 AM UTC (9:10 PM to 12:10 AM La Paz). Its own concurrency group means it never queues behind or cancels the scan or settle.
+- **Started by hand with test=true** it skips the window and late-start checks only. Outside the window the scan it starts stops at its own window check, which proves the chain without scanning.
+- **Independent code review (agents/code-reviewer.md): nothing that must be fixed.** Applied:
+  - the settle busy check;
+  - the 1 AM cutoff (with a NOW_UTC override for tests);
+  - an unreadable answer from GitHub fails closed;
+  - checkout without stored credentials (persist-credentials: false);
+  - README notes;
+  - script tests: tests/test_moves.py runs the workflow's own script with stand-ins for python3 and gh (outside the window, the cutoff, already scanned, busy, unreadable answer, all clear = exactly one start, test=true), and checks that every scheduled start falls inside the window.
+- **Not changed:** the trial scan itself, v3, the gate, live.py, any limit. The PC's own scan is unaffected. The trial copy stays secondary (PLAN6 B uses its days only when the PC missed a night and the scan began inside the window).

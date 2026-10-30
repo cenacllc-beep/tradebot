@@ -1,0 +1,68 @@
+# Copy to .github/workflows/ in the "tradebot" repository. Paper trading research only: this job never scans, never
+# trades and never touches a database. It only starts "tradebot evening scan (trial)" when that has not run tonight.
+#
+# Why (2026-10-30): GitHub's scheduler started none of tradebot-scan.yml's scheduled runs inside the evening window on
+# Oct 28 and Oct 29; both nights the trial scan was started by hand. Other workflows did run in the window (the PLAN5 L
+# sample at 02:51 UTC on Oct 30). So this job gets more chances:
+#   - after every PLAN5 L sample run (workflow_run, which starts when that run finishes, with no scheduler delay);
+#   - on its own schedule, at minutes no other workflow here uses.
+# Each time it checks the same two guards as the scan itself: inside the 8:50 PM to 1:00 AM La Paz window
+# (scan_window.py), and tonight's markets not logged yet in trial/paper.db (check.py; the kill switch also counts as
+# "nothing to do"). Only then, and only if no trial scan is already queued or running, does it start one
+# (workflow_dispatch, which GitHub allows a workflow's own token to do). Its own concurrency group means it never
+# queues behind or cancels the trial scan or settle.
+# Started by hand with test=true it skips the window check and starts the scan anyway; outside the window that scan
+# stops at its own window check, so this proves the chain end to end without scanning.
+name: trial scan backstop
+on:
+  workflow_run:
+    workflows: ["PLAN5 L hourly sample (research)"]
+    types: [completed]
+  schedule:
+    - cron: "10,40 1-3 * * *"
+    - cron: "10 4 * * *"
+  workflow_dispatch:
+    inputs:
+      test:
+        description: "Skip the window check (the scan it starts still checks the window itself)"
+        type: boolean
+        default: false
+concurrency:
+  group: tradebot-backstop
+  cancel-in-progress: false
+permissions:
+  actions: write      # to start the trial scan and read its runs
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+          persist-credentials: false   # it only reads; the token is passed to gh for the dispatch alone
+      - name: Start tonight's trial scan if it has not run
+        working-directory: trial
+        env:
+          TZ: America/La_Paz
+          GH_TOKEN: ${{ github.token }}
+          TEST: ${{ inputs.test }}
+        run: |
+          if [ "$TEST" != "true" ] && ! python3 ../scan_window.py; then echo "outside the scan window: nothing to do"; exit 0; fi
+          # not in the last 20 minutes before 1 AM: the scan's retries could run after the Eastern markets start (05:00 UTC)
+          now=${NOW_UTC:-$(date -u +%H%M)}
+          if [ "$TEST" != "true" ] && [ "$now" -ge 440 ] && [ "$now" -lt 500 ]; then echo "too close to 1 AM to start a scan: nothing to do"; exit 0; fi
+          if [ -f paper.db ] && python3 ../check.py; then echo "tonight's trial scan already ran (or the kill switch is on): nothing to do"; exit 0; fi
+          # a scan or settle already queued or running shares the "tradebot" group: starting another could cancel a pending one
+          busy=0
+          for w in tradebot-scan.yml tradebot-settle.yml; do
+            for s in queued in_progress waiting pending requested; do
+              n=$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/$w/runs?status=$s&per_page=1" --jq '.total_count')
+              case "$n" in ''|*[!0-9]*) echo "could not read the runs of $w ($n): not starting anything"; exit 1;; esac
+              busy=$((busy + n))
+            done
+          done
+          if [ "$busy" -gt 0 ]; then echo "a trial scan or settle is already queued or running: nothing to do"; exit 0; fi
+          gh api -X POST "repos/${GITHUB_REPOSITORY}/actions/workflows/tradebot-scan.yml/dispatches" -f ref=main
+          echo "started the trial scan (tradebot-scan.yml)"

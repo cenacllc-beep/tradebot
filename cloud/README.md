@@ -59,3 +59,17 @@ PC's `paper.db`. Paper trading only; no keys or secrets are needed (all data sou
 - **Trial settle:** `tradebot-settle.yml` starts hourly from 18:40 to 22:40 UTC. Settling again is safe.
 - **PLAN5 L:** the PC samples again as well as GitHub (research/PLAN5.md, logistics of 2026-10-29). The workflow no longer
   scores. The score runs once, by hand, after `python research/lip.py merge <PC copy>`.
+
+## Updated 2026-10-30: the trial scan backstop
+- On Oct 28 and Oct 29 GitHub started none of tradebot-scan.yml's scheduled runs inside the evening window. Both nights the trial scan was started by hand.
+- New workflow, `cloud/workflows/trial-scan-backstop.yml` (copied to `.github/workflows/`). It starts the trial scan when tonight's has not run:
+  - after every PLAN5 L sample run (workflow_run starts as soon as that run finishes, with no scheduler delay);
+  - on its own crons, at minutes no other workflow uses.
+- Each time it checks the same guards as the scan:
+  - inside the 8:50 PM to 1 AM La Paz window (scan_window.py);
+  - tonight not logged yet (check.py);
+  - no trial scan already queued or running.
+- It never scans, commits or touches a database, and it has its own concurrency group.
+- It does not start a scan while a trial scan or settle is queued or running: they share a group, where a new pending run would cancel the older one. It also does not start one in the last 20 minutes before 1 AM.
+- When a PLAN5 L run ends just before 8:55 PM, the trial scan may start a few minutes early (from 8:50 PM). That is inside the window by design.
+- To check the whole chain by hand: Actions, "trial scan backstop", Run workflow, with "test" ticked. That skips the window check. The scan it starts stops at its own window check outside the evening.
