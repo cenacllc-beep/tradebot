@@ -1093,4 +1093,5 @@ Full analysis: docs/INCIDENT_2026-10-23.md. Nothing that trades was changed: run
   - checkout without stored credentials (persist-credentials: false);
   - README notes;
   - script tests: tests/test_moves.py runs the workflow's own script with stand-ins for python3 and gh (outside the window, the cutoff, already scanned, busy, unreadable answer, all clear = exactly one start, test=true), and checks that every scheduled start falls inside the window.
+- **Checked end to end at 1:40 PM:** a test=true start ran the backstop (16 seconds). It started the trial scan as the workflow's own bot, and that scan stopped at its own window check (no scan, no commit). The script test needs bash, so on the Windows PC test_moves.py runs only the text checks (passed there).
 - **Not changed:** the trial scan itself, v3, the gate, live.py, any limit. The PC's own scan is unaffected. The trial copy stays secondary (PLAN6 B uses its days only when the PC missed a night and the scan began inside the window).
