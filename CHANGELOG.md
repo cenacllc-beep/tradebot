@@ -1047,3 +1047,12 @@ Full analysis: docs/INCIDENT_2026-10-23.md. Nothing that trades was changed: run
   - letting the jobs run after an update restart without sign-in, either through Windows' option to finish setting up after an update with the user's sign-in info, or through the tasks' "run whether the user is signed in or not";
   - Windows Update active hours.
 - No code, rule or threshold changed.
+
+## 2026-10-29 21:45 (local) - the phone page and nightly backup work unattended
+- **The 9:25 PM evening report did both of its steps without help.**
+  - It republished the phone page: "Updated Oct 29, 8:58 PM", with no data-check warning.
+  - It uploaded tonight's JSON backup to the page's file storage (1,010,457 bytes, 9:26 PM).
+- **Why uploads were missing.** The report stops before both steps on any night the evening scan did not run, so most of the missing uploads since Oct 14 match nights the laptop was asleep. The Oct 28 evening, when the scan did run, is the one miss with no known cause.
+- **A sturdier report prompt is not applied.** It would copy files to the run's scratchpad first and report exact errors. Changing a scheduled task's prompt needs the user's approval, which was not given, so it stays as it is.
+- **Tonight's scan:** 55 markets logged; 3 paper trades opened (Oct 30 rain: SEA, DAL and WPB, all NO); FRESHNESS all current.
+- The switch to running whether or not signed in waits for the user to run tasks\run_signed_out.cmd (it needs administrator permission). A try without that permission was refused by Windows, and nothing changed.
