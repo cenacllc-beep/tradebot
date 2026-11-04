@@ -1095,3 +1095,33 @@ Full analysis: docs/INCIDENT_2026-10-23.md. Nothing that trades was changed: run
   - script tests: tests/test_moves.py runs the workflow's own script with stand-ins for python3 and gh (outside the window, the cutoff, already scanned, busy, unreadable answer, all clear = exactly one start, test=true), and checks that every scheduled start falls inside the window.
 - **Checked end to end at 1:40 PM:** a test=true start ran the backstop (16 seconds). It started the trial scan as the workflow's own bot, and that scan stopped at its own window check (no scan, no commit). The script test needs bash, so on the Windows PC test_moves.py runs only the text checks (passed there).
 - **Not changed:** the trial scan itself, v3, the gate, live.py, any limit. The PC's own scan is unaffected. The trial copy stays secondary (PLAN6 B uses its days only when the PC missed a night and the scan began inside the window).
+
+## 2026-11-04 02:30 (local) - status check after four idle days; why the rain trades lost (descriptive); backstop waits for the window
+- **Scheduled jobs, Oct 30 to Nov 3:** the PC scanned every evening at 8:55-8:57 PM (55 markets; 2-4 paper trades a night) and settled every afternoon; FRESHNESS all current. The settle on Nov 3 needed retries (Kalshi connection resets and timeouts) and still finished.
+- **Cloud trial copy:** the backstop started the trial scan on Oct 30 (8:52 PM), Nov 1 (9:46 PM), Nov 2 (9:21 PM) and Nov 3 (10:10 PM). It missed Oct 31 (market day Nov 1): no triggering run finished inside the window (PLAN5 L ran at 8:23 PM, then not until 2:45 AM), and the backstop's own crons ran 5 to 8 hours late every night.
+- **Runner comparison (the Nov 1 follow-up, done late):** the PC was complete and on time on every evening since Oct 29; GitHub was not (two nights by hand, one missed, the rest 9:20-10:10 PM). PLAN5 L hours Oct 28 19Z to Nov 4 05Z: 155 hours, the PC took 131, GitHub 32, together 138 (gaps of 17 hours, mostly Oct 29). The phone page stays on the PC's dashboard; the PC's jobs remain the primary runner.
+- **v4 airport forecast, Nov 3 evening: 0 logged** (34 on other nights). The Iowa Environmental Mesonet archive has no NBS 18/19 UTC run for Nov 3 (only 00 and 06 UTC, checked at 06:10 UTC Nov 4), so stationfc found nothing to log. Not a bot fault; that market day is simply missing from the v4 forward test.
+- **Backstop change (cloud/workflows/trial-scan-backstop.yml, also in .github/workflows/):**
+  - It now also follows the trial settle (workflow_run).
+  - A check that starts from 4:50 PM until the window opens waits until 8:56 PM. Waking then lets a scheduled 8:55 PM trial scan that GitHub did start go first.
+  - After the wait it takes the newest main (it never writes trial/paper.db back) and runs the usual guards.
+  - It waits only while the repository reads as public, because the wait costs about 4 runner-hours a night. Each network call has its own time limit. timeout-minutes is 260.
+- **Independent code review (agents/code-reviewer.md): nothing that must be fixed.** Applied:
+  - time limits on every gh and git call, so a hung call cannot hold the group for hours;
+  - the public-repository condition for the wait;
+  - waking at 8:56 PM instead of 8:51 PM, so the trial scan keeps its 8:55 PM design time when GitHub starts it;
+  - one date call (no hour-change race) and a 6-minute wait at exactly 8:50 PM;
+  - a failed fetch goes on (the scan re-checks tonight and the kill switch on the newest main), and a failed checkout starts nothing;
+  - the whole tree, not just paper.db, is refreshed after the wait;
+  - comments, README and CLAUDE.md section 9 updated;
+  - tests: a date stand-in exercises the real time arithmetic, the logged order of calls is checked, plus private-repository, checkout-failure and job-timeout checks.
+  
+  Left as is: the seconds-wide gap between the busy check and the start, which already existed. Any duplicate start stops at tradebot-scan.yml's own check.
+- **Why the rain paper trades lost (user question, Oct 30; descriptive, interim, no rule changed).** From a read-only copy of paper.db after the Nov 3 scan:
+  - 18 settled v3 rain trades: 2 won, 16 lost, net -$6.74 on paper.
+  - 16 of the 18 were NO bets made because v3 gave a lower chance of rain than Kalshi; it rained in 14 of them.
+  - Across all 305 resolved v3 rain markets (10 market days), v3 runs low on rain in its middle range (said about 41%, rained 59%; said 59%, rained 75%). Kalshi's prices were close to calibrated.
+  - Where Kalshi was 16+ points above v3, it rained in 30 of 35 markets. The 8-point blend edge (16-point disagreement) therefore selects v3's misses.
+  - Day-clustered: v3 is low by +0.116 (SE 0.061, 7 of 9 days above zero) in the 15-85% range; Kalshi by +0.016 (SE 0.050).
+  - Interim pooled Brier: v3 0.094, Kalshi 0.069. The gate is still judged once on Nov 11 (section 11). Nothing here changes v3 (frozen), the gate or any threshold.
+  - Likely cause: v3's fixed rule combining two 12-hour chances was never calibrated on outcomes. A correction would be a new version with its own written plan and a test on new markets.

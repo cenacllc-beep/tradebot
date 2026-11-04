@@ -69,7 +69,16 @@ PC's `paper.db`. Paper trading only; no keys or secrets are needed (all data sou
   - inside the 8:50 PM to 1 AM La Paz window (scan_window.py);
   - tonight not logged yet (check.py);
   - no trial scan already queued or running.
-- It never scans, commits or touches a database, and it has its own concurrency group.
+- It never scans or commits, and it has its own concurrency group. (After a wait it replaces its own checked-out copy with the newest main; it never writes trial/paper.db back.)
 - It does not start a scan while a trial scan or settle is queued or running: they share a group, where a new pending run would cancel the older one. It also does not start one in the last 20 minutes before 1 AM.
 - When a PLAN5 L run ends just before 8:55 PM, the trial scan may start a few minutes early (from 8:50 PM). That is inside the window by design.
 - To check the whole chain by hand: Actions, "trial scan backstop", Run workflow, with "test" ticked. That skips the window check. The scan it starts stops at its own window check outside the evening.
+
+## Updated 2026-11-04: the backstop waits for the window
+- On Oct 31 the trial scan never started. No PLAN5 L or settle run finished inside the window (PLAN5 L ran at 8:23 PM, then not until 2:45 AM), and the backstop's own crons ran 5 to 8 hours late every night.
+- The backstop now also follows the trial settle (workflow_run).
+- A check that starts from 4:50 PM until the window opens waits until 8:56 PM. It then takes the newest main and checks as usual. Starting at 8:56 PM means a scheduled 8:55 PM trial scan that GitHub did start goes first; the backstop then sees it running and does nothing.
+- A waiting run holds the backstop's group for up to about 4 hours. Triggers in that time collapse into one pending run, so Actions shows the replaced ones as cancelled. That is expected.
+- The wait costs about 4 runner-hours a night, free only while the repository is public. The backstop waits only when the repository reads as public; if it ever goes private again, it falls back to checking without waiting.
+- Each network call has its own time limit, so a hung call cannot hold the group for hours.
+

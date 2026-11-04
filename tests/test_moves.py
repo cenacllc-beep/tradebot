@@ -142,7 +142,8 @@ for f in ("plan5-lip.yml", "tradebot-scan.yml", "tradebot-settle.yml"):   # a ru
 # only if tonight is not logged and no trial scan is queued or running; it never scans, commits or touches a database itself
 bs = open(os.path.join(WORK, "cloud", "workflows", "trial-scan-backstop.yml"), encoding="utf-8").read()
 name = re.search(r"(?m)^name: (.+)$", wf).group(1)
-assert 'workflows: ["%s"]' % name in bs and "types: [completed]" in bs, "it follows the PLAN5 L workflow by its exact name"
+sname = re.search(r"(?m)^name: (.+)$", st).group(1)
+assert 'workflows: ["%s", "%s"]' % (name, sname) in bs and "types: [completed]" in bs, "it follows the PLAN5 L and trial settle workflows by their exact names"
 assert "group: tradebot-backstop" in bs and "actions: write" in bs and "contents: read" in bs and "contents: write" not in bs
 assert re.search(r"uses: actions/checkout@v5\n\s+with:\n\s+ref: main", bs)
 run = bs[bs.index("run: |"):]
@@ -166,26 +167,51 @@ if BACKSTOP_RUN:
     import subprocess, textwrap
     script = textwrap.dedent(run[len("run: |"):].split("\n", 1)[1])
     BS = os.path.join(OUT, "backstop"); BIN = os.path.join(BS, "bin"); os.makedirs(os.path.join(BS, "trial")); os.makedirs(BIN)
-    open(os.path.join(BIN, "python3"), "w").write('#!/bin/bash\ncase "$1" in ../scan_window.py) exit $WIN;; ../check.py) exit $CHK;; esac\nexit 9\n')
-    open(os.path.join(BIN, "gh"), "w").write('#!/bin/bash\nif [ "$2" = "-X" ]; then echo POST >> "$LOG"; exit 0; fi\necho "$GH_COUNT"\n')
-    for f in ("python3", "gh"): os.chmod(os.path.join(BIN, f), 0o755)
-    LOG = os.path.join(BS, "posts.txt")
-    def backstop(win=0, chk=3, count="0", now="0200", test="", db=True):
+    # scan_window.py answers from a list (one answer per call: before and after the wait); date answers the local time
+    # asked for; sleep, git and the start only record. Every call is logged in order.
+    DATE = shutil.which("date")
+    open(os.path.join(BIN, "python3"), "w").write('#!/bin/bash\ncase "$1" in\n ../scan_window.py) w=$(head -n1 "$WINF"); tail -n +2 "$WINF" > "$WINF.t"; mv "$WINF.t" "$WINF"; echo "win ${w:-$WIN}" >> "$LOG"; exit ${w:-$WIN};;\n ../check.py) echo "check $CHK" >> "$LOG"; exit $CHK;; esac\nexit 9\n')
+    open(os.path.join(BIN, "gh"), "w").write('#!/bin/bash\nif [ "$2" = "-X" ]; then echo POST >> "$LOG"; exit 0; fi\nif [ "$2" = "repos/$GITHUB_REPOSITORY" ]; then echo "$PRIV"; exit 0; fi\necho "$GH_COUNT"\n')
+    open(os.path.join(BIN, "sleep"), "w").write('#!/bin/bash\necho "sleep $1" >> "$LOG"\n')
+    open(os.path.join(BIN, "git"), "w").write('#!/bin/bash\necho "git $*" >> "$LOG"\nif [ "$1" = "fetch" ]; then exit $FETCH; fi\nif [ "$1" = "checkout" ]; then exit $CO; fi\n')
+    open(os.path.join(BIN, "date"), "w").write('#!/bin/bash\nif [ "$1" = "+%%H%%M" ]; then echo "$HM"; exit 0; fi\nexec "%s" "$@"\n' % DATE)
+    for f in ("python3", "gh", "sleep", "git", "date"): os.chmod(os.path.join(BIN, f), 0o755)
+    LOG = os.path.join(BS, "posts.txt"); WINF = os.path.join(BS, "win.txt")
+    def backstop(win=0, chk=3, count="0", now="0200", test="", db=True, wins=(), hm="1500", fetch=0, co=0, priv="false"):
+        """(exit code, number of starts, the logged calls)"""
         if os.path.exists(LOG): os.remove(LOG)
+        open(WINF, "w").write("".join("%d\n" % w for w in wins))
         pdb = os.path.join(BS, "trial", "paper.db")
         if db: open(pdb, "w").close()
         elif os.path.exists(pdb): os.remove(pdb)
         env = dict(os.environ, PATH=BIN + os.pathsep + os.environ["PATH"], WIN=str(win), CHK=str(chk), GH_COUNT=count, NOW_UTC=now,
-                   TEST=test, LOG=LOG, GITHUB_REPOSITORY="x/y")
+                   TEST=test, LOG=LOG, WINF=WINF, GITHUB_REPOSITORY="x/y", HM=hm, FETCH=str(fetch), CO=str(co), PRIV=priv)
         r = subprocess.run(["bash", "-eo", "pipefail", "-c", script], cwd=os.path.join(BS, "trial"), env=env, capture_output=True, text=True)
-        return r.returncode, (open(LOG).read().count("POST") if os.path.exists(LOG) else 0), r.stdout
+        lg = open(LOG).read() if os.path.exists(LOG) else ""
+        return r.returncode, lg.count("POST"), lg
     assert backstop(win=1)[:2] == (0, 0), "outside the window: nothing"
     assert backstop(now="0450")[:2] == (0, 0) and backstop(now="0439")[:2] == (0, 1), "not in the last 20 minutes before 1 AM"
     assert backstop(chk=0)[:2] == (0, 0), "tonight already scanned (or the kill switch is on): nothing"
     assert backstop(count="1")[:2] == (0, 0), "a scan or settle queued or running: nothing"
     assert backstop(count="null")[:2] == (1, 0) and backstop(count="")[:2] == (1, 0), "an unreadable answer starts nothing (fails closed)"
     assert backstop()[:2] == (0, 1) and backstop(db=False)[:2] == (0, 1), "all clear: exactly one start"
+    assert backstop(win=1, hm="1900", test="true")[:2] == (0, 1), "test=true skips the window check and the wait"
     assert backstop(win=1, now="0450", test="true")[:2] == (0, 1), "test=true skips only the window and the late-start checks"
+    # before the window (from 4:50 PM): wait until 8:56 PM, take the newest main, check the window, then the usual guards
+    rc, n, lg = backstop(wins=(3, 0), hm="1908")
+    assert (rc, n) == (0, 1) and lg.split("\n")[:-1] == ["win 3", "sleep 6480", "git fetch -q --depth=1 origin main",
+        "git checkout -q --detach FETCH_HEAD", "win 0", "check 3", "POST"], lg
+    assert "sleep 14760" in backstop(wins=(3, 0), hm="1650")[2], "4:50 PM waits 246 minutes"
+    assert "sleep 360" in backstop(wins=(3, 0), hm="2050")[2], "8:50 PM, if the window check still said outside: 6 minutes"
+    for hm in ("1649", "0809", "0005", "2051"):
+        assert backstop(wins=(3,), hm=hm)[1:] == (0, "win 3\n"), "outside 4:50 to 8:50 PM: nothing, no wait (%s)" % hm
+    assert backstop(wins=(3,), hm="1900", priv="true")[1:] == (0, "win 3\n"), "a private repository: no 4-hour wait"
+    assert backstop(wins=(3, 0), hm="2000", chk=0)[:2] == (0, 0), "scanned while it waited: nothing"
+    rc, n, lg = backstop(wins=(3, 3), hm="2000"); assert (rc, n) == (0, 0) and "sleep 3360" in lg, "still outside after the wait: nothing"
+    rc, n, lg = backstop(wins=(3, 0), hm="2000", fetch=1)
+    assert (rc, n) == (0, 1) and "git checkout" not in lg, "no fresh copy: it goes on and the scan checks tonight itself"
+    rc, n, lg = backstop(wins=(3, 0), hm="2000", co=1); assert (rc, n) == (1, 0), "a failed checkout starts nothing"
+    tmo = int(re.search(r"timeout-minutes: (\d+)", bs).group(1)); assert tmo >= (1256 - 1010) + 10, "the job outlives the longest wait"
 print("both copies sample; the workflow never scores; several start times with one scan an evening; pushes retry; the backstop starts a missed trial scan%s: ok" % ("" if BACKSTOP_RUN else " (its script test needs bash; skipped here)"))
 # merge: the hours only the other copy took come over (samples, fills, log, hours.json), the target keeps any hour it has
 # rows for, results are united, a second merge changes nothing, and wrong folders or directions are refused
