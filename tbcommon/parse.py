@@ -38,3 +38,13 @@ def rts(s):
 def cents(p):
     """Dollars -> whole cents (rounded)."""
     return int(round(p * 100))
+
+
+def market_day(ticker):
+    """The market day in a Kalshi daily-market ticker ("KXRAIN-26OCT14-NYC" -> date(2026, 10, 14)), or None when the
+    ticker has no readable day (None, no second part, or not YYMONDD). One parser for the measurement and research
+    code; the frozen v3 path (strategy.py), shadow.py, the pre-registered scorers and the dashboard keep their own."""
+    try:
+        return datetime.strptime(ticker.split("-")[1], "%y%b%d").date()
+    except (AttributeError, IndexError, TypeError, ValueError):
+        return None

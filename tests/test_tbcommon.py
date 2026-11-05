@@ -93,4 +93,28 @@ q = os.path.join(OUT, "log", "r.jsonl"); jsonio.append(q, [{"i": 1}, {"i": 2}]);
 open(q, "a").write('{"i": 3')   # a crash mid-line
 assert jsonio.lines(q) == [{"i": 1}, {"i": 2}] and jsonio.lines(q + ".none") == []
 assert open(q).read().startswith('{"i":1}\n')   # compact, one object per line
+# ---------- market_day and read-only connections (added 2026-11-05, refactor stage 3) ----------
+import sqlite3
+from datetime import date, datetime
+from tbcommon.parse import market_day
+from tbcommon import db as tdb
+assert market_day("KXRAIN-26OCT14-NYC") == date(2026, 10, 14) and market_day("KXHIGHDEN-26NOV05-T48") == date(2026, 11, 5)
+for bad in (None, "", "KXRAIN", "KXRAIN-BADDAY-NYC", "KXRAIN-26XYZ14-NYC", 42):
+    assert market_day(bad) is None, bad
+import risk, postmortem   # risk keeps its own parser (the frozen strategy.py imports it); both must agree
+rnd = random.Random(1)
+for _ in range(500):
+    t = "KXRAIN-%s-%s" % (rnd.choice(["26OCT14", "26NOV05", "26FEB29", "27FEB28", "26DEC31", "BAD", ""]), rnd.choice(["NYC", "SEA", "DEN"]))
+    try: old = datetime.strptime(t.split("-")[1], "%y%b%d").date().isoformat()
+    except (IndexError, ValueError): old = None
+    assert risk.day_of(t) == old and (market_day(t).isoformat() if market_day(t) else None) == old, t
+dbp = os.path.join(OUT, "ro.db"); w = sqlite3.connect(dbp); w.execute("create table t(x)"); w.execute("insert into t values(1)"); w.commit(); w.close()
+c = tdb.connect_ro(dbp, sqlite3.Row); assert c.execute("select x from t").fetchone()["x"] == 1
+try: c.execute("insert into t values(2)"); raise AssertionError("a read-only connection must refuse writes")
+except sqlite3.OperationalError: pass
+c.close()
+try: tdb.connect_ro(os.path.join(OUT, "missing.db")); raise AssertionError("a missing database must not be created")
+except sqlite3.OperationalError: assert not os.path.exists(os.path.join(OUT, "missing.db"))
+assert tdb.uri_ro(os.path.join(OUT, "a b#c.db")).endswith("a%20b%23c.db?mode=ro")
+print("tbcommon: market_day, read-only connections: ok")
 print("tbcommon: all checks passed")

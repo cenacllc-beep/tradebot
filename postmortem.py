@@ -13,6 +13,7 @@ Every settled trade gets one or more cause codes, the most specific first:
 - UNKNOWN: no decision record (trades opened before the audit ledger) and too little to tell.
 Wins get WON. A won trade can still carry TIMING_ERROR or LOW_PROBABILITY_BET: luck is not evidence. Python 3.8+."""
 from datetime import datetime, timedelta, timezone
+from tbcommon.parse import market_day
 
 # Hours behind UTC of each city's standard time (Kalshi's day runs from local standard-time midnight). Unknown: Eastern.
 STD_OFFSET={**{c:6 for c in ("CHI","MKE","MIN","STL","SGF","DAL","HOU","AUS","SATX","OKC","CLL","NOLA")},
@@ -20,8 +21,9 @@ STD_OFFSET={**{c:6 for c in ("CHI","MKE","MIN","STL","SGF","DAL","HOU","AUS","SA
 def day_start(ticker):
     """Kalshi day start for daily weather markets: local standard-time midnight on the date in the ticker. Without the
     close time it is approximate, so it is used only when no decision record exists."""
-    try: d=datetime.strptime(ticker.split("-")[1],"%y%b%d").replace(tzinfo=timezone.utc)
-    except (IndexError,ValueError): return None
+    day=market_day(ticker)
+    if day is None: return None
+    d=datetime(day.year,day.month,day.day,tzinfo=timezone.utc)
     import risk
     return (d+timedelta(hours=STD_OFFSET.get(risk.city_of(ticker),5))).timestamp()
 def classify(trade,decision=None,calib=None,station_expected=None,max_age_s=3*3600):

@@ -24,18 +24,18 @@ This report runs after every settle, so a flag is a screen, not a test: a patter
 change the bot after a plan is written (research/PLAN3.md) and it holds on markets after the day it was found."""
 import os, sys, json, sqlite3, math
 from statistics import NormalDist
-from pathlib import Path
 from datetime import datetime
 HERE=os.path.dirname(os.path.abspath(__file__))
 if HERE not in sys.path: sys.path.insert(0,HERE)
 from config import DB
+from tbcommon.db import connect_ro
 OUTDIR=os.getenv("TRADEBOT_RESULTS") or os.path.join(HERE,"research","results")   # tests point this at a temporary folder
 MIN_N,MIN_DAYS,MIN_WEEKS,ALPHA=30,10,4,0.05
 
 
 def ro(path):
     p=path if os.path.isabs(path) else os.path.join(HERE,path)
-    return sqlite3.connect(Path(p).resolve().as_uri()+"?mode=ro",uri=True) if os.path.exists(p) else None
+    return connect_ro(p) if os.path.exists(p) else None
 def rows(c,sql,args=()):
     try: cur=c.execute(sql,args); names=[d[0] for d in cur.description]; return [dict(zip(names,r)) for r in cur.fetchall()]
     except sqlite3.Error: return []

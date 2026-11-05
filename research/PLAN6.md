@@ -187,3 +187,13 @@ If the look is still pending, the task tries again the next afternoon.
   - the model check uses only decisions made while the markets were open to that scan;
   - a damaged trial copy loses only B;
   - not-used days say "not counted".
+- **Erratum, 2026-11-05 (found by the PLAN7 statistics review; changes no rule and no reading).** The guide figure in
+  "Expected precision" took the holdout's two-standard-error column (0.0039) as one standard error.
+  - **The right figures:** blend minus market had SE 0.0020 (day-level SD about 0.018). A single calibrated forecast
+    minus market had SD about 0.028.
+  - **The stated expectation still holds approximately:** v3 is a single forecast, so its interval at 12 to 20 days is
+    at least about +/-0.013 to +/-0.018, and likely wider (v3 is noisier than the airport forecast those figures come
+    from). That is about a fifth to a quarter of the market's Brier.
+  - **What this note does not change:** the report's numbers and readings. They are computed from the data, not from
+    this guide.
+

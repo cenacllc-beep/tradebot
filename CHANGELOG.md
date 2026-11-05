@@ -1125,3 +1125,112 @@ Full analysis: docs/INCIDENT_2026-10-23.md. Nothing that trades was changed: run
   - Day-clustered: v3 is low by +0.116 (SE 0.061, 7 of 9 days above zero) in the 15-85% range; Kalshi by +0.016 (SE 0.050).
   - Interim pooled Brier: v3 0.094, Kalshi 0.069. The gate is still judged once on Nov 11 (section 11). Nothing here changes v3 (frozen), the gate or any threshold.
   - Likely cause: v3's fixed rule combining two 12-hour chances was never calibrated on outcomes. A correction would be a new version with its own written plan and a test on new markets.
+
+## 2026-11-05 16:25 (local) - PLAN7 (v3 with its rain lean corrected) and refactor stage 3 (no functional change)
+User: "intelligently implement your recommendations above" and "act like a senior engineer who just joined a massive
+unfamiliar codebase ... do not change functionality. only upgrade the code quality, scalability and maintainability."
+
+**PLAN7 (research/PLAN7.md, research/plan7.py, tests/test_plan7.py; one line in run.bat settle).**
+- **What it is.** Research and paper only, written before its forward data and before the fit. A correction
+  logit(q) = a + b logit(v3) is fitted once on the test's own days (from Nov 11, or from Nov 13 if a test-day market
+  never resolves) and frozen. It is judged on market days from Nov 11:
+  - the gate's day-mean Brier statistic (primary);
+  - maker and taker arms, one contract per signal.
+  
+  Futility look at 60 forward market days, final look at 110, backstop 2027-06-30. Never part of the gate, never
+  connected to live.py.
+- **First statistics review (agents/statistician.md): 3 MUST, 5 SHOULD, 6 NICE, all applied before any forward data.**
+  - pinned rule: copies of the rule values, the gate statistic, the fill rule, the bootstrap and the fee, checked
+    against their sources;
+  - forward rows only from the fit days' model versions; v3's code stays unchanged while PLAN7 runs;
+  - the final look is refused unless the futility look said "continue";
+  - an honest power statement (A's pass threshold about 7% of the market's Brier, power about 15% for a blend-sized
+    edge, the maker arm about 6c a contract to pass);
+  - an early end or a shortfall by the backstop reads "not confirmed";
+  - fit timing that cannot be blocked forever, and candles stored as each day starts (unfilled after 7 days without
+    any);
+  - a Bonferroni line with the airport-forecast test;
+  - A's day-to-day correlation, with its block bootstrap required for "confirmed";
+  - descriptive fit checks (clustered SEs, leave-one-day-out), the window judged on the scan's start, and a raw-v3 maker
+    placebo.
+- **Statistics re-check: M1-M3, S1 and S3-S5 resolved; power arithmetic and the PLAN6 erratum correct.** Applied:
+  - **MUST:** the backstop enforced in code (market days after 2027-06-30 never count; a shortfall reads "not
+    confirmed" from 2027-07-07);
+  - **SHOULD:**
+    - the model-version rule's brittleness stated (any edit to weather.py, nws.py or strategy.py, including
+      LOOK_DEADLINE, ends PLAN7's data), with one narrow amendment procedure (research/results/plan7_versions.json,
+      the user's approval, evidence the forecast code is unchanged);
+    - status shows rows not counted by reason;
+    - the calendar states the scan rate needed (about 47% of nights);
+  - **NICE:** a Bonferroni line including A's bootstrap; "2.5%" called an upper bound; exclusions counted on the look's
+    days; market_day and the bot's date pinned; the fit-versus-forward window difference reported; the joint power
+    stated.
+- **Erratum to PLAN6** (found by the review): its precision guide used two standard errors as one (0.0039 is 2 SE of
+  blend minus market). This changes no rule and no reading; a note was added to PLAN6's revision notes.
+
+**Refactor stage 3 (docs/REFACTOR.md section 6; docs/ARCHITECTURE.md rewritten for the system as it runs).**
+- **Review findings, most severe first:**
+  1. code identity across three copies;
+  2. backup growth (quadratic);
+  3. single-attempt HTTP in the frozen path;
+  4. the gate's rules in two places;
+  5. logs read as an interface;
+  6. discovery.db growth (214 MB);
+  7. a stop date copied in presentation code;
+  8. duplicated read-only connections and ticker-date parsing;
+  9. import plumbing;
+  10. dense style.
+  
+  Performance: no bottleneck at this scale.
+- **Changed, with no functional change:**
+  - tbcommon/db.py (connect_ro);
+  - tbcommon.parse.market_day;
+  - learn, freshness and postmortem use them (risk.py and marks.py keep their own copies, after the code review);
+  - control_view reads gate.STOP_DATE;
+  - manifest.py (new: `manifest.py write|check`, for every deploy);
+  - golden.py covers learn, freshness and ohlc.
+- **Kept on purpose:** the copies in the operations scripts and the dashboard (resilience boundaries), and in the frozen
+  and pre-registered code.
+- **Waits:**
+  - the frozen-path work, until PLAN7 ends;
+  - backup retention and discovery.db pruning, for the user's decision (both delete data).
+- **Proof.**
+  - Golden master: 148,974 data fields, 0 differences.
+  - 15,404 text pieces, 1 changed stretch: the shadow scenario's "per $ per day" rounds to +60.4% or +60.5% depending
+    on test timing, and the old code also gave both values on reruns.
+  - The full suite passes.
+
+**Independent code review (agents/code-reviewer.md) of the refactor and plan7.py.**
+- Its own golden run: 149,027 fields, 0 differences; the pinned copies faithful; the fit's numerics checked. Its first
+  golden run differed only because this working copy lacked research/results/rain_model.json (now copied from the
+  repository: the same file as on the PC).
+- **MUST:**
+  - manifest.py dropped killswitch.py through a "KILL*" filter. Fixed: core.kill_file's rule, top folder only.
+  - A decision row without a day start could block both PLAN7 looks. Fixed: not counted (no_day_start).
+- **SHOULD, applied:**
+  - the no-candles rule after 3 tries, whatever the cause;
+  - auto's steps each on their own;
+  - day files: their own temp names, retry on Windows locks, an unreadable file moved aside and fetched again;
+  - only a missing table means "no versions";
+  - a failed fit reported every run;
+  - the model and the candles copied to Documents\tradebot_backups\plan7;
+  - the backstop filter (already in place);
+  - risk.py restored, because the frozen strategy.py imports it and the v3 path must not load tbcommon; marks.py
+    restored too;
+  - manifest.py covers rain_model.json and compares .github and .gitignore with their cloud/ copies;
+  - tests for each.
+- **NICE, applied:** looks wait for pending results (left out and listed after 7 days); KALSHI_BASE honoured; the
+  small-sample correction on the clustered SEs; Windows clutter and a manifest written into the folder skipped.
+- **Left as is (documented):**
+  - control_view imports gate.py at load (gate.py has no dependencies);
+  - plan7 auto runs before the evening scan inside the settle step, and each pending day can wait up to 60 seconds on
+    a hung network.
+- **Code re-check: the earlier items fixed.** Two new MUST items, both fixed:
+  - damage only zlib notices now counts as an unreadable day file;
+  - the off-folder copy is never overwritten by an emptier store or a refit (a lost local file is read or restored
+    from it).
+  
+  Also applied: workflow copies compared in both directions, the remaining small items, and tests for each.
+- **New off-folder files.** PLAN7 copies its model and candle files to Documents\tradebot_backups\plan7 (the place
+  backup.py already uses for paper.db).
+

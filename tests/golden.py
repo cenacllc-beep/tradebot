@@ -18,7 +18,7 @@ real databases). Python 3.8+, standard library only."""
 import os, sys, re, json, math, shutil, sqlite3, subprocess
 
 SCENARIOS = ("structure", "lip", "discover", "micro", "combo", "longshot", "engines", "marks", "audit", "end_to_end",
-             "fix", "shadow")
+             "fix", "shadow", "learn", "freshness", "ohlc")   # learn, freshness and ohlc added 2026-11-05 (refactor stage 3)
 _TS = re.compile(r"\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?|\d{8}_\d{6}|backed up -> .*"
                  r"|WARNING: only \d of \d backups.*|skipped, already exists: .*")
 

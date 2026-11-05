@@ -41,13 +41,13 @@ Checks:
 
 Python 3.8+, standard library (requests only for --clock)."""
 import os, sys, re, json, glob, sqlite3, time
-from pathlib import Path
 HERE = os.path.dirname(os.path.abspath(__file__))
 if HERE not in sys.path:
     sys.path.insert(0, HERE)
 from tbcommon import clock
 from tbcommon.jsonio import load as _load_json, save
 from tbcommon.parse import rts
+from tbcommon.db import connect_ro
 
 H = 3600
 LIMITS = {   # seconds: how old each dataset may be, from the job that refreshes it and how often that job runs
@@ -81,7 +81,7 @@ FULL_READ_CAP = 64 * 1024 * 1024   # tasks.log is read whole only below this siz
 
 # ---------- reading timestamps (read-only) ----------
 def _ro(db):
-    return sqlite3.connect(Path(db).resolve().as_uri() + "?mode=ro", uri=True)
+    return connect_ro(db)
 
 
 def _one(c, sql, args=()):

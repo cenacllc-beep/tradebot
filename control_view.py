@@ -12,6 +12,7 @@ Python 3.8+."""
 import json, html
 from tbcommon import clock
 import registry, calibration, risk, audit, postmortem, metrics
+import gate
 e=html.escape
 def _j(s):
     try: return json.loads(s) if s else {}
@@ -124,8 +125,7 @@ def research_notes(notes):
         rows.append('<details><summary>%s <small>(%s)</small></summary><p class=note>%s</p></details>'%(e(names.get(f,f)),when(ts),"<br>".join(e(x) for x in txt)))
     return '<h3>Research results (exploratory, not actionable)</h3><p class=note>The latest summary of each research tool. None of them trades; a pattern here earns only a written plan.</p>'+"".join(rows)
 def safety_line(now_ts,lip_samples=None):
-    from datetime import date
-    d=clock.bot_date(now_ts); stop=date(2026,11,11)
+    d=clock.bot_date(now_ts); stop=gate.STOP_DATE   # one source of the gate's rules (gate.py)
     lock=("Real money: locked by date until Nov 11 (%d days). After that it also needs your own typed unlock, and the rain bot keeps paper trading"
           " (so live.py has something to copy) only if the gate's single look passes."%(stop-d).days) if d<stop else \
          "Real money: the date lock has passed; orders still need your own typed unlock (live.py status shows whether you gave it), and the rain bot paper-trades new market days only after a gate look that passed."

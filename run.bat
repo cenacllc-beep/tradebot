@@ -3,7 +3,8 @@ rem tradebot launcher. Uses %USERPROFILE%\Python313\python.exe,
 rem because "python" on PATH still points at the broken Python 3.8.
 rem   run scan       back up, scan, copy new paper rain trades to Kalshi if an account is connected (live.py),
 rem                  shadow scan, back up again, refresh dashboard.html
-rem   run settle     record outcomes (main bot, Kalshi account, shadow tests), back up, refresh dashboard.html
+rem   run settle     record outcomes (main bot, Kalshi account, shadow tests), PLAN7's fit and limit-order checks
+rem                  (research, read-only on paper.db), back up, refresh dashboard.html
 rem   run report     Brier scores, trades and the gate, shadow results, then refresh dashboard.html
 rem   run dashboard  current prices of open paper trades (marks.py), rebuild dashboard.html and open it
 rem                  (add --no-open to skip the browser)
@@ -110,6 +111,7 @@ if errorlevel 1 (
 "%PY%" live.py sync
 "%PY%" shadow.py settle
 "%PY%" learn.py
+"%PY%" research\plan7.py auto
 "%PY%" backup.py postsettle
 "%PY%" dashboard.py --no-open
 "%PY%" freshness.py
