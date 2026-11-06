@@ -1394,3 +1394,13 @@ unfamiliar codebase ... do not change functionality. only upgrade the code quali
 - **Phone page:** republished from the PC's 6:23 PM dashboard, using the report tasks' own steps. It had been showing
   the 3:20 PM snapshot with the old false "PLAN5 L hourly samples" warning ("1 of 16 checks need attention"). The PC has
   read "FRESHNESS: all current (17 checks)" since its 6:20 PM run, the first with the freshness fix.
+
+## 2026-11-06 19:29 (local) - the scheduled jobs now run whether or not the user is signed in
+- **The user ran tasks\run_signed_out.cmd** (written 2026-10-29) and answered Yes to Windows' permission prompt.
+- **logs\signed_out.txt:** "OK" for all three jobs: Evening scan, Afternoon settle and Hourly research now run whether
+  or not the user is signed in.
+  - The logon is Task Scheduler's S4U: no password is asked for or stored, the jobs keep normal (not administrator)
+    rights, and they run in the background with no window.
+- **What it fixes:** a Windows Update restart (as on Oct 29) no longer stops the jobs until someone signs in.
+- **Undo:** `.\tasks\run_signed_out.cmd undo`.
+- **No code changed.** The first runs under the new setting are tonight's 8:20 PM hourly and the 8:55 PM scan.
