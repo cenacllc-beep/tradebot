@@ -97,7 +97,7 @@ def load(p, default=None):
     """A JSON file, or default when it is missing or unreadable (a monitor must not crash on the file it monitors)."""
     try:
         return _load_json(p, default)
-    except (OSError, ValueError):
+    except (OSError, ValueError, RecursionError):   # RecursionError: a deeply nested file
         return default
 
 
@@ -106,8 +106,38 @@ def _ts(v):
     or anything else counts as having no timestamp instead of crashing the monitor (review 2026-10-23)."""
     if isinstance(v, bool) or not isinstance(v, (int, float)):
         return None
-    v = float(v)
+    try:
+        v = float(v)
+    except OverflowError:   # a JSON integer too large for a float (code review 2026-11-06)
+        return None
     return v if v == v and abs(v) != float("inf") else None
+
+
+def _epoch(v):
+    """_ts() limited to plausible epoch seconds (code re-checks 2026-11-06): 0 or less and anything from late 2096 on
+    (4e9 s) count as no timestamp. Such values made clock.label() raise and the whole monitor crash (a ts of 1e20, a ts
+    of 0 in a check's age test; on Windows anything before 1970 or after the year 3000). Every file the bot writes holds
+    time.time() seconds. _ts() itself stays unbounded because it also reads signed numbers that are not dates (the
+    clock skew in seconds)."""
+    v = _ts(v)
+    return v if v is not None and 0 < v < 4e9 else None
+
+
+def _exit_code(text):
+    """A tasks.log exit code as an int; a damaged one (too long to convert) reads as 1, a failure (re-check 2026-11-06)."""
+    try:
+        return int(text)
+    except ValueError:
+        return 1
+
+
+def _job_time(text):
+    """A tasks.log time as plausible epoch seconds, or None (counted as a line without a time). rts() can raise on a
+    damaged line: a year out of range, or before 1970 on Windows (code re-check 2026-11-06)."""
+    try:
+        return _epoch(rts(text))
+    except (ValueError, OverflowError, OSError, TypeError):
+        return None
 
 
 def _mtime(p):
@@ -126,6 +156,13 @@ def last_jsonl_ts(p, key="ts"):
     """The timestamp of the last readable line of a JSONL file. Reads the end of the file first (64 KB, then 1 MB,
     16 MB, then all of it) until a whole line parses, so it stays fast as files grow and still works when one line is
     longer than the first read (a structure-scan line can pass 70 KB; review 2026-10-23)."""
+    row = last_jsonl_row(p, key)
+    return _epoch(row.get(key)) if row else None
+
+
+def last_jsonl_row(p, key="ts"):
+    """The last readable line of a JSONL file whose `key` holds a usable timestamp, as a dict, or None. The same reading
+    rule as last_jsonl_ts (2026-11-06: split out so a check can also read the line's other fields)."""
     try:
         with open(p, "rb") as f:
             f.seek(0, 2)
@@ -138,11 +175,12 @@ def last_jsonl_ts(p, key="ts"):
                     lines = lines[1:]   # the first line read may be cut
                 for ln in reversed(lines):
                     try:
-                        v = _ts(json.loads(ln).get(key))
-                    except (ValueError, AttributeError):
+                        row = json.loads(ln)
+                        v = _epoch(row.get(key))
+                    except (ValueError, AttributeError, RecursionError):   # RecursionError: a deeply nested line
                         continue
                     if v is not None:
-                        return v
+                        return row
                 if start == 0:
                     return None
     except OSError:
@@ -163,10 +201,10 @@ def task_runs(path, tail=4 * 1024 * 1024):
             m = TASK_LINE.match(ln.strip())
             if not m:
                 continue
-            t, job = (rts(m.group(1)) if m.group(1) else None), m.group(2)
+            t, job = (_job_time(m.group(1)) if m.group(1) else None), m.group(2)
             if m.group(3):
                 r = out.setdefault(job, dict(started=None, notime=False))
-                r.update(done=t, finished=True, exit=int(m.group(4)), notime=r.get("notime") or t is None)
+                r.update(done=t, finished=True, exit=_exit_code(m.group(4)), notime=r.get("notime") or t is None)
             else:
                 out[job] = dict(started=t, done=None, finished=False, exit=None, notime=t is None)
         return out
@@ -188,7 +226,7 @@ def task_runs(path, tail=4 * 1024 * 1024):
 def check(key, name, last, limit, now, detail="", action="", status=None):
     """A result row. Without an explicit status: waiting (no timestamp), fail (in the future), ok or stale (by age).
     The action is kept only when something needs doing or has not started (ok and info rows have none)."""
-    last = _ts(last)
+    last = _epoch(last)
     age = clock.age(last, now) if last else None
     if status is None:
         if last is None:
@@ -230,8 +268,8 @@ def _paper(db, now, root):
                           "Check that paper.db is in the tradebot folder.", status="fail"))
         return rows, None, False
     try:
-        last_obs = _ts(_one(c, "select max(ts) from obs"))
-        last_scan = _ts(_one(c, "select max(started_ts) from scans where kind='scan'"))
+        last_obs = _epoch(_one(c, "select max(ts) from obs"))
+        last_scan = _epoch(_one(c, "select max(started_ts) from scans where kind='scan'"))
         last = max([t for t in (last_obs, last_scan) if t] or [None])
         row = check("scan", "Evening scan", last, LIMITS["scan"], now,
                     "markets last logged %s" % clock.label(last_obs) if last_obs else "no market logged yet",
@@ -239,7 +277,7 @@ def _paper(db, now, root):
         kill = _kill_file(root)
         if kill and row["status"] in ("stale", "waiting"):   # scans are halted on purpose: not a fault, and no advice to run one
             row.update(status="info", action="", detail="kill switch on (%s, since %s): scans are halted until you run .\\run unkill. %s" % (
-                os.path.basename(kill), clock.label(_mtime(kill)), row["detail"]))
+                os.path.basename(kill), clock.label(_epoch(_mtime(kill))), row["detail"]))
         rows.append(row)
         # open trades past their market's close
         try:
@@ -270,7 +308,7 @@ def _paper(db, now, root):
             try:
                 for ts, inputs in c.execute("select ts,inputs from decisions where scan_id=? and inputs is not null", (sid,)):
                     g = (json.loads(inputs) or {}).get("grid") or {}
-                    f, t = _ts(g.get("fetched")), _ts(ts)
+                    f, t = _epoch(g.get("fetched")), _epoch(ts)
                     if f and t:
                         worst = max(worst or 0.0, t - f)
             except (sqlite3.Error, ValueError, AttributeError):
@@ -365,14 +403,15 @@ def checks(root=None, db=None, now=None, offsite=None):
     start, end = _lip_window(root)
     in_window = start is not None and start <= now < end
     progs = load(os.path.join(lip_dir, "programs.json"), None)
-    fetched = _ts(progs.get("fetched")) if isinstance(progs, dict) else None
+    fetched = _epoch(progs.get("fetched")) if isinstance(progs, dict) else None
     moved = lip_moved(root)
     second = os.path.exists(os.path.join(lip_dir, "SECONDARY.txt")) and not moved
     if second:   # since 2026-10-29 this PC samples alongside GitHub: an hour missed here can be taken there, so only a
         # sampler that has stopped altogether (nothing for a day inside the window) is flagged
         detail = ("this PC samples alongside GitHub Actions; the two copies are merged before the single score, so an hour"
                   " missed here (laptop asleep) can still be taken there")
-        last = _lip_last(lip_dir)
+        last, note = _lip_seen(lip_dir)
+        detail = "; ".join(x for x in (detail, note) if x)
         base = last if (last and start and last >= start) else start   # inside the window, age counts from its start
         out.append(check("lip_samples", "PLAN5 L hourly samples (this PC)", base if in_window else last, 24 * H, now, detail,
                          "Nothing sampled here for a day: check tasks\\hourly.cmd and logs\\tasks.log.",
@@ -380,10 +419,12 @@ def checks(root=None, db=None, now=None, offsite=None):
     if moved:   # sampling runs elsewhere since 2026-10-28 (GitHub Actions): this copy's age says nothing
         out.append(check("lip_samples", "PLAN5 L hourly samples", _lip_last(lip_dir), LIMITS["lip_samples"], now,
                          moved, status="info"))
+    seen, seen_note = _lip_seen(lip_dir) if not (moved or second) else (None, "")
     for key, name, last, detail, action in () if (moved or second) else (
             ("lip_programs", "PLAN5 L reward programs", fetched, "cached list of liquidity programs", "The hourly job refreshes it; check tasks\\hourly.cmd."),
-            ("lip_samples", "PLAN5 L hourly samples", _lip_last(lip_dir),
-             "window %s to %s" % (clock.label(start), clock.label(end)) if start else "", "Missed hours count against the test; check the hourly schedule.")):
+            ("lip_samples", "PLAN5 L hourly samples", seen,
+             "; ".join(x for x in ("window %s to %s" % (clock.label(start), clock.label(end)) if start else "", seen_note) if x),
+             "Missed hours count against the test; check the hourly schedule.")):
         if not in_window:   # outside the window nothing refreshes these, by design
             out.append(check(key, name, last, LIMITS[key], now, detail, status="waiting" if start is None or now < start else "info"))
         elif last is None or last < start:   # inside the window: age counts from the window's start until the first refresh
@@ -406,7 +447,7 @@ def checks(root=None, db=None, now=None, offsite=None):
     if os.path.exists(dsc):
         try:
             cd = _ro(dsc)
-            d_last = _ts(_one(cd, "select max(ts) from runs where note is null"))
+            d_last = _epoch(_one(cd, "select max(ts) from runs where note is null"))
             cd.close()
         except sqlite3.Error:
             pass
@@ -436,6 +477,38 @@ def _lip_last(lip_dir):
     ts = [last_jsonl_ts(os.path.join(lip_dir, f)) for f in ["samples.jsonl"] + daily[-1:]]
     ts = [t for t in ts if t]
     return max(ts) if ts else None
+
+
+def _lip_seen(lip_dir):
+    """(time, note): when PLAN5 L's sampler last showed it was running, and a note for the check's detail.
+
+    The time is the newest sample row, or the newest sample_log entry when that is later, has found an empty universe
+    (exactly the integer 0) and says why: research/lip.py logs every hour it samples, also when no market qualifies,
+    with the reasons in "skipped". Without this a sampler with nothing to sample read as a stopped one (2026-11-06:
+    since Nov 5 no weather market that settles before PLAN5 L's score date has had an open liquidity program, so every
+    hour logged universe 0 and the PC's check went stale). No credit is given, so the check still goes stale, when:
+    - the log entry found markets but wrote no sample row (every order book failed, say);
+    - it lists no reason at all: no program on any weather market, which may also mean lip.py no longer reads Kalshi's
+      program list (code review 2026-11-06), so the note says so instead;
+    - the universe field is anything but the integer 0."""
+    last = _lip_last(lip_dir)
+    try:
+        daily = sorted(f for f in os.listdir(lip_dir) if re.match(r"sample_log-\d{8}\.jsonl$", f))
+    except OSError:
+        daily = []
+    logs = [r for r in (last_jsonl_row(os.path.join(lip_dir, f)) for f in ["sample_log.jsonl"] + daily[-1:]) if r]
+    if not logs:
+        return last, ""
+    row = max(logs, key=lambda r: _epoch(r.get("ts")))
+    ran, uni, why = _epoch(row.get("ts")), row.get("universe"), row.get("skipped")
+    if type(uni) is not int or uni != 0 or (last is not None and ran <= last):
+        return last, ""
+    reasons = "; ".join("%s: %s" % (k, why[k]) for k in sorted(why)) if isinstance(why, dict) else ""
+    if not reasons:
+        return last, ("its last run (%s) found no liquidity program listed for any weather market; if that lasts, check that"
+                      " research/lip.py still reads Kalshi's program list" % clock.label(ran))
+    return ran, ("the sampler still runs (last run %s) but found no market it may sample (%s); last sample row %s"
+                 % (clock.label(ran), reasons, clock.label(last) if last else "none yet"))
 
 
 def lip_moved(root):

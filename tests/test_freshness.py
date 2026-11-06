@@ -240,4 +240,87 @@ assert json.load(open(os.path.join(root, "research", "data", "clock.json")))["sk
 before = datetime(2026, 10, 20, 16, 0, tzinfo=timezone.utc).timestamp()
 K = by_key(F.checks(root=folder("prewindow"), db=os.path.join(OUT, "none.db"), now=before, offsite=os.path.join(OUT, "none")))
 assert K["lip_samples"]["status"] == "waiting" and K["lip_programs"]["status"] == "waiting", (K["lip_samples"], K["lip_programs"])
+
+# 8. PLAN5 L: a sampler that runs but finds no market to sample is running, not stopped (2026-11-06). The newest
+# sample_log entry counts only when it is later than the last sample row, its universe is exactly the integer 0 and it
+# gives its reasons (code review 2026-11-06: no reason at all may mean lip.py no longer reads Kalshi's program list).
+def lip_case(name, second, logs, sample_ts=NOW - 30 * H, now=NOW):
+    """logs: {file name: [rows]}; each file also ends in a broken line."""
+    root = folder(name)
+    if second:
+        touch(root, "research/data/lip/SECONDARY.txt", NOW - 9 * 86400, "secondary copy\n")
+    touch(root, "research/data/lip/programs.json", NOW - H, json.dumps(dict(fetched=NOW - H, rows=[])))
+    if sample_ts:
+        touch(root, "research/data/lip/samples-20261029.jsonl", sample_ts, json.dumps(dict(ts=sample_ts)) + "\n")
+    for f, rows in (logs or {}).items():
+        touch(root, "research/data/lip/" + f, NOW, "".join(json.dumps(r) + "\n" for r in rows) + "{broken\n")
+    return by_key(F.checks(root=root, db=os.path.join(OUT, "none.db"), now=now, offsite=os.path.join(OUT, "none")))["lip_samples"]
+WHY = {"settles after the score date": 12}
+def entry(ts, universe=0, why=WHY):
+    return dict(ts=ts, universe=universe, sampled=0, skipped=why)
+EMPTY = [entry(NOW - 2 * H, 3), entry(NOW - 40 * 60)]
+DAILY = "sample_log-20261030.jsonl"
+for second in (True, False):
+    name = "PLAN5 L hourly samples (this PC)" if second else "PLAN5 L hourly samples"
+    def stale(r):
+        assert r["status"] == "stale" and r["last"] == NOW - 30 * H and "still runs" not in r["detail"], r
+    r = lip_case("lip_none_%s" % second, second, None)            # no log at all: as before, the last sample decides
+    stale(r); assert r["name"] == name and not r["detail"].startswith(";"), r
+    r = lip_case("lip_empty_%s" % second, second, {DAILY: EMPTY})   # it ran 40 minutes ago and found nothing: ok, with the reasons
+    assert r["status"] == "ok" and r["last"] == NOW - 40 * 60, r
+    assert "still runs" in r["detail"] and "(settles after the score date: 12); last sample row Oct 29, 6:00 AM" in r["detail"], r
+    r = lip_case("lip_single_%s" % second, second, {"sample_log.jsonl": EMPTY})   # the older single-file name too
+    assert r["status"] == "ok" and r["last"] == NOW - 40 * 60, r
+    # several files: the newest entry decides, and only the newest daily file is read
+    r = lip_case("lip_files_a_%s" % second, second, {"sample_log.jsonl": [entry(NOW - 5 * H, 366)],
+                                                     "sample_log-20261029.jsonl": [entry(NOW - 3 * H, 50)], DAILY: EMPTY})
+    assert r["status"] == "ok" and r["last"] == NOW - 40 * 60, r
+    r = lip_case("lip_files_b_%s" % second, second, {"sample_log.jsonl": [entry(NOW - 20 * 60)], DAILY: [entry(NOW - H, 7)]})
+    assert r["status"] == "ok" and r["last"] == NOW - 20 * 60, r
+    r = lip_case("lip_files_c_%s" % second, second, {"sample_log-20261029.jsonl": [entry(NOW - 20 * 60)], DAILY: [entry(NOW - H, 7)]})
+    stale(r)   # the older daily file is not read, and the newest found markets
+    r = lip_case("lip_found_%s" % second, second, {DAILY: EMPTY[:1] + [entry(NOW - 40 * 60, 5, {"order book failed": 5})]})
+    stale(r)   # markets found but nothing written
+    r = lip_case("lip_stopped_%s" % second, second, {DAILY: [entry(NOW - 30 * H)]})   # the log stopped too
+    stale(r)
+    r = lip_case("lip_noprog_%s" % second, second, {DAILY: [entry(NOW - 40 * 60, 0, {})]})   # no program listed at all
+    assert r["status"] == "stale" and r["last"] == NOW - 30 * H and "no liquidity program listed" in r["detail"], r
+    for i, bad in enumerate((False, "0", None, 0.0, [])):   # a malformed field is not an empty universe
+        stale(lip_case("lip_bad%d_%s" % (i, second), second, {DAILY: [entry(NOW - 40 * 60, bad)]}))
+    r = lip_case("lip_never_%s" % second, second, {DAILY: EMPTY}, sample_ts=None)   # never a sample row, but it runs
+    assert r["status"] == "ok" and "last sample row none yet" in r["detail"], r
+    r = lip_case("lip_older_%s" % second, second, {DAILY: EMPTY}, sample_ts=NOW - 10 * 60)   # a newer sample row wins
+    assert r["status"] == "ok" and r["last"] == NOW - 10 * 60 and "still runs" not in r["detail"], r
+    r = lip_case("lip_after_%s" % second, second, {DAILY: EMPTY}, now=datetime(2026, 11, 22, 16, 0, tzinfo=timezone.utc).timestamp())
+    assert r["status"] == "info", r   # after the window nothing is expected
+r = lip_case("lip_huge", True, {DAILY: [dict(ts=10 ** 400, universe=0, skipped=WHY)]})   # an integer too big for a float
+assert r["status"] == "stale" and r["last"] == NOW - 30 * H, r
+assert F._ts(10 ** 400) is None and F._ts(1.5) == 1.5 and F._ts(True) is None
+assert F._ts(-420) == -420   # a signed number that is not a date (the clock skew) still reads
+for bad in (0, -5, 1e20, 1e11, 4e9, 5e10, float("nan"), float("inf")):   # implausible epochs count as no timestamp (re-check 2026-11-06)
+    assert F._epoch(bad) is None, bad
+r = lip_case("lip_far", True, {DAILY: [dict(ts=1e20, universe=0, skipped=WHY)]})   # used to crash clock.label
+assert r["status"] == "stale" and r["last"] == NOW - 30 * H, r
+root = folder("marks_zero")   # marks.jsonl with ts 0 while a trade is open used to crash check()
+db = paper(root, NOW - 15 * H, open_tickers=("KXRAINNYC-26OCT31-T0",))
+touch(root, "marks.jsonl", NOW - 60, json.dumps(dict(ts=0)) + "\n")
+touch(root, "research/data/lip/samples.jsonl", NOW - 60, json.dumps(dict(ts=1e20)) + "\n" + "[" * 100000 + "\n")
+K = by_key(F.checks(root=root, db=db, now=NOW, offsite=os.path.join(root, "offsite")))
+assert K["marks"]["status"] == "waiting" and K["lip_samples"]["status"] == "stale", (K["marks"], K["lip_samples"])
+assert F.summary_line(list(K.values())).startswith("FRESHNESS: ")
+log = os.path.join(root, "logs", "tasks.log")   # damaged job-log times count as lines without a time, never a crash
+for bad in ("0001-01-01T00:00:00+00:00", "3500-01-01T00:00:00+00:00", "1960-01-01T00:00:00", "2026-13-45T99:99:99"):
+    tasks(root, "===== %s evening\n===== %s evening done (exit 0)\n" % (bad, bad))
+    r = F.task_runs(log)["evening"]
+    assert r["done"] is None and r["notime"] and r["exit"] == 0, (bad, r)
+    by_key(F.checks(root=root, db=db, now=NOW, offsite=os.path.join(root, "offsite")))
+assert F.last_jsonl_ts(os.path.join(OUT, "lip_empty_True", "research", "data", "lip", DAILY)) == NOW - 40 * 60
+assert F.last_jsonl_row(os.path.join(OUT, "lip_empty_True", "research", "data", "lip", DAILY))["universe"] == 0
+assert F.last_jsonl_row(os.path.join(OUT, "nowhere.jsonl")) is None
+assert F._exit_code("0") == 0 and F._exit_code("7" * 5000) == 1   # a damaged exit code reads as a failure, never a crash
+deep = os.path.join(OUT, "deep.json")
+open(deep, "w").write("[" * 100000 + "]" * 100000)
+assert F.load(deep, "fallback") == "fallback"   # a deeply nested file reads as unreadable
+tasks(root, "===== 2026-10-30T12:00:00-04:00 evening\n===== 2026-10-30T12:05:00-04:00 evening done (exit %s)\n" % ("9" * 5000))
+assert F.task_runs(os.path.join(root, "logs", "tasks.log"))["evening"]["exit"] == 1
 print("freshness and clock: all checks passed")

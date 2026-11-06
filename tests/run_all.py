@@ -37,6 +37,7 @@ TESTS=[("test_fix.py",[],"daily loss stop, migration, clear margin, single-look 
        ("test_gatelook.py",[],"stop date: the gate judged once and stored; no v3 paper trades after a failed look"),
        ("test_nov11.py",[],"Nov 11 report (PLAN6): read-only, quotes the stored look, gate's own statistic, cloud days never mixed"),
        ("test_plan7.py",[],"PLAN7: corrected v3 fitted once after the test, forward looks at 60 and 110 days, read-only"),
+       ("test_plan8.py",[],"PLAN8: the price with the airport forecast mixed in, fitted once on past data, looks at 60 and 110 days"),
        ("test_manifest.py",[],"code manifest: the same code on the PC, in the repository and in the working copy"),
        ("test_plan4launch.py",[],"PLAN4 chains started from a flag by the hourly job: once, detached, never while running"),
        ("test_moves.py",[],"renamed temperature series; PLAN5 L sampled on GitHub and the PC, merged once before the score"),

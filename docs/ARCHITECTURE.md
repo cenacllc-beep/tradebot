@@ -22,7 +22,7 @@ Tradebot is a batch-oriented research and paper-trading system for Kalshi's dail
    opens them read-only.
 4. **Pre-registered scorers keep their code.** Once a plan's outcomes have begun, its scoring code is not refactored,
    so its results stay reproducible from the registered code. This covers backtest*.py, plan3.py, plan4.py,
-   placebo.py, lip.py, nov11.py, plan7.py, and shadow.py's forward-test blocks.
+   placebo.py, lip.py, nov11.py, plan7.py, plan8.py, and shadow.py's forward-test blocks.
 5. **Operations scripts depend on the standard library only.** These are backup.py, export.py, check.py,
    killswitch.py, manifest.py, joblock.py and scan_window.py. The dashboard can also render without them. Each must
    keep working when anything else in the folder is broken.
@@ -96,6 +96,7 @@ Tradebot is a batch-oriented research and paper-trading system for Kalshi's dail
 - `shadow.py settle`: fills from minute candles, price moves, the airport-forecast test's paper results;
 - `learn.py`;
 - `research\plan7.py auto`: PLAN7's candle store, and its one-time fit from Nov 11;
+- `research\plan8.py auto`: PLAN8's status line (counts only; its model was fitted once on past data on 2026-11-06);
 - backup (postsettle), dashboard, freshness.
 
 The afternoon job then runs `run.bat report` (Brier, gate, shadow).
@@ -118,8 +119,11 @@ The afternoon job then runs `run.bat report` (Brier, gate, shadow).
 - From Nov 11, report(), live.py and the dashboard quote only the stored look.
 - research/nov11.py writes the PLAN6 report next to it.
 - After a failed look, v3 still logs every market and opens no paper trades.
-- Two forward tests then continue on those logs, each with its own pre-set end: the airport forecast (shadow.py) and
-  PLAN7 (research/plan7.py).
+- Three forward tests then continue on those logs, each with its own pre-set end:
+  - the airport forecast (shadow.py);
+  - PLAN7 (research/plan7.py);
+  - PLAN8 (research/plan8.py), from market day Nov 7: the price with the airport forecast mixed in, an accuracy test
+    only.
 
 ## 5. External interfaces
 | Service | Used by | Calls |
@@ -151,10 +155,12 @@ The User-Agent everywhere is "tradebot-paper-research/1.0".
    difference.
 
 ## 7. Testing
-- **tests/run_all.py** runs 40 deterministic tests from 37 scripts: fake data, temporary folders, no network, never the real
+- **tests/run_all.py** runs 41 deterministic tests from 38 scripts: fake data, temporary folders, no network, never the real
   databases.
 - **Research scorers:** each pre-registered scorer has a planted-edge test and a null test.
 - **Pinned copies:** tests/test_plan7.py and test_fix.py check that each pinned copy still equals its source.
+  research/plan8.py imports PLAN7's pinned functions instead and pins their source hashes; tests/test_plan8.py checks
+  them.
 - **tests/golden.py** flattens every output of 15 scenario suites into about 150,000 fields to prove that a refactor
   changed nothing.
 

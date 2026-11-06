@@ -1244,3 +1244,128 @@ unfamiliar codebase ... do not change functionality. only upgrade the code quali
   - **tests/test_schedule.py:** the "nothing off Windows" check now runs only off Windows.
 - **Result:** 40 of 40 pass on the PC and in the working copy. The evening scan at 8:55 PM ran normally with today's
   code: 54 markets, 2 paper trades, FRESHNESS all current, and PLAN7 waiting for Nov 11.
+
+
+## 2026-11-06 01:30 (local) - freshness: a running PLAN5 L sampler with nothing to sample is not a stopped one
+- **Found while reviewing the trades (user: "any recommendation for more successful orders?", then "intelligently
+  resolve the issues").** Since Nov 5 the hourly PLAN5 L sampler has found no market it may sample: Kalshi's
+  liquidity programs on daily weather markets covered 400-700 markets an hour on Oct 24-28, 40-90 on Oct 29 to Nov 3,
+  7 on Nov 4 and none since; the 12 programs left are on long-dated markets (KXLOWA Feb 2027, a Paris rain market) that
+  settle after the score date. research/lip.py logs every such hour (sample_log, universe 0) but writes no sample row,
+  so freshness.py read the PC's sampler as stopped: "1 stale: PLAN5 L hourly samples (this PC)" from 00:21 on Nov 6.
+- **freshness.py (read-only monitor; nothing that trades or scores changed):** _lip_seen() counts the newest
+  sample_log entry when it is later than the last sample row, found an empty universe (exactly the integer 0) and
+  lists its reasons; the check's detail then shows them ("settles after the score date: 12") and the last sample row.
+  No credit, so the check still goes stale, for a run that found markets but wrote no row, a log that lists no
+  program at all (that could also mean lip.py no longer reads Kalshi's program list; the detail says so), any other
+  universe value, or a log that stops. last_jsonl_ts() is now a wrapper of the new last_jsonl_row() (same reading
+  rule); _ts() returns None for an integer too large for a float instead of raising. research/lip.py is unchanged (a
+  pre-registered scorer).
+- **tests/test_freshness.py:** both copies of the check (this PC's and the repository's): an empty universe, the older
+  single-file log name, several log files (the newest entry decides; only the newest daily file is read), markets
+  found but nothing written, a stopped log, no program listed, five malformed universe values, no sample row ever, a
+  newer sample row, after the window, and an oversized timestamp. Three code changes that the first version of these
+  tests missed (code review) are now caught. 40 of 40 tests pass.
+- **What it means for PLAN5 L (no rule changed):** its pass rule needs at least 15 days. Only Oct 28 to Nov 4 (8 days,
+  perhaps 9 with Nov 5's one hour) had both reward programs and 12 or more sampled hours, so unless Kalshi reopens
+  programs on daily weather markets for about 6 more days before Nov 20, the single score from Nov 25 will read "not
+  testable" by its own rule. Changing that rule now would change a pre-registered test after its samples began, which
+  is the user's decision; Claude recommends leaving it.
+- **Also checked, no change:** the fee rounding (core.fee rounds each order up to a whole cent; Kalshi charged the demo
+  fills to 1/100 cent): $0.80 vs about $0.70 over the 23 settled rain trades, so the paper record overstates fees by
+  about $0.10. It is the gate's pre-set "approximate fees" and in the frozen core, so it stays. The demo copies skipped
+  "no price to buy at" (25 of 29) because Kalshi's demo exchange has almost no sellers; the real exchange is unaffected.
+  logs\signed_out.txt does not exist, so tasks\run_signed_out.cmd has not been run yet.
+- **Reviews (three fresh code reviewers, agents/code-reviewer.md):**
+  - **First review:** nothing must be fixed; applied:
+    - tests now cover several log files and the newest-daily-file pick (three code changes had passed the old tests);
+    - no credit when a log lists no program at all, because it may mean lip.py no longer reads Kalshi's program list;
+    - the reasons appear in the detail, with exact wording;
+    - the check is not run in the MOVED branch;
+    - OverflowError is caught.
+  - **Second review:** a finite but absurd timestamp could still crash the monitor. Every stored timestamp now passes
+    through _epoch() (0 < ts < 4e9, late 2096). _ts() stays unbounded for the signed clock skew; a first attempt that
+    bounded _ts() broke the clock-skew test.
+  - **Third review:** must-fix: Windows cannot label dates after the year 3000, so the bound came down from 1e11 to 4e9.
+    Also applied: tasks.log times go through _job_time(); RecursionError, a damaged exit code and the KILL file's mtime
+    are guarded.
+  - **Left as they are** (theoretical, and they fail closed): a deeply nested decisions.inputs value.
+  - **Tests:** test_freshness covers all of the above; 41 of 41 tests pass.
+
+
+## 2026-11-06 17:45 (local) - PLAN8: Kalshi's price first, the airport forecast as a small correction (research only)
+- **Why (user: "would you implement other forecast skills, tools or resources for a higher success?", then
+  "intelligently implement your recommendations above"):** Claude recommended one test before any new data source.
+  Starting from Kalshi's price, does mixing in the forecast the bot already logs make it more accurate? Only if it does
+  is a short-range model such as HRRR worth proposing (that needs the user's approval for a new data site and a
+  package).
+- **What changed from the recommendation, and why:**
+  - **No climatology figure:** one November per city is too noisy, and the price already reflects it.
+  - **The weights are fitted on Kalshi's 1,711 past markets (81 days), not the ~14 test days.** That is steadier, can be
+    frozen before any forward data exists, and keeps PLAN8 apart from PLAN7.
+  - **v3 is left out:** correcting it is PLAN7's job.
+  - **No trading section:** the airport forecast's own forward test already trades on the same forecast.
+- **Added:**
+  - research/PLAN8.md (written before any forward data);
+  - research/plan8.py (fit | status | score | auto);
+  - tests/test_plan8.py;
+  - one line in run.bat settle (`plan8.py auto`, after PLAN7's);
+  - its entry in tests/run_all.py;
+  - docs/ARCHITECTURE.md and CLAUDE.md updated.
+- **The design:**
+  - **Inputs:** read-only on paper.db's v4_obs and market_results; no network.
+  - **Primary measure (A):** the gate's day-mean Brier statistic, the mix against the price.
+  - **Attribution (B):** the mix against a recalibrated price, judged only after A.
+  - **Looks:** futility at 60 forward days; final at 110, which needs the reading and the 7-day block bootstrap.
+  - **HRRR condition:** A and B both pass at the three-test line (0.833%).
+  - **Backstop:** 2027-06-30.
+  - **Code it relies on:** PLAN7's pinned functions are imported, and their source hashes are pinned. The forecast's
+    code, its logging, kalshi.quote, and plan8.py and PLAN8.md themselves are hashed at the fit and checked at each
+    look.
+- **Exploration on past data (disclosed in the plan):**
+  - fitted on all days: weight on the price 0.753, on the forecast 0.447; -0.0028 Brier against the price (t about
+    -1.66);
+  - fitted on the first half, scored on the second: -0.0012 (t about -1.25);
+  - the price-only control: about 0.
+  - So this is a new idea, not a confirmed lead. It barely beats PLAN.md's 50/50 mix, which was judged "not clear".
+- **Power, honestly:** about 42% for A (13% if the noise is as large as in summer), about 20% for A and B together, and
+  about 11% for the HRRR condition.
+- **Dry run on the PC (saved nothing):** 1,711 markets, 81 days, 0 formula disagreements. Weights -0.0467 / 0.7527 /
+  0.4473; control -0.1485 / 1.2167. The code identity matched.
+- **Statistics review** (agents/statistician.md):
+  - **Must-fix:** B's rule was incomplete.
+  - **Should-fix, five items:**
+    - the past evidence was weaker than written;
+    - power was not given for correlated days or for A and B together;
+    - the log window did not match the fit, so it is now 00:50-01:30 UTC, with the late window as a sensitivity
+      reading;
+    - the day set must come from logged markets, not results, with a settle-proof rule;
+    - the plan did not say which multiplicity line governs.
+  - All applied before any forward data.
+- **Statistics re-check:**
+  - **Must-fix:** the power table counted the t condition only. It now uses the full rule.
+  - **Should-fix:** check the plan's own code at each look; fix the data a look uses; enforce FORWARD_FIRST in the fit;
+    show A's mean only at 60; state the coverage needed. All applied.
+  - **Notes applied:** the clipping wording; the docstring; each ticker counted once.
+- **Code review** (agents/code-reviewer.md):
+  - **Must-fix:** a missing data folder would have frozen the test as failed forever. The fit now refuses, saving
+    nothing, unless the data is exactly the holdout.
+  - **Should-fix:** the fit refuses once the first window opens; a damaged model is restored from the off-folder copy.
+    Both applied.
+  - **Notes applied:** result files are copied off the folder; the plan's own code is in the identity; PLAN7's BOT_TZ
+    and kalshi.quote are pinned; --ended is final-look only; the docstring.
+  - **Left as is:** malformed v4_obs rows make a look or the status raise (fail closed; auto catches it).
+- **Correction to the record:** the first draft of PLAN8.md stated "written 02:30" and "revised 04:30". The file times
+  show about 01:35 and 01:45; the plan now says so.
+- **Final verification** (a fresh reviewer, both roles): no must-fix; it re-simulated power and found it matches.
+  Applied four should-fix items:
+  - B is "not judged" on an early end too;
+  - the futility look stores no standard error;
+  - kalshi._p and shadow._t are pinned;
+  - results never go into PLAN8.md.
+
+  Before the fit it asked for two confirmations: that no off-folder PLAN8 model exists, and that the past data is
+  present (the dry run had read it).
+- **Frozen** 17:24 local: research/plan8.py SHA-256 2c0d027d400a4a702a6d400dfcb06aad2cbb02b7c3d354ef001613f2e6ff1bad.
+- **PLAN5 L (no rule changed):** see the 01:30 entry. It will most likely read "not testable".
+
