@@ -1369,3 +1369,28 @@ unfamiliar codebase ... do not change functionality. only upgrade the code quali
 - **Frozen** 17:24 local: research/plan8.py SHA-256 2c0d027d400a4a702a6d400dfcb06aad2cbb02b7c3d354ef001613f2e6ff1bad.
 - **PLAN5 L (no rule changed):** see the 01:30 entry. It will most likely read "not testable".
 
+
+## 2026-11-06 19:30 (local) - "bet with confident markets" checked on past data: not pursued (research only, no code change)
+- **Why (user, after another losing day: "intelligently implement recommendations to improve the system"):** the
+  interim calibration table showed Kalshi's confident rain prices coming true slightly more often than priced (70-90%
+  priced, 89% rained; 46 markets). Before writing a forward test, the idea was checked on past data, after fees.
+- **Exploration** (read-only, on the PC; research/data kalshi_rain.jsonl and kalshi_temp.jsonl, scan-time quotes with a
+  6c spread at most; buy the side priced above 50c at the ask; one contract; fee at the bot's whole-cent rule and at
+  Kalshi's finer rounding; SE clustered by day):
+  - **Rain** (1,711 markets, 81 days):
+    - favourites costing 70-95c: -1.9c a contract (SE 1.8c);
+    - 95c and up: +0.8c (SE 0.3c), one positive band among 12 looks.
+  - **Temperature** (10,885 markets, 105 days):
+    - 70-95c: -1.2c a contract (SE 0.4c, about three standard errors below zero);
+    - 95c and up: -0.6c.
+- **Decision:** not pursued and no PLAN9. The pattern does not survive paying the spread and the fee on past data. The
+  one positive band is consistent with the number of looks, and the temperature side contradicts it. Recorded here so
+  it is not re-tried without a genuinely new reason (CLAUDE.md section 11a).
+- **research/longshot.py** (Kalshi-wide favourite/longshot report) was not run:
+  - it requires research/results/plan4_K.json, which is not on the PC;
+  - its trade data (PLAN4 K1) has sports, crypto and commodities series but no weather series, so it cannot answer the
+    weather question.
+  - Left unchanged.
+- **Phone page:** republished from the PC's 6:23 PM dashboard, using the report tasks' own steps. It had been showing
+  the 3:20 PM snapshot with the old false "PLAN5 L hourly samples" warning ("1 of 16 checks need attention"). The PC has
+  read "FRESHNESS: all current (17 checks)" since its 6:20 PM run, the first with the freshness fix.
