@@ -1404,3 +1404,31 @@ unfamiliar codebase ... do not change functionality. only upgrade the code quali
 - **What it fixes:** a Windows Update restart (as on Oct 29) no longer stops the jobs until someone signs in.
 - **Undo:** `.\tasks\run_signed_out.cmd undo`.
 - **No code changed.** The first runs under the new setting are tonight's 8:20 PM hourly and the 8:55 PM scan.
+
+## 2026-11-06 20:00 (local) - dashboard: each calendar day shows its paper result (presentation only)
+- **What (user: "i'd like the calendar dates to show the total amounts made/ lost on the day"):** under each market day
+  in the test calendar, the dashboard shows the net result of the main bot's paper bets for that day, after fees. Gains
+  are green with "+" and losses red with a minus sign; a day with only open bets reads "open"; a day with no bets is
+  blank. Each day's tip adds the amount with the number of bets won and lost, and a legend line explains it.
+- **Phones:** below 820px the calendar shows 7 days a row instead of 15, so each amount fits.
+- **Code:**
+  - dashboard.py: day_pnl() and day_amt(); calendar() takes the trades;
+  - dashboard_assets.py: the amount styles and the narrow-screen grid.
+  - The day totals use every main-bot paper trade, as the paper account does. On today's data they sum to -$8.56: rain
+    -$6.91 and the two Oct 14 temperature bets -$1.65.
+- **Checks:**
+  - Rendered from a copy of the PC's paper.db at 390, 780 and 1100px: no amount wider than its day, no sideways scroll.
+  - 41 of 41 tests pass.
+- **Code review** (agents/code-reviewer.md): fine to ship. Two should-fix items applied:
+  - won and lost use the page's own won() rule;
+  - a day with nothing counted (a void trade, or a settled one without P&L) stays blank instead of "open".
+
+  Notes left as they are: usd()'s +/-0.004 cutoff (P&L is whole cents), and the narrow grid's columns are not
+  weekdays.
+- **Known test flake:** tests/test_gatelook.py failed once in a full run because two backups landed in the same second
+  ("skipped, already exists"; backup.py never overwrites). It passed three times alone, and in the next full run. It is
+  a timing issue in the test only; fix later by waiting a second between its backups.
+- **Found while checking:** Kalshi settled KXRAIN-26OCT30-PHX as "scalar" (no yes/no result) at 2026-11-06 20:36 UTC,
+  and KXRAIN-26NOV03-PHX and -26NOV05-PHX are still "closed" with no result. Because a test-day market without a yes/no
+  result keeps the gate look pending (CLAUDE.md section 11; strategy.LOOK_DEADLINE unset), the Nov 11 look would stay
+  "not judged yet". That is the user's decision; nothing was changed.

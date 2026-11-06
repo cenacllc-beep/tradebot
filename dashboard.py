@@ -142,8 +142,31 @@ def mtext(rg,mg):
     if mg is None: return "<small>Brier score, lower is better. Needs a clear margin over 5+ market days (%d so far), judged once on %s.</small>"%(len({r["ticker"].split("-")[1] for r in rg}),dstr(STOP))
     if mg[0]>=0: return "<small>Market ahead by %.3f a market over %d days. Judged once on %s.</small>"%(mg[0],mg[2],dstr(STOP))
     return "<small>Lead %.3f a market; clear above %.3f (%.2f standard errors, %d days). Judged once on %s.</small>"%(-mg[0],tcrit(mg[2])*mg[1],tcrit(mg[2]),mg[2],dstr(STOP))
-def calendar(rain,nd):
+def day_pnl(tr):
+    """{market day: [net P&L of its settled paper trades after fees, won, lost, still open]} for the main bot's paper
+    trades, all of them, as in the paper account (added 2026-11-06 at the user's request: the calendar shows each day's
+    result). Won and lost use the page's own rule, won(r) (the result is the side bought)."""
+    out={}
+    for r in tr:
+        d=mdate(r.get("ticker") or "")
+        if not d: continue
+        x=out.setdefault(d,[0.0,0,0,0])
+        if r.get("status")=="settled" and r.get("pnl") is not None:
+            x[0]+=r["pnl"]; x[1 if won(r) else 2]+=1
+        elif r.get("status")=="open": x[3]+=1
+    return out
+def day_amt(x):
+    """A day's result for its calendar cell: (text, class, words for its tip)."""
+    if not x or not (x[1] or x[2] or x[3]): return "","",""
+    pl,nw,nl,opn=x
+    words=[]
+    if nw or nl: words.append("paper bets %s after fees (%d won, %d lost)"%(plus(pl).replace("-","\u2212"),nw,nl))
+    if opn: words.append("%s still open"%s_(opn,"bet"))
+    if not (nw or nl): return "open","",". ".join(words)
+    return plus(pl).replace("-","\u2212"),sgn(pl),". ".join(words)
+def calendar(rain,nd,tr=()):
     days=[RESTART+timedelta(days=i) for i in range(1,(STOP-RESTART).days)]   # market days that can settle by the stop date
+    money=day_pnl(tr)
     by={}
     for r in rain: by.setdefault(mdate(r["ticker"]),[]).append(r)
     now=datetime.now(timezone.utc); cells=""
@@ -154,13 +177,17 @@ def calendar(rain,nd):
         elif dstart(d)<=now: st,t="missed","%s: no scan before the day started"%dstr(d)
         else: st,t="upcoming","%s: upcoming"%dstr(d)
         nx=" next" if d==nd else ""
-        cells+='<li class="%s%s" tabindex=0%s><i></i><span>%d</span></li>'%(st,nx,tip(t+(". Next scan is for this day." if nx else "")),d.day)
+        amt,cls,words=day_amt(money.get(d))
+        t+=(". "+words[0].upper()+words[1:]) if words else ""
+        cells+='<li class="%s%s" tabindex=0%s><i></i><span>%d</span><b class="amt %s">%s</b></li>'%(
+            st,nx,tip(t+(". Next scan is for this day." if nx else "")),d.day,cls,e(amt))
     today=date.today(); dn=max(1,min((today-RESTART).days+1,(STOP-RESTART).days+1))
     legend=('<p class=calkey><span><i class=settled></i>Settled</span><span><i class=logged></i>Waiting for results</span>'
-            '<span><i class=missed></i>Missed scan</span><span><i class=upcoming></i>Upcoming</span><span><i class="upcoming next"></i>Next scan</span></p>')
+            '<span><i class=missed></i>Missed scan</span><span><i class=upcoming></i>Upcoming</span><span><i class="upcoming next"></i>Next scan</span>'
+            '<span>Under each day: its paper bets&#8217; result after fees</span></p>')
     head='<div class=calhead><b>Day %d of %d</b><span>%s market days can settle before the %s stop date. %s left.</span></div>'%(
         dn,(STOP-RESTART).days+1,len(days),dstr(STOP),s_(max((STOP-today).days,0),"day"))
-    return '<div class=cal>%s<ol class=days style="--n:%d">%s</ol>%s</div>'%(head,min(len(days),15),cells,legend)   # up to 15 a row; 60 days wrap into 4 rows
+    return '<div class=cal>%s<ol class=days style="--n:%d">%s</ol>%s</div>'%(head,min(len(days),15),cells,legend)   # up to 15 a row (7 on narrow screens)
 def plan(obs):
     now=datetime.now(timezone.utc); today=date.today()
     nd=now.date() if now<dstart(now.date()) else now.date()+timedelta(days=1)   # next market day that has not begun
@@ -602,7 +629,7 @@ def build_page(D,live=False):
       '<details><summary>Data by estimator version</summary>%s</details></section>'
       '<p class=fine><b>Read with caution.</b> Early samples are noise. Cities share weather systems, so the effective sample is far smaller than the market count. Paper results ignore slippage and use approximate fees. The shadow tests are research only and never count toward the gate. Not financial advice. Data before Oct 13, 2026 was lost when the project folder was deleted; the test restarted that day.</p>'
       '</div><div id=tip role=tooltip></div>')%(
-      chips,when(datetime.now(BOT_TZ))+" (UTC-4)",acct,verdict(rg,bf,bm,rain,passed,mg,look),e(GV),npass,gate,calendar(rain,nd),
+      chips,when(datetime.now(BOT_TZ))+" (UTC-4)",acct,verdict(rg,bf,bm,rain,passed,mg,look),e(GV),npass,gate,calendar(rain,nd,tr),
       todo_html,lastline,money,backtest_panel(v4p),results(st),
       dsub,dumbbell(lrows),why,chart_table,
       e(GV),brier_view(bf,bm,len(rg),mg),shadow_view(so,sm,tr,v4,obs),ctl,

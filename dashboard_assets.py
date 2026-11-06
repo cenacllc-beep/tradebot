@@ -59,6 +59,9 @@ a.chip{text-decoration:none}
 .days .missed i,.calkey .missed{background:transparent;box-shadow:inset 0 0 0 1.5px var(--bad)}
 .days .next i,.calkey .next{box-shadow:0 0 0 2px var(--page),0 0 0 3.5px var(--acc)}
 .days .next span{color:var(--acc);font-weight:700}
+.days li b.amt{font:600 11px/1.25 var(--text);font-variant-numeric:tabular-nums;min-height:1.25em;white-space:nowrap;color:var(--mut);letter-spacing:-.01em}
+.days li b.amt.pos{color:var(--goodt)}.days li b.amt.neg{color:var(--badt)}
+@media(max-width:820px){.days{grid-template-columns:repeat(7,minmax(0,1fr));row-gap:8px}}
 .calkey{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12.5px;color:var(--mut)}
 .two{display:grid;gap:16px}@media(min-width:760px){.two{grid-template-columns:1fr 1fr;gap:20px}}
 .two>*{min-width:0}
