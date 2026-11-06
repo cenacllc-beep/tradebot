@@ -188,7 +188,8 @@ JB.os = os
 calls.clear()
 with JB.awake(30, setter=rec):
     pass
-assert calls == [], "nothing off Windows"
+if os.name != "nt":   # on the PC itself the real os is Windows, so the call is expected there
+    assert calls == [], "nothing off Windows"
 used = []
 class FakeAwake:
     def __init__(self, cap, setter=None): self.cap = cap

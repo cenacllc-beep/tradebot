@@ -1234,3 +1234,13 @@ unfamiliar codebase ... do not change functionality. only upgrade the code quali
 - **New off-folder files.** PLAN7 copies its model and candle files to Documents\tradebot_backups\plan7 (the place
   backup.py already uses for paper.db).
 
+
+## 2026-11-05 22:40 (local) - two tests made to hold on the PC too (tests only)
+- **Why.** The full suite run on the PC after today's deploy failed 2 of 40 tests. Neither failure came from today's
+  changes; both had been in place since Oct 23 and Oct 25.
+  - **tests/test_kill.py:** the bare-folder dashboard check expected the "unstyled" fallback. On the PC, Python finds the
+    real tradebot folder through tradebot.pth (CHANGELOG 2026-10-14), so a bare copy still imports the real
+    dashboard_assets.py. The check now expects the fallback only where that import fails.
+  - **tests/test_schedule.py:** the "nothing off Windows" check now runs only off Windows.
+- **Result:** 40 of 40 pass on the PC and in the working copy. The evening scan at 8:55 PM ran normally with today's
+  code: 54 markets, 2 paper trades, FRESHNESS all current, and PLAN7 waiting for Nov 11.

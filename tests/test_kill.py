@@ -83,7 +83,10 @@ with open(os.path.join(S2,"marks.jsonl"),"wb") as fh: fh.write(b'{"ts": 1, "mark
 os.remove(os.path.join(S2,"dashboard_assets.py")); os.remove(os.path.join(S2,"dashboard.html"))
 r=subprocess.run([sys.executable,os.path.join(S2,"dashboard.py"),"--no-open"],cwd=S2,capture_output=True,text=True,env=dict(os.environ,PYTHONPATH="",PAPER_DB=os.path.join(S2,"paper.db")))
 assert r.returncode==0 and "Bot halted (kill switch)" in open(os.path.join(S2,"dashboard.html"),encoding="utf-8").read(), r.stdout+r.stderr
-assert "unstyled" in r.stdout and "live prices unreadable" in r.stdout, r.stdout
+# On the PC, Python finds the real tradebot folder through tradebot.pth (CHANGELOG 2026-10-14), so a bare copy still
+# imports the real dashboard_assets.py; the "unstyled" fallback can only be seen where that does not happen.
+probe=subprocess.run([sys.executable,"-c","import dashboard_assets"],cwd=S2,capture_output=True,text=True,env=dict(os.environ,PYTHONPATH=""))
+assert "live prices unreadable" in r.stdout and ("unstyled" in r.stdout or probe.returncode==0), r.stdout
 os.remove(os.path.join(OUT,"KILL.txt"))
 # 7. run.bat itself (Windows only), in a scratch copy of the code. The PC's Python finds the tradebot folder through
 #    tradebot.pth (its ._pth file ignores PYTHONPATH and the script's own folder), so a scratch copy may import the REAL
