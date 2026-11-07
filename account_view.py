@@ -34,13 +34,21 @@ def label(t):
 def _r(x,k=4):
     if x is None: return None
     x=float(x); return round(x,k) if math.isfinite(x) else None
+def _payout(r,n,cost,fee):
+    """What a settled trade paid. yes/no: $1 a contract on the winning side. Kalshi's scalar and void settlements
+    (2026-11-06): the ledger's own P&L plus what the trade cost, since the bot records P&L = payout - cost - fee."""
+    if r.get("result") in ("yes","no"): return float(n if r.get("result")==r.get("side") else 0)
+    return float(r.get("pnl") or 0)+cost+fee
+def _won_lost(r,payout,cost,fee):
+    if r.get("result") in ("yes","no"): return "won" if payout>0 else "lost"
+    return "won" if payout-cost-fee>0 else "lost"   # scalar or void: by its P&L
 def main_ledger(tr,bank,t0):
     trades=[]; ev=[]
     for r in sorted(tr,key=lambda r:r.get("ts") or 0):
         cost=float(r.get("cost") or 0); fee=float(r.get("fee") or 0); n=int(r.get("n") or 0); ts=r.get("ts") or t0
         st,payout,closed="open",None,None
-        if r.get("status")=="settled" and r.get("result") in ("yes","no"):
-            payout=float(n if r.get("result")==r.get("side") else 0); closed=r.get("settled_ts") or ts; st="won" if payout>0 else "lost"
+        if r.get("status")=="settled" and r.get("result") in ("yes","no","scalar","void"):
+            payout=_payout(r,n,cost,fee); closed=r.get("settled_ts") or ts; st=_won_lost(r,payout,cost,fee)
         trades.append(dict(id=r.get("id"),ts=ts,label=label(r.get("ticker")),ticker=r.get("ticker"),side=(r.get("side") or "").upper(),n=n,
                            price=_r(r.get("price")),cost=_r(cost),fee=_r(fee),status=st,payout=payout,closed=closed,ver=r.get("version") or "",
                            nodate=bool(closed is not None and not r.get("settled_ts"))))
@@ -55,8 +63,8 @@ def maker_ledger(so,bank,t0):
         cost=float(r.get("cost") or 0); fee=float(r.get("fee") or 0); n=int(r.get("n") or 0); ts=r.get("ts") or t0
         s=r.get("status") or "pending"; payout=closed=None
         st={"pending":"resting","unfilled":"unfilled","filled":"open"}.get(s,"open")
-        if s=="settled" and r.get("result") in ("yes","no"):
-            payout=float(n if r.get("result")==r.get("side") else 0); closed=r.get("settle_ts") or ts; st="won" if payout>0 else "lost"
+        if s=="settled" and r.get("result") in ("yes","no","scalar","void"):
+            payout=_payout(r,n,cost,fee); closed=r.get("settle_ts") or ts; st=_won_lost(r,payout,cost,fee)
         trades.append(dict(id=r.get("id"),ts=ts,label=label(r.get("ticker")),ticker=r.get("ticker"),side=(r.get("side") or "").upper(),n=n,
                            price=_r(r.get("price")),cost=_r(cost),fee=_r(fee),status=st,payout=payout,closed=closed,filled=r.get("fill_ts"),
                            cancel=r.get("cancel_ts"),improved=bool(r.get("improved")),nodate=bool(closed is not None and not r.get("settle_ts"))))

@@ -118,7 +118,7 @@ The afternoon job then runs `run.bat report` (Brier, gate, shadow).
 ### 4.5 The stop date and after
 - From Nov 11, report(), live.py and the dashboard quote only the stored look.
 - research/nov11.py writes the PLAN6 report next to it.
-- After a failed look, v3 still logs every market and opens no paper trades.
+- After a failed look, v3 still logs every market. Until 2026-11-06 it then opened no paper trades; since the user's decision that day (strategy.TRADE_AFTER_LOOK) it keeps paper-trading, and the limit-order ledger alone stays stopped. Test-day markets still unsettled on 2026-11-18 (strategy.LOOK_DEADLINE) are left out of the look.
 - Three forward tests then continue on those logs, each with its own pre-set end:
   - the airport forecast (shadow.py);
   - PLAN7 (research/plan7.py);

@@ -145,8 +145,13 @@ print("C: settled v3 rain trades only, split by open time at the veto scan, tota
 # the summary: the stored verdict first, its unmet checks, the real-money rule as it is
 assert "1. **Gate (the single look, stored" in md and "): not passed.** Checks not met: at least 50 settled trades (4); net P&L" not in md
 assert "Checks not met: at least 50 settled trades (4)." in md and "at least 100 resolved markets" not in md
-assert "The rules (CLAUDE.md section 11) say no real money after a failed look" in md and "Real money stays locked" not in md
-assert "live.py's unlock still leaves the decision to you: it says plainly that the gate did not pass, and asks for the typed phrase" in md
+assert "Real money stays locked" not in md
+if gate.TRADE_AFTER_LOOK:   # the user's decision of 2026-11-06: real money from the stop date, after his own unlock
+    assert "The rules (CLAUDE.md section 11) said no real money after a failed look. On 2026-11-06 you decided to trade real money" in md
+    assert "typed the unlock yourself (it says plainly that the gate did not pass). At most $25 is at risk." in md and "nothing to copy" not in md
+else:
+    assert "The rules (CLAUDE.md section 11) say no real money after a failed look" in md
+    assert "live.py's unlock still leaves the decision to you: it says plainly that the gate did not pass, and asks for the typed phrase" in md
 assert "too few to conclude anything" in md
 for bad in ("re-run", "rerun", "guarantee"): assert bad not in md.lower(), bad
 print("summary: the stored verdict and its unmet checks, the real-money rule as it is: ok")

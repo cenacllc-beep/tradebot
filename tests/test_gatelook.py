@@ -1,6 +1,9 @@
 """The stop date's single look (pre-committed by the user on 2026-10-28, before the verdict). No network.
-From 2026-11-11 the gate is judged once, stored in paper.db, and v3 rain paper-trades market days from Nov 11 on only
-after a stored look that passed; the limit-order ledger mirrors it; live.py then has nothing new to copy.
+From 2026-11-11 the gate is judged once and stored in paper.db. Sections 1-10 check the Oct 28 rule (TRADE_AFTER_LOOK
+False, no cutoff): v3 rain paper-trades market days from Nov 11 on only after a stored look that passed, and the
+limit-order ledger mirrors it. Section 11 checks the user's decision of 2026-11-06 (the shipped setting): v3 rain keeps
+paper-trading whatever the look says, the look is still taken and stored once, the ledger stays stopped, and test-day
+markets still unsettled on Nov 18 are left out of the look.
 python test_gatelook.py WORK OUT"""
 import os, sys, io, json, random, sqlite3, contextlib, shutil
 import datetime as _dt
@@ -11,6 +14,8 @@ sys.path.insert(0, WORK)
 import core, kalshi, strategy, shadow, audit
 STOP = strategy.STOP_DATE
 assert str(STOP) == "2026-11-11" and "GATE_NOT_PASSED" in audit.REASONS
+assert strategy.TRADE_AFTER_LOOK is True and strategy.LOOK_DEADLINE == _dt.date(2026, 11, 18), "the user's decision of 2026-11-06"
+strategy.TRADE_AFTER_LOOK = False; strategy.LOOK_DEADLINE = None   # sections 1-10: the Oct 28 rule; section 11 restores the shipped values
 
 class FakeDate(_dt.date):
     T = None
@@ -236,5 +241,72 @@ assert [r["passed"] for r in D["gate_look"]] == [0]
 page = dashboard.build_page(D)
 html = page if isinstance(page, str) else json.dumps(page)
 assert "single look" in html and "did not pass" in html
+dashboard.TRADE_AFTER_LOOK = False
+assert "opens no new paper trades" in dashboard.build_page(D)
 print("dashboard: a stored failed look is the verdict: ok")
+
+# 11. the user's decision of 2026-11-06 (shipped): v3 rain trades market days from Nov 11 on whatever the look says
+strategy.TRADE_AFTER_LOOK = True; strategy.LOOK_DEADLINE = _dt.date(2026, 11, 18); dashboard.TRADE_AFTER_LOOK = True
+assert "keeps paper-trading" in strategy.look_line(None)
+today(D10)
+c = fresh("keep_before.db")
+got, out = scan_with(c, [mk(D10, "AAA"), mk(D11, "BBB")])
+assert sorted(got.values()) == ["TRADE", "TRADE"] and look_rows(c) is None, (got, out)
+c.close()
+today(STOP)
+c = fresh("keep.db")
+c.execute("insert into obs(ticker,version,ts,fc,mid,market_type) values(?,?,?,?,?,?)", ("KXRAIN-26NOV10-ZZZ", "v3", 0, 0.3, 0.4, "rain")); c.commit()
+got, out = scan_with(c, [mk(D12, "AAA")])
+assert list(got.values()) == ["TRADE"] and "waiting for 1 v3 rain markets" in out and "meanwhile v3 rain keeps paper-trading" in out, (got, out)
+assert not look_rows(c), "pending: nothing stored"
+c.execute("update obs set result='no' where ticker='KXRAIN-26NOV10-ZZZ'"); c.commit()
+_, rep = quiet(strategy.report, c)
+assert look_rows(c) == [("2026-11-11", 0)] and "not passed: no edge demonstrated. Even so, v3 rain keeps paper-trading" in rep, rep
+assert "your decision of 2026-11-06" in rep and "no live trading" not in rep, rep
+got, out = scan_with(c, [mk(D12, "CCC"), mk(D12, "DDD", 0.62, 0.64)])
+assert sorted(got.values()) == ["INSUFFICIENT_EDGE", "TRADE"], (got, out)
+assert look_rows(c) == [("2026-11-11", 0)], "still one stored look"
+def n_orders(c):
+    try: return c.execute("select count(*) from shadow_orders").fetchone()[0]
+    except sqlite3.OperationalError: return 0   # the ledger creates its table on its first run
+n0 = n_orders(c)
+kalshi.markets = lambda *a, **k: [mk(D12, "EEE")]
+c.execute("insert into obs(ticker,version,ts,fc,mid,market_type) values(?,?,?,?,?,?)", ("KXRAIN-%s-EEE" % D12.strftime("%y%b%d").upper(), "v3", 0, 0.71, 0.41, "rain")); c.commit()
+_, out = quiet(shadow.scan, c)
+assert n_orders(c) == n0 == 0, out
+assert ("GATE_NOT_PASSED",) in c.execute("select reason from decisions where strategy_id='maker_spread.rain.v3'").fetchall(), out
+D = dashboard.read_db(os.path.join(OUT, "keep.db")); html = dashboard.build_page(D)
+assert "did not pass" in html and "keeps paper-trading" in html and "opens no new paper trades" not in html
+import html as _html
+page_text = _html.unescape(html)
+for old in ("only if the gate's single look passes", "only after a gate look that passed", "nothing to copy"):   # review r79 MUST 1
+    assert old not in page_text, old
+assert "keeps paper trading whatever the gate's single look says" in page_text   # the control center's safety line
+c.close()
+c = fresh("keep_err.db")
+strategy.gate_inputs = lambda *a, **k: (_ for _ in ()).throw(RuntimeError("disk"))
+got, out = scan_with(c, [mk(D12, "AAA")])
+strategy.gate_inputs = real
+assert list(got.values()) == ["TRADE"] and "could not be worked out (disk)" in out, (got, out)
+c.close()
+# the Nov 18 cutoff: a test-day market that never gets a yes/no result keeps the look pending until then, then is left out and listed
+c = fresh("cutoff.db")
+passing_data(c, pnl=-0.1)
+c.execute("insert into obs(ticker,version,ts,fc,mid,market_type,result) values(?,?,?,?,?,?,?)", ("KXRAIN-26OCT30-PHX", "v3", 0, 0.1, 0.1, "rain", None)); c.commit()
+assert strategy.gate_look(c, today=_dt.date(2026, 11, 17))["passed"] is None and not look_rows(c)
+lk = strategy.gate_look(c, today=_dt.date(2026, 11, 18))
+assert lk["passed"] is False and lk["recorded"] and lk["unresolved"] == ["KXRAIN-26OCT30-PHX"], lk
+assert look_rows(c) == [("2026-11-11", 0)]
+c.close()
+sys.path.insert(0, os.path.join(WORK, "research")); import nov11
+# live.py's unlock calls the gate "passed" when a GATE line contains "passed (paper only)": no other state may (review r79)
+for flag in (True, False):
+    strategy.TRADE_AFTER_LOOK = flag
+    for lk in (None, dict(passed=None, pending=2, recorded=False), dict(error="disk"), dict(passed=False, recorded=True, ts=0),
+               dict(passed=False, recorded=False, ts=0)):
+        assert "passed (paper only)" not in strategy.look_line(lk), (flag, lk)
+strategy.TRADE_AFTER_LOOK = True
+assert "you decided to trade real money" in nov11.money_line(False) and "nothing to copy" not in nov11.money_line(False)
+print("user's decision of 2026-11-06: v3 keeps paper-trading after a pending, failed or unworkable look; the look is stored once;"
+      " the limit-order ledger stays stopped; the Nov 18 cutoff leaves out a never-settled test-day market: ok")
 print("stop date single look: all checks passed")

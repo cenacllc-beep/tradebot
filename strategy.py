@@ -111,7 +111,7 @@ def scan(c):
         if not t.startswith("KXRAIN"): R.abstain(m,"STRATEGY_DISABLED",**ctx); continue   # temperature: logged, not traded (user decision 2026-10-14, research/PLAN2.md result)
         if q-price<MIN_EDGE: R.abstain(m,"INSUFFICIENT_EDGE",**ctx); continue
         if abs(raw-mid)>VETO_MAX_GAP+1e-9: R.abstain(m,"ANOMALOUS_MODEL_MARKET_GAP",**ctx); continue   # veto since 2026-10-28 (user)
-        if not after and not before_stop(t): R.abstain(m,"GATE_NOT_PASSED",**ctx); continue   # market days from the stop date on need a passed look
+        if not after and not TRADE_AFTER_LOOK and not before_stop(t): R.abstain(m,"GATE_NOT_PASSED",**ctx); continue   # Oct 28 rule; off since 2026-11-06 (user)
         n=int(core.kelly_stake(q,price,cash)//price)
         if n<1: R.abstain(m,"SIZE_BELOW_ONE",**ctx); continue
         f=core.fee(price,n); cost=n*price
@@ -140,23 +140,61 @@ class Unreached(Exception):
 def _network_error(ex):
     try: return isinstance(ex,(kalshi.requests.exceptions.ConnectionError,kalshi.requests.exceptions.Timeout))
     except AttributeError: return False
-def result_of(t,tries=SETTLE_TRIES,pause=SETTLE_PAUSE_S,sleep=time.sleep):
-    """Kalshi's result for one market: 'yes' or 'no' once decided, else whatever Kalshi says (often ''). Retries a
-    failed lookup; after `tries` failures raises Unreached (added 2026-10-28: a single network error used to stop the
-    whole settle, losing every result found before it, on Oct 26 and Oct 27)."""
+# Kalshi settles a binary market in one of four ways (its settlements API, market_result): yes or no (the winning side
+# pays $1 a contract), scalar (a YES contract pays settlement_value_dollars and a NO contract the rest of $1) and void
+# (positions returned at their original cost). Until 2026-11-06 only yes and no were understood, so a trade on a scalar
+# or void market stayed open for good: its cost held room under the 15% cap and its loss never reached the daily stop.
+# Found when Kalshi settled KXRAIN-26OCT30-PHX "scalar" at $0.99 (status finalized). The bot held no trade on it.
+FINAL_STATUSES=("finalized","settled")   # Kalshi's market status once settlement is final ("settled": the older name)
+def settle_value(m):
+    """The dollars one YES contract pays in a scalar settlement, or None when Kalshi gives no usable value."""
+    for k,scale in (("settlement_value_dollars",1.0),("settlement_value",0.01)):   # dollars as text; the older field in cents
+        v=m.get(k)
+        if v is None or v=="": continue
+        try: v=float(v)
+        except (TypeError,ValueError): return None
+        if not abs(v)<float("inf") or (scale!=1.0 and v!=int(v)): return None   # NaN, infinite, or cents that are not whole (fail closed)
+        v*=scale
+        return v if 0.0<=v<=1.0 else None   # NaN and out-of-range values fail here
+    return None
+def payout(m,side):
+    """What one contract of `side` pays once Kalshi has settled market m: (result, dollars a contract), or None while it
+    cannot be settled yet. m is Kalshi's market (a bare result string is read as {"result": m}).
+    - yes or no: counted as soon as Kalshi reports them, as before 2026-11-06; the winning side pays 1.0.
+    - scalar: only once the market is finalized and with a readable value between 0 and 1: YES pays the value, NO 1 - value.
+    - void: only once finalized; the dollars are None because the cost comes back (see settled_pnl)."""
+    if not isinstance(m,dict): m={"result":m}
+    r=m.get("result")
+    if r in ("yes","no"): return r,(1.0 if r==side else 0.0)
+    if r not in ("scalar","void") or side not in ("yes","no") or str(m.get("status") or "").lower() not in FINAL_STATUSES: return None
+    if r=="void": return r,None
+    v=settle_value(m)
+    return None if v is None else (r,round(v if side=="yes" else 1.0-v,6))
+def settled_pnl(r,side,n,cost,fee,pay):
+    """Net P&L of n contracts of `side` that cost `cost` plus `fee`, settled as payout() said: (r, pay)."""
+    if r in ("yes","no"): return (n if r==side else 0)-cost-fee   # the formula used before 2026-11-06, unchanged
+    if r=="void": return -fee   # the cost comes back; the fee is assumed kept (Kalshi's docs do not say it is refunded)
+    return n*pay-cost-fee
+def market_of(t,tries=SETTLE_TRIES,pause=SETTLE_PAUSE_S,sleep=time.sleep):
+    """Kalshi's market for ticker t. Retries a failed lookup; after `tries` failures raises Unreached (added
+    2026-10-28: a single network error used to stop the whole settle, losing every result found before it, on Oct 26 and
+    Oct 27). Warns when Kalshi says the market is decided but it cannot be settled (payout() gives None)."""
     last=None
     for k in range(tries):
         try:
             m=kalshi.get(t)
             if not isinstance(m,dict): raise ValueError("no market in Kalshi's answer")
-            r=m.get("result")
-            if r not in ("yes","no") and str(m.get("status") or "").lower() in ("settled","finalized","determined"):
-                print("SETTLE WARNING: %s is %s with result %r; its paper trade stays open (check it by hand: a voided market refunds)"%(t,m.get("status"),r))
-            return r
+            if str(m.get("status") or "").lower() in FINAL_STATUSES+("determined",) and payout(m,"yes") is None:
+                print("SETTLE WARNING: %s is %s with result %r and settlement value %r; anything on it stays open (check it on Kalshi)"
+                      %(t,m.get("status"),m.get("result"),m.get("settlement_value_dollars",m.get("settlement_value"))))
+            return m
         except Exception as ex:
             last=ex
             if k<tries-1: sleep(pause*(k+1))
     raise Unreached("%s: %s"%(t,str(last)[:160]),network=_network_error(last))
+def result_of(t,tries=SETTLE_TRIES,pause=SETTLE_PAUSE_S,sleep=time.sleep):
+    """Kalshi's result for one market ('yes', 'no', 'scalar', 'void', or '' while undecided); see market_of()."""
+    return market_of(t,tries,pause,sleep).get("result")
 def settle(c,lookup=None,clock=time.time,budget=SETTLE_BUDGET_S):
     """Record results for open paper trades and logged markets (made robust 2026-10-28, audit):
     - a market that cannot be read is skipped and checked again at the next settle;
@@ -164,7 +202,7 @@ def settle(c,lookup=None,clock=time.time,budget=SETTLE_BUDGET_S):
     - a trade is settled only while still open, so two settles at once cannot record it twice;
     - after 3 network failures in a row, or `budget` seconds, the remaining markets wait for the next settle;
     - exits 1 only when no market could be read at all, so the scheduled job shows a failed settle."""
-    lookup=lookup or result_of; ready=audit.ensure(c) if audit else False
+    lookup=lookup or market_of; ready=audit.ensure(c) if audit else False   # lookup(t): Kalshi's market, or just its result
     got={}; missed=[]; run=[0]; t0=clock()   # run[0]: network failures in a row
     def res(t):
         if t not in got:
@@ -182,20 +220,22 @@ def settle(c,lookup=None,clock=time.time,budget=SETTLE_BUDGET_S):
         c.execute("release settle_one"); c.commit()
     try:
         for i,t,side,n,cost,f in c.execute("select id,ticker,side,n,cost,fee from trades where status='open'").fetchall():
-            r=res(t)
-            if r in ("yes","no"):
-                def one(i=i,t=t,side=side,n=n,cost=cost,f=f,r=r):
-                    pnl=(n if r==side else 0)-cost-f
+            m=res(t); o=payout(m,side) if m is not None else None
+            if o:
+                def one(i=i,t=t,side=side,n=n,cost=cost,f=f,r=o[0],pay=o[1]):
+                    pnl=settled_pnl(r,side,n,cost,f,pay)
                     cur=c.execute("update trades set status='settled',result=?,pnl=?,settled_ts=? where id=? and status='open'",(r,pnl,time.time(),i))
+                    if cur.rowcount==1 and r not in ("yes","no"):
+                        print("SETTLED %s %s x%s: Kalshi settled it %s%s, P&L %+.2f"%(t,side,n,r," at $%.4f a contract"%pay if pay is not None else " (cost returned)",pnl))
                     if cur.rowcount==1 and ready:
                         try:
                             audit.record_result(c,t,r); d=audit.decision_for(c,"trades:%d"%i)
-                            if d: audit.event(c,d,"settled",dict(result=r,pnl=pnl,won=r==side))
+                            if d: audit.event(c,d,"settled",dict(result=r,pnl=pnl,won=(r==side) if r in ("yes","no") else pnl>0))
                         except Exception as ex: print("AUDIT: settlement of %s not recorded (%s)"%(t,ex))
                 atomic(one)
         for (t,) in c.execute("select distinct ticker from obs where result is null").fetchall():
-            r=res(t)
-            if r in ("yes","no"):
+            m=res(t); r=m.get("result") if isinstance(m,dict) else m
+            if r in ("yes","no"):   # the gate scores yes/no only: a scalar or void market keeps no result here (section 11, LOOK_DEADLINE)
                 def one(t=t,r=r):
                     c.execute("update obs set result=? where ticker=? and result is null",(r,t))
                     if ready:
@@ -249,6 +289,9 @@ def gate_ok(g,today=None):
 #   it opens none (markets are still logged), the limit-order ledger, which mirrors the bot, places none, and live.py,
 #   which copies only new paper trades, has nothing to copy. While the look is pending, none either (fail closed);
 # - this only adds a stop: live.py's locks, the $25 cap and the user's typed unlock are unchanged.
+# Changed by the user on 2026-11-06 (TRADE_AFTER_LOOK and LOOK_DEADLINE below): v3 rain keeps paper-trading market days
+# from STOP_DATE on whatever the look says, so live.py can copy them to a real account the user unlocks himself. The look
+# is still judged once, stored and reported. The limit-order ledger (shadow.py) keeps the Oct 28 rule (research only).
 GATE_LOOK_TABLE="create table if not exists gate_look(stop_date text primary key,ts real not null,passed integer not null,detail text not null)"
 def market_day(t):
     try: return datetime.strptime(t.split("-")[1],"%y%b%d").date()
@@ -258,10 +301,16 @@ def _day_before(t,until):
 def before_stop(t):
     """True for a market of the test's own days (before STOP_DATE). An unreadable day counts as after (fail closed)."""
     return _day_before(t,STOP_DATE)
-# No cutoff (2026-10-28): a test-day market that never gets a yes/no result (for example a voided one) keeps the look
-# pending, so v3 stays closed to new market days (fail closed). A cutoff date after which such markets are left out and
-# listed is the user's decision (asked 2026-10-28); set LOOK_DEADLINE to that date only on the user's explicit word.
-LOOK_DEADLINE=None
+# The cutoff (the user's decision, 2026-11-06): Kalshi settled KXRAIN-26OCT30-PHX as "scalar", never yes or no, and two later
+# Phoenix markets were still unsettled. From LOOK_DEADLINE, test-day markets still without a yes/no result are left out of
+# the single look and listed with it. (Before: no cutoff, so such a market kept the look pending for good.)
+LOOK_DEADLINE=date(2026,11,18)
+# The user's decision of 2026-11-06, asked plainly with the paper record (-$6.91 of $15.98 staked, 6 of 29 bets won), in
+# place of the Oct 28 pre-commitment: v3 rain keeps paper-trading market days from STOP_DATE on, whatever the stored look
+# says, so live.py can copy its trades to a real account the user funds and unlocks himself. live.py's locks are unchanged
+# (no real money before STOP_DATE, the typed unlock, the $25 cap, the daily loss stop, the drawdown pause, the kill switch).
+# False restores the Oct 28 rule.
+TRADE_AFTER_LOOK=True
 def _writable(c):
     """True when c can write (live.py status opens paper.db read-only). Probes with a rolled-back savepoint."""
     try:
@@ -310,26 +359,35 @@ def gate_look(c,today=None,record=True):
             except sqlite3.Error: pass
     d.update(passed=ok,ts=time.time(),recorded=False); return d
 def _after_stop_allowed(c,today=None,record=True):
-    """May v3 rain trade a market day on or after STOP_DATE? Only after a stored look that passed. Any error: no."""
+    """Has the stored single look passed (takes and stores it when due)? Any error: no. The limit-order ledger trades market
+    days from STOP_DATE on only then; v3 rain did too until the user's decision of 2026-11-06 (TRADE_AFTER_LOOK)."""
     if not final(today): return False
     try:
         lk=gate_look(c,today,record)
         if lk.get("passed") is not True or not lk.get("recorded"): print(look_line(lk))
         return lk.get("passed") is True and bool(lk.get("recorded"))
     except Exception as ex:
-        print("GATE LOOK: could not be worked out (%s): no v3 rain paper trades for market days from %s on"%(ex,STOP_DATE)); return False
+        print(look_line(dict(error=ex))); return False
 def look_line(lk):
     """One line for report() and live.py status (its filter keeps lines that start with GATE)."""
+    keep=("v3 rain keeps paper-trading market days from %s on whatever the look says (your decision of 2026-11-06); live.py"
+          " copies them with real money only after you switch it to prod and type the unlock"%STOP_DATE)
     if lk is None:
+        if TRADE_AFTER_LOOK: return "GATE LOOK (pre-committed 2026-10-28): judged once from %s. Then %s."%(STOP_DATE,keep)
         return ("GATE LOOK (pre-committed 2026-10-28): judged once from %s. Only a look that passes lets v3 rain paper-trade market days from %s on;"
                 " if it does not pass, no edge was demonstrated and live.py gets nothing to copy."%(STOP_DATE,STOP_DATE))
-    if lk.get("error"): return "GATE LOOK: could not be worked out (%s): v3 rain opens no paper trades for market days from %s on"%(lk["error"],STOP_DATE)
+    if lk.get("error"):
+        return "GATE LOOK: could not be worked out (%s): %s"%(lk["error"],keep if TRADE_AFTER_LOOK else "v3 rain opens no paper trades for market days from %s on"%STOP_DATE)
     if lk.get("passed") is None:
-        return ("GATE LOOK: waiting for %d v3 rain markets or trades of the test's days to settle%s; until then v3 rain opens"
-                " no paper trades for market days from %s on"%(lk.get("pending",0),(" (at most until %s)"%LOOK_DEADLINE) if LOOK_DEADLINE else "",STOP_DATE))
+        return ("GATE LOOK: waiting for %d v3 rain markets or trades of the test's days to settle%s; %s"%(
+            lk.get("pending",0),(" (at most until %s)"%LOOK_DEADLINE) if LOOK_DEADLINE else "",
+            "meanwhile "+keep if TRADE_AFTER_LOOK else "until then v3 rain opens no paper trades for market days from %s on"%STOP_DATE))
     when=time.strftime("%Y-%m-%d %H:%M",time.localtime(lk["ts"]))
     head="GATE LOOK (single look, stored %s): "%when if lk.get("recorded") else "GATE LOOK (worked out now, stored by the next report or scan): "
     if lk["passed"]: return head+"passed on paper. v3 rain keeps paper trading; real money still needs your own typed unlock, starting tiny."
+    if TRADE_AFTER_LOOK:
+        return head+("not passed: no edge demonstrated. Even so, %s: real money there goes on a strategy that did not beat the"
+                     " market on paper."%keep)
     return head+("not passed: no edge demonstrated. v3 rain opens no new paper trades (markets are still logged), so live.py has nothing to copy."
                  " Changing that needs your explicit decision.")
 def report(c):
@@ -369,6 +427,8 @@ def report(c):
     print("GATE (v3 rain only):",verdict if fin else f"judged once on {STOP_DATE} (single look); the numbers above are interim")
     print(look_line(lk))
     left=(STOP_DATE-date.today()).days
-    print(f"STOP DATE: {STOP_DATE} ({left} days left). If not clearly passed by then: no edge demonstrated, no live trading.")
+    print(f"STOP DATE: {STOP_DATE} ({left} days left). If not clearly passed by then: no edge demonstrated"
+          +(" (real money after it is your own decision of 2026-11-06)." if TRADE_AFTER_LOOK else ", no live trading."))
     if no>=100 and clear(mg) and n3<50: print("NOTE: Brier looks good but <50 settled v3 trades: no live money; the user decides on an extension"
-                                               " (after a failed look v3 opens no paper trades, so an extension needs the user's explicit rule change).")
+                                               "%s."%(" (since 2026-11-06 v3 keeps paper-trading after the look, by the user's decision)" if TRADE_AFTER_LOOK else
+                                                      " (after a failed look v3 opens no paper trades, so an extension needs the user's explicit rule change)"))

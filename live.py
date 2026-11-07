@@ -20,7 +20,8 @@ old live.db cannot undo a later `lock`. Limits on every order: rain markets only
 begun, buy only, limit price no higher than the paper price (immediate-or-cancel, so nothing rests on the book), count
 no more than the paper count, one bot order per market (checked on Kalshi too, so a lost or restored live.db cannot
 cause a second order), at most $25 at risk across the whole account (Kalshi's own position figures; missing figures stop
-the run), enough cash, a daily loss stop of $2.50, and a pause after a 25% drawdown from the bot's peak.
+the run), enough cash, a daily loss stop of $2.50, and a pause after a 25% drawdown from the bot's peak. Since
+2026-11-06 (your rule): no "no rain" copy when v3 itself says rain 50% or more (SKIP_NO_FROM; fails closed).
 
 Your key never goes in this folder: settings live in %USERPROFILE%\\.kalshi\\settings.json (or the KALSHI_ENV,
 KALSHI_KEY_ID, KALSHI_KEY_FILE environment variables) and the key file must sit outside this folder. Nothing here prints,
@@ -37,7 +38,7 @@ if HERE not in sys.path: sys.path.insert(0,HERE)
 from config import DB, DAILY_LOSS_LIMIT
 import kalshi
 from core import fee, killed   # Kalshi taker fee (rounded up to the cent); the kill switch (one rule for every file)
-from strategy import STOP_DATE, started, close_time
+from strategy import STOP_DATE, started, close_time, payout, settled_pnl, STRATEGY_RAIN   # payout/settled_pnl: yes, no, scalar and void (2026-11-06)
 
 BASES={"demo":"https://external-api.demo.kalshi.co/trade-api/v2",     # Kalshi demo exchange, fake money
        "prod":"https://api.elections.kalshi.com/trade-api/v2"}        # real exchange (the bot already reads prices here)
@@ -45,6 +46,12 @@ MAX_AT_RISK=25.0          # dollars at risk across the account at once (user dec
 DAILY_STOP=DAILY_LOSS_LIMIT*MAX_AT_RISK   # $2.50 of settled losses in 24 hours stops new orders
 DRAWDOWN_PAUSE=0.25       # pause after the bot's value falls 25% from its peak (CLAUDE.md 11a)
 MIRROR_HOURS=12           # only paper trades opened in the last 12 hours are copied
+# The user's rule of 2026-11-06 ("yes" to the no-rain filter, with real money from Nov 12): a NO ("no rain") paper trade
+# is not copied when v3's own forecast for that market says rain is SKIP_NO_FROM or more likely. In the paper record
+# those bets won 1 of 22 (a screen found after looking, not a tested edge). Paper keeps making them, so whether skipping
+# was right stays measurable. It applies on every exchange, so the demo rehearses the real setup, and it only ever
+# removes orders. It fails closed: a NO trade whose forecast cannot be read is not copied.
+SKIP_NO_FROM=0.50
 GIVE_UP=1800              # an order still not found on Kalshi after 30 minutes counts as never placed
 UNLOCK_PHRASE="UNLOCK REAL MONEY"
 def _abs(p): return p if os.path.isabs(p) else os.path.join(HERE,p)   # paths never depend on the current folder
@@ -296,6 +303,32 @@ def paper_trade(pid):
     if p is None: return None
     try: return p.execute("select id,ts,ticker,side,price,n,version,status from trades where id=?",(pid,)).fetchone()
     finally: p.close()
+def v3_forecast(t,paper_id=None):
+    """v3's own rain chance for market t, read-only from paper.db, or None when it cannot be read.
+    For a paper trade, the forecast it was decided on: the decision ledger's row for it, written in the same savepoint
+    as the trade. While that ledger exists, a missing row or an empty value counts as unreadable (fail closed); the scan's
+    log (obs) is used only without the ledger or without a paper trade, because obs keeps the first snapshot of each
+    market, which can be from an earlier scan than the trade (review 2026-11-06)."""
+    p=paper_ro()
+    if p is None: return None
+    try:
+        if paper_id is not None and p.execute("select 1 from sqlite_master where type='table' and name='decisions'").fetchone():
+            r=p.execute("select p_model from decisions where trade_ref=? and strategy_id=? order by ts desc limit 1",
+                        ("trades:%d"%paper_id,STRATEGY_RAIN)).fetchone()
+        else:
+            r=p.execute("select fc from obs where ticker=? and version='v3'",(t,)).fetchone()
+        fc=float(r[0]) if r and r[0] is not None else None
+        return fc if fc is not None and 0.0<=fc<=1.0 else None   # NaN or out of range: unreadable
+    except (sqlite3.Error,TypeError,ValueError): return None
+    finally: p.close()
+def filter_reason(t,side,paper_id=None):
+    """Why the user's no-rain filter (SKIP_NO_FROM) keeps this copy from being placed, or None to go ahead."""
+    if side!="no": return None
+    fc=v3_forecast(t,paper_id)
+    if fc is None: return "no-rain filter: v3's forecast for this market could not be read (not copied, to be safe)"
+    if fc>=SKIP_NO_FROM-1e-12:
+        return "no-rain filter: v3 itself says rain %d%% (your rule of 2026-11-06: no 'no rain' copies from %d%%)"%(round(fc*100),round(SKIP_NO_FROM*100))
+    return None
 def cents_for(price): return int(math.floor(price*100+1e-6))   # never above the paper price (0.427 -> 42c)
 def record(c,row_id,o,note=None,v2=False):
     """Store Kalshi's answer and return the money used (cost + fees, never less than fills x limit price + fee formula,
@@ -334,6 +367,8 @@ def place(cl,c,env,paper_id,t,side,n,cents,note):
         pt=paper_trade(paper_id)
         if not pt or pt[2]!=t or pt[3]!=side or pt[6]!="v3" or pt[7]!="open" or not t.startswith("KXRAIN") or n>pt[5] or cents/100>pt[4]+1e-9:
             raise ExchangeError("order does not match paper trade %s"%paper_id)
+        f=filter_reason(t,side,paper_id)   # checked again here, so no caller can skip it
+        if f: raise ExchangeError("order blocked: "+f)
         coid="tb-%s-%d-%d"%(env,paper_id,int(pt[1]))   # the same every time for this paper trade
     cur=c.execute("insert into orders(ts,env,paper_id,ticker,side,count,limit_cents,client_order_id,status,note) values(?,?,?,?,?,?,?,?,?,?)",
                   (now(),env,paper_id,t,side,n,cents,coid,"sending",note)); c.commit(); rid=cur.lastrowid
@@ -410,6 +445,8 @@ def mirror():
             print("  skipped %s: %s"%(t,why))
         if killed(): return print("  KILL file appeared: stopping")
         if not 1<=cents<=99 or cents/100>price+1e-9 or side not in ("yes","no") or n<1: skip("bad paper row"); continue
+        f=filter_reason(t,side,pid)
+        if f: skip(f); continue
         try: m=market(cl,t)
         except ExchangeError as e: skip("could not read the market (%s)"%e); continue
         if not m: skip("not listed on this exchange"); continue
@@ -453,11 +490,13 @@ def sync():
     for rid,t,side,fc,cost,fees in c.execute("select id,ticker,side,fill_count,cost,fees from orders where env=? and fill_count>0 and result is null",(env,)).fetchall():
         try: m=market(cl,t) or {}
         except ExchangeError as e: print("  could not read %s: %s"%(t,e)); continue
-        r=m.get("result")
-        if r in ("yes","no"):
-            pnl=round((fc if r==side else 0)-cost-fees,4)
+        o=payout(m,side)   # until 2026-11-06 only yes/no: a scalar or void order stayed open, so its loss never reached the stops
+        if o:
+            r=o[0]; pnl=round(settled_pnl(r,side,fc,cost,fees,o[1]),4)
             c.execute("update orders set result=?,pnl=?,settled_ts=? where id=?",(r,pnl,now(),rid)); n+=1
             print("  settled %s: %s, %s%.2f"%(t,r,"+$" if pnl>=0 else "-$",abs(pnl)))
+        elif m.get("result") or str(m.get("status") or "").lower() in ("finalized","settled","determined"):
+            print("  %s: Kalshi says %s with result %r and no usable settlement value; left open (check it on Kalshi)"%(t,safe(m.get("status")),safe(m.get("result"))))
         elif m.get("status") in ("active","open"): still_open.add(t)
     c.commit()
     reconcile(cl,c,env,still_open)
@@ -480,6 +519,7 @@ def status():
     print("Ledger: %s"%LIVE_DB)
     if k.get("key_id"): print("Key ID: %s...  key file: %s (%s)"%(k["key_id"][:4],k.get("key_file"),"found" if os.path.isfile(k.get("key_file") or "") else "MISSING"))
     print("Orders: "+((lock_reason(c,env,s) or "allowed") if ready(k) else "none (no %s account set up yet)"%env))
+    print("Filter: 'no rain' paper bets are not copied when v3 itself says rain %d%% or more (your rule of 2026-11-06)"%round(SKIP_NO_FROM*100))
     why=stops(c,env)
     if why: print("Paused: "+why)
     if ready(k):

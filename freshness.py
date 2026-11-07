@@ -370,35 +370,38 @@ def _clock_rows(root, now):
     return rows
 
 
-def checks(root=None, db=None, now=None, offsite=None):
-    """Every check as a list of rows (see check()). Read-only. Arguments exist for tests; the defaults are this folder,
-    PAPER_DB, the clock, and TRADEBOT_OFFSITE_BACKUPS as backup.py uses them."""
-    root = root or HERE
-    now = clock.now() if now is None else now
-    if db is None:
-        env = os.getenv("PAPER_DB", "paper.db")
-        db = env if os.path.isabs(env) else os.path.join(root, env)
-    offsite = offsite or os.getenv("TRADEBOT_OFFSITE_BACKUPS", os.path.join(os.path.expanduser("~"), "Documents", "tradebot_backups"))
-    out, data_last, has_open = _paper(db, now, root)
-    # backups and the export
-    out.append(check("backup", "Backups in the folder", _newest(os.path.join(root, "backups", "paper_*.db")), LIMITS["backup"], now,
-                     "newest backups\\paper_*.db", "Scans and settles back up; if they ran and this is stale, run .\\run backup and read its message."))
-    out.append(check("offsite", "Backups outside the folder", _newest(os.path.join(offsite, "paper_*.db")), LIMITS["backup"], now,
-                     "newest in %s" % offsite, "Check that this folder exists and can be written."))
-    out.append(check("export", "JSON export", _mtime(os.path.join(root, "backups", "paper_latest.json")), LIMITS["export"], now,
-                     "backups\\paper_latest.json (the off-laptop copy)", "export.py runs after each scan; run .\\run export."))
-    # the page, and whether it was built before the data it shows
+def _backup_rows(root, now, offsite):
+    """The backups inside and outside the folder, and the JSON export."""
+    return [
+        check("backup", "Backups in the folder", _newest(os.path.join(root, "backups", "paper_*.db")), LIMITS["backup"], now,
+              "newest backups\\paper_*.db", "Scans and settles back up; if they ran and this is stale, run .\\run backup and read its message."),
+        check("offsite", "Backups outside the folder", _newest(os.path.join(offsite, "paper_*.db")), LIMITS["backup"], now,
+              "newest in %s" % offsite, "Check that this folder exists and can be written."),
+        check("export", "JSON export", _mtime(os.path.join(root, "backups", "paper_latest.json")), LIMITS["export"], now,
+              "backups\\paper_latest.json (the off-laptop copy)", "export.py runs after each scan; run .\\run export."),
+    ]
+
+
+def _page_row(root, now, data_last):
+    """The dashboard page, and whether it was built before the data it shows."""
     page = _mtime(os.path.join(root, "dashboard.html"))
     row = check("page", "Dashboard page", page, LIMITS["page"], now, "dashboard.html", "Run .\\run dashboard.")
     if page and data_last and page < data_last - PAGE_LAG and row["status"] == "ok":
         row.update(status="stale", detail="dashboard.html was built before the latest scan data (%s)" % clock.label(data_last),
                    action="Run .\\run dashboard.")
-    out.append(row)
-    # live prices, needed only while something is open
-    out.append(check("marks", "Live prices of open positions", last_jsonl_ts(os.path.join(root, "marks.jsonl")), LIMITS["marks"], now,
-                     "marks.jsonl" + ("" if has_open else " (nothing open, so not needed)"), "The hourly job runs marks.py; check tasks\\hourly.cmd.",
-                     status=None if has_open else "info"))
-    # research caches
+    return row
+
+
+def _marks_row(root, now, has_open):
+    """Live prices of open positions: needed only while something is open."""
+    return check("marks", "Live prices of open positions", last_jsonl_ts(os.path.join(root, "marks.jsonl")), LIMITS["marks"], now,
+                 "marks.jsonl" + ("" if has_open else " (nothing open, so not needed)"), "The hourly job runs marks.py; check tasks\\hourly.cmd.",
+                 status=None if has_open else "info")
+
+
+def _lip_rows(root, now):
+    """PLAN5 L's caches: reward programs, hourly samples (on this PC, or elsewhere since 2026-10-28) and fee types."""
+    out = []
     lip_dir = os.path.join(root, "research", "data", "lip")
     start, end = _lip_window(root)
     in_window = start is not None and start <= now < end
@@ -439,6 +442,12 @@ def checks(root=None, db=None, now=None, offsite=None):
     out.append(check("fee_types", "Fee types cached by PLAN5 L", None, 0, now,
                      "each series' fee type is read once and kept; to re-read them, delete research\\data\\lip\\series.json"
                      if fee else "not cached yet", status="info" if fee else "waiting"))
+    return out
+
+
+def _research_rows(root, now):
+    """The market-structure scan and the market catalogue: (rows, last structure run, last catalogue refresh)."""
+    out = []
     st_last = last_jsonl_ts(os.path.join(root, "research", "data", "structure", "runs.jsonl"))
     out.append(check("structure", "Market-structure scan", st_last, LIMITS["structure"], now,
                      "research\\data\\structure\\runs.jsonl", "The hourly job runs it every 6 h."))
@@ -453,9 +462,12 @@ def checks(root=None, db=None, now=None, offsite=None):
             pass
     out.append(check("discovery", "Market catalogue", d_last, LIMITS["discovery"], now, "research\\data\\discovery.db",
                      "The hourly job refreshes it every 6 h."))
-    out += _tasks(root, now)
-    out += _clock_rows(root, now)
-    # reports older than the data they describe
+    return out, st_last, d_last
+
+
+def _report_rows(root, now, st_last, d_last):
+    """Reports older than the data they describe."""
+    out = []
     sm = _mtime(os.path.join(root, "research", "results", "structure.md"))
     if sm and st_last and sm < st_last - PAGE_LAG:
         out.append(check("report_structure", "Structure report", sm, 0, now, "structure.md is older than its last scan (%s)" % clock.label(st_last),
@@ -465,6 +477,28 @@ def checks(root=None, db=None, now=None, offsite=None):
         out.append(check("report_discovery", "Catalogue summary", dm, 0, now,
                          "discovery.md was written before the latest catalogue refresh (%s); the hourly job refreshes without summarizing" % clock.label(d_last),
                          status="info"))
+    return out
+
+
+def checks(root=None, db=None, now=None, offsite=None):
+    """Every check as a list of rows (see check()). Read-only. Arguments exist for tests; the defaults are this folder,
+    PAPER_DB, the clock, and TRADEBOT_OFFSITE_BACKUPS as backup.py uses them."""
+    root = root or HERE
+    now = clock.now() if now is None else now
+    if db is None:
+        env = os.getenv("PAPER_DB", "paper.db")
+        db = env if os.path.isabs(env) else os.path.join(root, env)
+    offsite = offsite or os.getenv("TRADEBOT_OFFSITE_BACKUPS", os.path.join(os.path.expanduser("~"), "Documents", "tradebot_backups"))
+    out, data_last, has_open = _paper(db, now, root)
+    out += _backup_rows(root, now, offsite)
+    out.append(_page_row(root, now, data_last))
+    out.append(_marks_row(root, now, has_open))
+    out += _lip_rows(root, now)
+    research, st_last, d_last = _research_rows(root, now)
+    out += research
+    out += _tasks(root, now)
+    out += _clock_rows(root, now)
+    out += _report_rows(root, now, st_last, d_last)
     return out
 
 

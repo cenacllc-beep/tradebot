@@ -313,9 +313,13 @@ def money_line(ok):
     if ok:
         return ("The gate passed on paper only. Real money still needs your own typed unlock (.\\run live unlock), starts tiny and is"
                 " capped at $25 at risk.")
-    return ("The rules (CLAUDE.md section 11) say no real money after a failed look. live.py's unlock still leaves the decision to"
-            " you: it says plainly that the gate did not pass, and asks for the typed phrase. v3 opens no new paper trades for market"
-            " days from %s on, so live.py has nothing to copy." % STOP)
+    if not getattr(gate, "TRADE_AFTER_LOOK", False):
+        return ("The rules (CLAUDE.md section 11) say no real money after a failed look. live.py's unlock still leaves the decision to"
+                " you: it says plainly that the gate did not pass, and asks for the typed phrase. v3 opens no new paper trades for market"
+                " days from %s on, so live.py has nothing to copy." % STOP)
+    return ("The rules (CLAUDE.md section 11) said no real money after a failed look. On 2026-11-06 you decided to trade real money"
+            " from %s anyway: v3 keeps paper-trading, and live.py copies its trades once you have funded the account, switched it to"
+            " prod and typed the unlock yourself (it says plainly that the gate did not pass). At most $25 is at risk." % STOP)
 
 
 def lines(R):

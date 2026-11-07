@@ -1432,3 +1432,265 @@ unfamiliar codebase ... do not change functionality. only upgrade the code quali
   and KXRAIN-26NOV03-PHX and -26NOV05-PHX are still "closed" with no result. Because a test-day market without a yes/no
   result keeps the gate look pending (CLAUDE.md section 11; strategy.LOOK_DEADLINE unset), the Nov 11 look would stay
   "not judged yet". That is the user's decision; nothing was changed.
+
+## 2026-11-06 20:15 (local) - why the paper bets lose (read-only analysis, no code change)
+- User: "investigate and identify patterns to detect future losses based on our losing orders". Read-only on a copy of
+  paper.db: 29 settled v3 rain bets (6 won, -$6.91 of $15.98 staked, $0.93 fees) and 407 resolved logged v3 rain
+  markets over 13 market days.
+- **v3 runs low on rain from about 20% to 90%.** It said 30-40%: rained 53%; 60-70%: rained 89% (18 markets, 10 days;
+  +25 points +/- 7, day-clustered). Kalshi's mid was calibrated at every level.
+- **Disagreements are one-sided.** Of the 8+ point disagreements, v3 was the drier side 95 times and the wetter side 23.
+  When v3 was drier, it rained 75% of the time (market 71%, v3 51%). So 27 of the 29 bets were "no rain". The 14 bets
+  bought under 20c all lost (13% implied). At the prices paid about 7.5 wins were expected; there were 6.
+- **Cause, from the definition** (weather._rain_v3): each half-day's chance is the highest single hourly chance. Several
+  hours at a moderate chance add up to more, so v3 comes out low. This is the lean PLAN7 corrects and tests forward.
+- **Candidate screen, found after looking:** "no-rain bets when v3 itself says 50%+" won 1 of 22 (-12.0c +/- 4.3 a
+  contract, 9 days, at the mid). The rest were +5.6c +/- 11.2 (10 days). The 40% and 60% cutoffs point the same way.
+  In-sample, few days, and zero wins in 12 cheap bets happens about 1 time in 4 at fair prices: a screen, not a test.
+- Nothing changed. Offered the user: paper only until PLAN7's first look, or a live-only filter. The question was
+  answered with a new request; the earlier decision (copy every bet) stands.
+
+## 2026-11-06 20:40 (local) - the user's decisions: a Nov 18 cutoff for the gate look, and real money from Nov 11
+- Asked plainly, with the paper record, the user chose "option 1" (the cutoff) "but we change to real money trading by
+  11th november", then "Real money from Nov 11". This changes the rule pre-committed on 2026-10-28, before the verdict.
+- strategy.py:
+  - LOOK_DEADLINE = 2026-11-18 (was None). From then, test-day markets still without a yes/no result are left out of
+    the single look and listed with it. Found earlier today: Kalshi settled KXRAIN-26OCT30-PHX as "scalar", and two
+    later Phoenix markets were unsettled, so without a cutoff the look could stay pending for good.
+  - TRADE_AFTER_LOOK = True (new): v3 rain keeps paper-trading market days from Nov 11 on whatever the stored look
+    says, including while it is pending or cannot be worked out. False restores the Oct 28 rule.
+  - The look is still taken once, stored and reported as the only verdict. report(), look_line and the error message
+    say what now happens.
+- Unchanged:
+  - shadow.py's limit-order ledger keeps the old rule (no orders after a failed or pending look).
+  - live.py, with all of its locks: no real money before Nov 11, the user's own `live use prod` and typed unlock, the
+    $25 cap, the $2.50 daily loss stop, the drawdown pause and the kill switch.
+- gate.py mirrors both values for the dashboard; tests/test_fix.py checks they agree.
+- Texts updated for the new rule: dashboard.py (the verdict), research/nov11.py (money_line), audit.py (the
+  GATE_NOT_PASSED reason), registry.py (v3's note) and docs/ARCHITECTURE.md.
+- tests/test_gatelook.py: sections 1-10 still prove the old rule with the flag off. A new section 11 proves the new
+  one: trades continue after a pending, failed or unworkable look; the look is stored once; the ledger stays stopped;
+  the Nov 18 cutoff leaves a never-settled test-day market out. tests/test_nov11.py follows the flag.
+- PLAN7: strategy.py's change gives v3 a new model_version. Deployed before the Nov 9 evening scan, it appears on a test
+  day, which PLAN7's fit_versions accepts; weather.py and nws.py are unchanged. PLAN8's frozen identity does not
+  include strategy.py.
+
+## 2026-11-06 21:00 (local) - refactor stage 4 (no functional change)
+- User: "act like a senior engineer ... do not change functionality". docs/REFACTOR.md section 7 has the review: data
+  growth, the problem areas ranked, what stays frozen and why.
+- Changed:
+  - freshness.checks() is split into six named sections;
+  - control_view.section() is split into nine;
+  - dashboard.shadow_view() is split into three panels.
+  - tests/golden.py: skips backup copies named by the clock second, masks 24-hour clock labels, and runs the gatelook
+    scenario.
+- Proof:
+  - golden master (old, new, old again): 167,461 data fields and 15,794 text pieces, 0 differences;
+  - the page and the freshness checks built from copies of the PC's real files are identical (clock times masked);
+  - 41 tests pass.
+- Not touched: live.py, the forecast (weather.py, nws.py, kalshi.py, core.py, config.py), shadow.py, stationfc.py and
+  the pre-registered scorers.
+
+## 2026-11-06 21:45 (local) - independent code review of the two changes above (agents/code-reviewer.md)
+- Verdict:
+  - live.py is untouched. Its locks, limits and kill switch are not loosened or bypassed, and real orders still need
+    the user's deposit, `live use prod` and typed unlock.
+  - The look is stored once.
+  - The limit-order ledger stays stopped after a pending, failed or unworkable look.
+  - PLAN8's identity is unchanged.
+  - The refactor changes no output. The reviewer swapped the old functions back in and compared on the real paper.db
+    and 21 scenario databases, plus a symbol-table check. The only exceptions are the documented empty-registry case
+    and which KeyError is raised for a missing table.
+- MUST, fixed: the control center's safety line (control_view.safety_line) still said the bot paper-trades after Nov 11
+  "only if the gate's single look passes", contradicting the verdict on the same page. A user could read that and
+  believe the unlock does nothing. It now follows gate.TRADE_AFTER_LOOK, and test_gatelook checks the page for the old
+  phrases.
+- SHOULD:
+  - Fixed: the limit-order ledger's rule text in registry.py.
+  - Applied, deploy timing:
+    - PLAN7 and PLAN6 B count the new model version only once a PC scan logs it for a test day (market day up to
+      Nov 10).
+    - Deploy to the PC and the repository together, byte-identical, before the Nov 8 evening scan.
+    - Afterwards, check the decisions ledger for the new version. If it has not appeared by the Nov 9 scan, ask the
+      user about PLAN7's amendment.
+    - All strategy.py text fixes are in this same release.
+  - Left, as a ticket: a market Kalshi settles as neither yes nor no (KXRAIN-26OCT30-PHX was "scalar") leaves a paper
+    trade open for good in strategy.settle. live.py sync records P&L only for yes or no, so such a loss would never
+    reach the daily loss stop or the drawdown pause, and stays counted as at risk. The $25 cap still bounds it. A live.py
+    change needs the user's instruction; he is told.
+- COULD:
+  - Fixed: look_line wording ("Then v3 rain keeps paper-trading ...; live.py copies them with real money only after you
+    switch it to prod and type the unlock"; no doubled phrase; not "an account you funded", since demo needs no unlock).
+  - Fixed: report()'s stop-date line no longer says "no live trading" when TRADE_AFTER_LOOK is on.
+  - Fixed: the dashboard's failed-look text, the same way.
+  - Fixed: golden.py masks only the time in "Nov 07 00:22", and counts backup copies per folder and tag instead of
+    dropping them, so a missing backup still shows.
+  - Added: a test that no state other than a pass gives live.py's unlock its "passed (paper only)" text.
+  - Added: notes in CLAUDE.md sections 5 and 11a.
+  - Left: if gate.py cannot be imported, the page falls back to the old rule's wording (text only).
+- After the fixes:
+  - 41 tests pass.
+  - The refactor's golden comparison is still 0 differences with the tightened masks: 167,461 data fields and 15,798
+    text pieces.
+
+## 2026-11-06 22:00 (local) - incident: Kalshi's "scalar" and "void" settlements were not understood (fixed)
+- User: "act as a senior debugging engineer investigating a live production issue". Full write-up:
+  docs/INCIDENT_2026-11-06.md.
+- Found: KXRAIN-26OCT30-PHX is finalized with result "scalar" at $0.99 (Kalshi's API, read on the PC with kalshi.get).
+  The Nov 3, 4 and 5 Phoenix markets are still closed with no result.
+- Root cause: paper (strategy.settle), the limit-order ledger (shadow.settle) and live.py (sync) each settled only "yes"
+  and "no". Kalshi also reports "scalar" (YES pays the settlement value, NO the rest) and "void" (cost returned), so a
+  trade or order on such a market would have stayed open for good:
+  - its cost held room under the 15% cap and the live $25 at-risk count;
+  - its loss never reached the paper daily stop or live.py's daily loss stop and drawdown pause.
+  - The bot held nothing on the affected markets (checked in paper.db and live.db).
+- Fix: one rule in strategy.py, used by all three ledgers and the account view:
+  - settle_value, payout, settled_pnl and market_of (result_of wraps it).
+  - yes/no: unchanged, to the bit.
+  - scalar: only once finalized and with a value from 0 to 1.
+  - void: only once finalized, P&L -fee.
+  - An unreadable final result stays open with a warning.
+  - The gate's log (obs) and the ledger's market results stay yes/no.
+  - dashboard.won and account_view show scalar and void by their P&L.
+  - live.py: only sync changed, and only so these losses reach the stops; no lock or limit changed.
+- Tests: tests/test_settle.py section 8 and tests/test_live.py section 8; the full suite passes (41). PLAN8's frozen
+  identity is unchanged; pre-registered scorers are untouched.
+- Tonight's run (20:55-20:58, exit 0) was otherwise healthy: 3 paper trades (Nov 7 ABQ YES, SATX NO, PVD NO); the demo
+  copies were skipped for "no price to buy at" on the demo exchange; FRESHNESS all current.
+
+## 2026-11-06 22:30 (local) - independent code review of the settlement fix (agents/code-reviewer.md)
+- Verdict:
+  - Safe for real money: no lock, limit or kill-switch path changed. Settling scalar and void can only bring the daily
+    loss stop and the drawdown pause into play sooner.
+  - yes/no P&L is unchanged to the bit: 200,000 random cases, paper and live rounding.
+  - PLAN8's identity is unchanged (41 keys).
+  - The full suite passes.
+- MUST: none.
+- SHOULD:
+  - Deploy timing: done. It ships with the earlier changes in one deploy (scheduled 2026-11-07 10:00). Afterwards the
+    decisions ledger must show the new model version on a test market day by the Nov 9 scan. The new version is
+    v3@ca1cc9fd54b0 before the final text edits; the deploy notes the final hash.
+  - The limit-order ledger test: added to tests/test_settle.py (scalar NO, void, yes, scalar without a value).
+  - Left, told to the user:
+    - The gate's single look now counts a scalar or void trade as settled, by definition: it counts toward the 50 and
+      its real P&L toward the net. Before, it would have kept the look waiting. No test-day trade is on such a market.
+    - Win counts in report(), control_view, metrics, postmortem, learn and shadow's report still call scalar and void
+      "not won", while the dashboard and the account view go by P&L. Money figures are right everywhere. A shared
+      helper is the follow-up. nov11.py (PLAN6) is frozen.
+- COULD:
+  - Fixed: the older cents field must hold a whole number (fail closed).
+  - Fixed: the warning no longer says "its paper trade" when there is none.
+  - Left:
+    - "Refunded" label for void;
+    - a side table so never-binary markets stop being re-queried at each settle (one request each, as before);
+    - shadow's local import of strategy.
+  - The void fee assumption is noted above and in docs/INCIDENT_2026-11-06.md.
+- After the fixes: 41 tests pass.
+
+## 2026-11-06 21:30 (local) - assessment of the decision process, and the user's no-rain filter for live.py
+- User: "fully assess. do we have a better decision making process?" Read-only on paper.db, 334 resolved rain markets
+  with all three sources (11 days).
+- Accuracy, Brier score (lower is better; day-clustered difference against the price):
+  - Kalshi's price: 0.0584;
+  - v3: 0.0806, worse by 0.020 +/- 0.006;
+  - the airport forecast: 0.0761, worse by 0.016 +/- 0.007;
+  - the bot's 50/50 blend: 0.0659;
+  - 80/20 price and airport: 0.0602, worse by 0.0016 +/- 0.0011.
+- Rules so far, per contract:
+  - v3 paying the ask: -3.4c +/- 8.2 (29 bets);
+  - limit orders: -0.2c +/- 12.9 (29);
+  - airport-forecast signals: -3.6c taker and -5.1c maker (35 and 38);
+  - the watch-only selector: +8.1c, 8 of 8 won. It buys favourites at 87-95c; 8 of 8 at those prices happens about half
+    the time, and buying favourites lost after fees on 81 past days.
+  - Told: none of these is better than trusting the price. The improvements are to anchor on the price (PLAN8), correct
+    v3's lean (PLAN7), use limit orders (a new strategy for real money, which needs its own test), bet only on a
+    forward-tested edge, and pre-commit an end rule for real money.
+- The user: "november 12 we start real money trading (not negotiable)", then "yes" to the filter.
+- live.py changes:
+  - SKIP_NO_FROM = 0.50, v3_forecast(t, paper_id) and filter_reason(t, side, paper_id).
+  - A NO paper trade is not copied when v3's own forecast for it is 50% or more.
+  - The forecast comes from the trade's own decision row (written with the trade); obs is the fallback, since obs keeps
+    the first snapshot, which can come from an earlier evening.
+  - It fails closed: an unreadable, NaN or out-of-range forecast means no copy.
+  - mirror() records a skipped row with the reason (never retried), and place() checks it again before anything is
+    written or sent.
+  - status() prints the rule.
+  - It applies on demo and prod alike, and it only removes orders.
+  - No lock or limit changed.
+- tests/test_live.py:
+  - section 8b: the 50% boundary, a missing forecast, YES unaffected, under 50% copied, no retry, place() blocked, the
+    status line, and the decision row beating an older obs snapshot;
+  - the paper() helper now logs an obs forecast (0.30 by default) as the scan does.
+
+## 2026-11-06 21:45 (local) - independent code review of the no-rain filter (agents/code-reviewer.md)
+- Verdict:
+  - The filter is safe and can only remove orders. It runs before anything is written to "sending" or sent to Kalshi.
+  - No lock, limit or kill-switch check moved.
+  - The data is right: decisions.p_model is the exact forecast the trade was decided on, written in the trade's own
+    savepoint.
+- MUST: none.
+- SHOULD, both fixed:
+  - A "database is locked" error on the decision read fell back to obs, which can hold an older first snapshot.
+  - A decision row with an empty forecast also fell back to obs.
+  - Now, while the decision ledger exists, a paper trade's forecast comes only from its own decision row. A missing
+    row, an empty value or any read error counts as unreadable, so the copy is skipped (fail closed). obs is used only
+    when there is no ledger at all.
+- COULD:
+  - Applied: the strategy id comes from strategy.STRATEGY_RAIN; live.py's docstring lists the filter; tests cover a
+    missing row, an empty forecast and place() blocking on the decision row's value.
+  - Left: paper_ro() outside the try (it fails closed, as paper_trade() does), and the permanent skip after a passing
+    read failure (the same as the other skips).
+- Checked on the PC's real paper.db:
+  - Of 34 v3 rain trades, only the two of Oct 15 (before the ledger existed) lack a decision row.
+  - Every later decision forecast equals obs.
+  - The filter would have skipped Nov 5 TTN and PHIL, Nov 6 DC and tonight's SATX and PVD "no rain" bets, and copied
+    tonight's ABQ YES.
+- Side note: the reviewer's probe wrote a 16 KB backup of its own scratch database into the cloud container's
+  /root/Documents/tradebot_backups. It is not on the PC and holds no project data.
+
+## 2026-11-07 10:10 (local) - PLAN9 written, reviewed and frozen before its forward data
+- User, 2026-11-06 evening: "use/implement your recommendations above. use open source options if available", then
+  "we need a fully free option/alternative".
+- Open-Meteo's ensemble API was approved for research and a logger was drafted (research/ensfc.py). Both were dropped
+  before any use: its free tier is non-commercial only. The logger was deleted before any deploy, and no call was made
+  except one format check of the API.
+- research/PLAN9.md and research/plan9.py: v3's own 24 hourly NWS chances combined in four 6-hour blocks ("v3-6h",
+  clipped like v3).
+  - Tests in a fixed order: B (v3-6h vs v3), then A (v3-6h vs the price) only if B is confirmed. Each at the one-sided
+    2.5% line, t plus the block bootstrap.
+  - Futility at 60 counted market days, showing only the signs; final at 110; backstop 2027-06-30.
+  - Market days from Nov 8. Fully free data the bot already logs; no new source, address or package.
+  - tests/test_plan9.py; run.bat's settle runs `plan9.py auto` (its CRLF line endings were restored after an edit had
+    turned them into LF in the work copy; caught before any deploy).
+- Statistics review (agents/statistician.md):
+  - Verdict: the forward test is valid; choosing among six rules only inflates the in-sample numbers.
+  - Applied:
+    - B's wording: v3-6h is never below v3, so B passes whenever v3 runs low and cannot show why.
+    - Expected results stated honestly.
+    - Readiness: a day with missing results counts after 7 days only once a settle recorded a result past that mark,
+      and a day with no resolved market takes no slot.
+    - The identity record is stored once before the first window and never re-created.
+    - The fixed sequence (B then A at 2.5%) instead of Bonferroni at 1.25%.
+    - The four-test line (0.625%) for any trading proposal.
+    - The futility look shows only signs and counts.
+    - The gate's reading is labelled "not this plan's verdict".
+    - Section 7 says plainly that B without A has no trading value.
+    - A power section, all six rules with their in-sample Brier, and the window wording (each row's own log time).
+    - Clipping like v3.
+    - Two descriptive readings at the final look: calibration 30-80%, and the 00:50-01:30 UTC subset.
+  - Left: the other descriptive splits (Brier decomposition, by time zone, against PLAN7's q).
+- Code review (agents/code-reviewer.md):
+  - Applied:
+    - MUST 1: a lost or damaged identity record could be silently re-created. Now a damaged file stops the looks, a lost
+      one is restored from its off-folder copy, and none is created after the first window opens.
+    - MUST 2: looks could be recomputed. Now they are stored once with an off-folder copy, a damaged one stops the
+      looks, and the final look needs the stored futility look.
+    - SHOULDs: main catches SystemExit; PLAN7's t table is pinned (the constants hash); amendments cover PLAN7 pins too,
+      in PLAN8's format; status shows "CODE CHANGED" and exclusions; signs only at futility.
+    - COULDs: exclusions only for the look's days; the Markdown is written atomically before the JSON; the final look
+      keeps the futility look's counted markets.
+  - Left: identity coverage of weather.RAIN, the obs insert and kalshi.quote (wider than the plan states).
+- Frozen (SHA-256):
+  - research/PLAN9.md 2383e0d5fe1d75ab7e94c50d40d11a86e64261ffccfd8dddd21d0295b946502e
+  - research/plan9.py fd1454af16fe07ef294a7d4f2ca1667c5ab1a4cfd7764bd79e272d1b307edb64
+  - The identity record is stored on the PC at the deploy, before 2026-11-08 00:50 UTC.

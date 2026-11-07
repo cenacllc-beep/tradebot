@@ -162,4 +162,73 @@ src=open(os.path.join(WORK,"strategy.py"),encoding="utf-8").read()
 assert "where id=? and status='open'" in src and "cur.rowcount==1 and ready" in src
 c.close()
 print("audit ledger: one settled event however many settles run, and the open-only guard: ok")
+
+# 8. Kalshi's four settlements (2026-11-06, after KXRAIN-26OCT30-PHX settled "scalar" at $0.99): yes, no, scalar, void
+P=strategy.payout
+fin=lambda **k: dict(dict(status="finalized"), **k)
+assert P(fin(result="yes"), "yes")==("yes", 1.0) and P(fin(result="yes"), "no")==("yes", 0.0) and P("no", "no")==("no", 1.0)
+assert P({"result": "yes", "status": "determined"}, "yes")==("yes", 1.0), "yes/no count as soon as Kalshi reports them, as before"
+assert P(fin(result="scalar", settlement_value_dollars="0.9900"), "yes")==("scalar", 0.99)
+assert P(fin(result="scalar", settlement_value_dollars="0.9900"), "no")==("scalar", 0.01)
+assert P(fin(result="scalar", settlement_value=25), "no")==("scalar", 0.75), "the older field, in cents"
+for odd in (99.5, "0.99", 0.99):   # cents must be whole: a dollar amount in the cents field would read 100 times too small
+    assert P(fin(result="scalar", settlement_value=odd), "yes") is None, odd
+assert P({"result": "scalar", "status": "settled", "settlement_value_dollars": "0.5"}, "yes")==("scalar", 0.5)
+for bad in (dict(result="scalar", status="determined", settlement_value_dollars="0.99"),   # not final yet: its value may change
+            dict(result="scalar", status="closed", settlement_value_dollars="0.99"),
+            fin(result="scalar"), fin(result="scalar", settlement_value_dollars=""), fin(result="scalar", settlement_value_dollars="1.5"),
+            fin(result="scalar", settlement_value_dollars="-0.01"), fin(result="scalar", settlement_value_dollars="nan"),
+            fin(result="scalar", settlement_value_dollars="inf"), fin(result="scalar", settlement_value_dollars="abc"),
+            dict(result="void", status="closed"), fin(result=""), fin(result="unknown"), {"result": ""}, "scalar", "", None, {}):
+    assert P(bad, "yes") is None and P(bad, "no") is None, bad
+assert P(fin(result="void"), "yes")==("void", None) and P(fin(result="scalar", settlement_value_dollars="0.99"), "maybe") is None
+SP=strategy.settled_pnl
+assert SP("yes", "yes", 3, 1.26, 0.06, 1.0)==3-1.26-0.06 and SP("no", "yes", 3, 1.26, 0.06, 0.0)==0-1.26-0.06, "yes/no: the old formula, to the bit"
+assert abs(SP("scalar", "yes", 3, 1.26, 0.06, 0.99)-(2.97-1.32))<1e-12 and abs(SP("scalar", "no", 3, 0.24, 0.02, 0.01)-(0.03-0.26))<1e-12
+assert SP("void", "no", 3, 0.24, 0.02, None)==-0.02, "void: the cost comes back, the fee is assumed kept"
+c=fresh([("KXRAIN-S1","yes",3,1.26,0.06),("KXRAIN-S2","no",3,0.24,0.02),("KXRAIN-V1","no",2,0.30,0.02),("KXRAIN-S3","yes",1,0.40,0.02),
+         ("KXRAIN-S4","yes",1,0.40,0.02),("KXRAIN-Y1","yes",2,0.80,0.03)],["KXRAIN-S1","KXRAIN-Y1"])
+mk_={"KXRAIN-S1": fin(result="scalar", settlement_value_dollars="0.9900"), "KXRAIN-S2": fin(result="scalar", settlement_value_dollars="0.9900"),
+     "KXRAIN-V1": fin(result="void"), "KXRAIN-S3": dict(result="scalar", status="determined", settlement_value_dollars="0.99"),
+     "KXRAIN-S4": fin(result="scalar"), "KXRAIN-Y1": fin(result="yes")}
+kalshi.get=lambda t: dict(mk_[t])
+_, out=quiet(strategy.settle, c)   # the default lookup reads Kalshi's market (strategy.market_of)
+c2=sqlite3.connect("paper.db")
+got={t: (s_, r, None if p is None else round(p, 6)) for t, s_, r, p in c2.execute("select ticker,status,result,pnl from trades")}
+assert got=={"KXRAIN-S1": ("settled", "scalar", 1.65), "KXRAIN-S2": ("settled", "scalar", -0.23), "KXRAIN-V1": ("settled", "void", -0.02),
+             "KXRAIN-S3": ("open", None, None), "KXRAIN-S4": ("open", None, None), "KXRAIN-Y1": ("settled", "yes", 1.17)}, got
+assert dict(c2.execute("select ticker,result from obs").fetchall())=={"KXRAIN-S1": None, "KXRAIN-Y1": "yes"}, "the gate scores yes/no only"
+assert "SETTLED KXRAIN-S1 yes x3: Kalshi settled it scalar at $0.9900 a contract, P&L +1.65" in out and "KXRAIN-V1 no x2: Kalshi settled it void (cost returned)" in out, out
+assert "SETTLE WARNING: KXRAIN-S4 is finalized with result 'scalar'" in out and "KXRAIN-S3" not in out.split("SETTLE WARNING")[-1], out
+assert strategy.result_of("KXRAIN-S1", sleep=lambda s: None)=="scalar"
+assert c2.execute("select count(*) from market_results where ticker like 'KXRAIN-S%' or ticker like 'KXRAIN-V%'").fetchone()[0]==0, \
+    "the ledger's market results stay yes/no"
+c2.close()
+# what was open no longer holds room under the 15% cap: only the two undecided trades count
+assert abs(c.execute("select coalesce(sum(cost+fee),0) from trades where status='open'").fetchone()[0]-0.84)<1e-9
+c.close()
+# the account view closes them with what they paid (P&L + cost + fee), not as open trades
+import account_view
+L=account_view.main_ledger([dict(id=1,ts=1,ticker="KXRAIN-26OCT30-PHX",side="yes",n=3,price=0.42,cost=1.26,fee=0.06,status="settled",result="scalar",pnl=1.65,settled_ts=2),
+                            dict(id=2,ts=1,ticker="KXRAIN-26OCT30-PHX",side="no",n=2,price=0.15,cost=0.30,fee=0.02,status="settled",result="void",pnl=-0.02,settled_ts=2),
+                            dict(id=3,ts=1,ticker="KXRAIN-26OCT31-SEA",side="no",n=2,price=0.10,cost=0.20,fee=0.01,status="settled",result="yes",pnl=-0.21,settled_ts=2)],25.0,0)
+assert [(x["status"], round(x["payout"], 6)) for x in L["trades"]]==[("won", 2.97), ("lost", 0.30), ("lost", 0.0)], L["trades"]
+assert abs(sum(b for _, b in L["events"])-(1.65-0.02-0.21))<1e-6, L["events"]
+# the limit-order ledger (shadow.settle) uses the same rule (review 2026-11-06)
+import shadow
+if os.path.exists("paper.db"): os.remove("paper.db")
+c=core.db(); shadow.tables(c)
+for t, side, n, cost in (("KXRAIN-S1", "no", 3, 0.24), ("KXRAIN-V1", "yes", 2, 0.80), ("KXRAIN-Y1", "yes", 2, 0.80), ("KXRAIN-S4", "yes", 1, 0.40)):
+    c.execute("insert into shadow_orders(ts,ticker,strategy,version,side,price,fair,n,cost,fee,cancel_ts,status,fill_ts) values(?,?,?,?,?,?,?,?,?,?,?,?,?)",
+              (time.time()-86400, t, "maker", "v3", side, cost/n, 0.5, n, cost, 0.0, time.time()-3600, "filled", time.time()-7200))
+c.commit()
+shadow._markets=lambda ts: {t: dict(mk_[t]) for t in ts}
+def no_candles(*a, **k): raise AssertionError("no price history is needed here")
+shadow._candles=no_candles
+quiet(shadow.settle, c)
+got={t: (st, r, None if p is None else round(p, 6)) for t, st, r, p in c.execute("select ticker,status,result,pnl from shadow_orders")}
+assert got=={"KXRAIN-S1": ("settled", "scalar", -0.21), "KXRAIN-V1": ("settled", "void", 0.0), "KXRAIN-Y1": ("settled", "yes", 1.2),
+             "KXRAIN-S4": ("filled", None, None)}, got
+c.close()
+print("scalar and void settlements: paper trades and the limit-order ledger close with Kalshi's value, the gate keeps yes/no only, the account view agrees: ok")
 print("settle under network errors: all checks passed")

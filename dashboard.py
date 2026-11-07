@@ -64,6 +64,7 @@ except Exception as ex:   # gate.py missing or broken: never show a pass, and sa
     _gate=None; GATE_OK=False; print("gate rules unavailable (gate.py could not be imported: %s)"%ex)
 STOP=_gate.STOP_DATE if _gate else date(2026,11,11)
 T975=_gate.T975 if _gate else {}
+TRADE_AFTER_LOOK=bool(getattr(_gate,"TRADE_AFTER_LOOK",False)); LOOK_DEADLINE=getattr(_gate,"LOOK_DEADLINE",None)
 def tcrit(days): return _gate.tcrit(days) if _gate else float("inf")
 def clear(mg): return _gate.clear(mg) if _gate else False
 def margin(rg):
@@ -86,7 +87,10 @@ def days_list(ds): return ", ".join(dstr(d) for d in ds)
 def city(t):   # Kalshi's renamed daily-high series put a T before the city (KXHIGHTSEA): shown as SEA
     s=t.split("-")[0]
     return t.split("-")[-1] if t.startswith("KXRAIN") else (s[7:] if s.startswith("KXHIGHT") else s.replace("KXHIGH",""))+" "+t.split("-")[-1]
-def won(r): return bool(r.get("side")) and r.get("result")==r.get("side")
+def won(r):
+    """A settled trade won: its side came true, or, for Kalshi's scalar and void settlements (2026-11-06), it made money."""
+    if r.get("result") in ("scalar","void"): return (r.get("pnl") or 0)>0
+    return bool(r.get("side")) and r.get("result")==r.get("side")
 def tip(s): return ' data-tip="%s"'%e(s,quote=True)
 def s_(n,word): return "%d %s%s"%(n,word,"" if n==1 else "s")
 
@@ -111,10 +115,13 @@ def meter(frac,over=False):
 def verdict(rg,bf,bm,rain,passed,mg,look=None):
     n=len(rg)
     if passed: return "All four gate checks pass on paper. Real money still needs your go-ahead, starting tiny."
-    if final() and not look: return ("The gate's single look is pending: it is taken once every market of the test's days has settled,"
-                                     " by the next report or scan. Until then the rain bot opens no paper trades for new market days.")
-    if look: return ("The gate's single look (%s) did not pass: no edge demonstrated. The rain bot opens no new paper trades,"
-                     " so live.py has nothing to copy."%dstr(datetime.fromtimestamp(look[0]["ts"]).date()))
+    cut=(" (markets still unsettled on %s are left out)"%dstr(LOOK_DEADLINE)) if LOOK_DEADLINE else ""
+    if final() and not look: return ("The gate's single look is pending: it is taken once every market of the test's days has settled%s,"
+                                     " by the next report or scan. %s"%(cut,"Meanwhile the rain bot keeps paper-trading (your decision of Nov 6)."
+                                     if TRADE_AFTER_LOOK else "Until then the rain bot opens no paper trades for new market days."))
+    if look: return ("The gate's single look (%s) did not pass: no edge demonstrated. %s"%(dstr(datetime.fromtimestamp(look[0]["ts"]).date()),
+                     "By your decision of Nov 6 the rain bot keeps paper-trading, and live.py copies its bets with real money once you switch"
+                     " it to prod and type the unlock." if TRADE_AFTER_LOOK else "The rain bot opens no new paper trades, so live.py has nothing to copy."))
     if n==0:
         pend=sorted({d for d in (mdate(r["ticker"]) for r in rain if r.get("result") not in ("yes","no")) if d})
         if pend:
@@ -360,8 +367,9 @@ def brier_view(bf,bm,n,mg):
 def statrow(cells): return '<div class=stats>'+"".join('<div><span class=sl>%s</span><b class="sv %s">%s</b><small>%s</small></div>'%(a,c,b,d) for a,b,d,c in cells)+'</div>'
 def sgn(x,eps=0.004): return "pos" if x>eps else ("neg" if x<-eps else "")
 def fpts(x): return ("%+.1f"%x).replace("-","−")
-def shadow_view(so,sm,tr,v4=(),obs=()):
-    """Shadow tests from shadow.py: research only, never part of the gate."""
+def moves_panel(sm,tr):
+    """Shadow test 1: did prices move toward the forecast between our scan and the market's day start?
+    (Adds 'gap' and 'tw' to the measured rows, as before.)"""
     thr=EDGE/BLEND if BLEND else 1.0
     mv=[r for r in sm if r.get("status")=="ok" and None not in (r.get("mid_start"),r.get("mid_scan"),r.get("fc")) and r["version"]==GV and r["mtype"]=="rain"]
     for r in mv:
@@ -385,13 +393,16 @@ def shadow_view(so,sm,tr,v4=(),obs=()):
         a+=table(["Gap at scan","Markets","Toward","Away","Avg move"],rows,"No market has differed from the forecast by 5 or more points yet.",num=(1,2,3,4))
     a+=('<p class=note>Compares each market&#8217;s mid price when we scanned with its mid when the market&#8217;s day started, in points toward the forecast '
         '(below zero means away). A noisy evening price tends to drift back toward any sensible forecast, so movement toward the forecast alone does not prove it knows more; the money tests decide.</p>')
+    return a
+def maker_panel(so,tr):
+    """Shadow test 2: the hypothetical limit-order ledger."""
     now=datetime.now(timezone.utc).timestamp()
     mo=[r for r in so if (r.get("strategy") or "maker")=="maker"]
     if not mo: b='<p class=empty>Each evening scan also places hypothetical limit orders on a separate $%d paper ledger. None yet.</p>'%round(BANK)
     else:
         stl=[r for r in mo if r.get("status")=="settled"]; fil=[r for r in mo if r.get("status") in ("filled","settled")]
         dec=[r for r in mo if r.get("status") in ("filled","settled","unfilled")]; rest=[r for r in mo if r.get("status")=="pending"]
-        w=[r for r in stl if r.get("result")==r.get("side")]; pnl=sum(r.get("pnl") or 0 for r in stl)
+        w=[r for r in stl if won(r)]; pnl=sum(r.get("pnl") or 0 for r in stl)
         mst=[r for r in tr if r.get("status")=="settled" and r["version"]==GV]; mp=sum(r.get("pnl") or 0 for r in mst)
         b=statrow([("Orders",str(len(mo)),("%d resting now"%len(rest)) if rest else "placed so far",""),
                    ("Filled",("%d <small>of %d</small>"%(len(fil),len(dec))) if dec else "–",("fill rate "+pct(len(fil)/float(len(dec)))) if dec else "decided when each day starts",""),
@@ -400,7 +411,7 @@ def shadow_view(so,sm,tr,v4=(),obs=()):
         rows=[]
         for r in sorted(mo,key=lambda r:-(r.get("ts") or 0))[:12]:
             st=r.get("status"); d=mdate(r["ticker"])
-            if st=="settled": tg=("won","Won") if r.get("result")==r.get("side") else ("lost","Lost")
+            if st=="settled": tg=("won","Won") if won(r) else ("lost","Lost")
             elif st=="filled": tg=("filled","Filled")
             elif st=="unfilled": tg=("excluded","Not filled")
             else: tg=("rest","Resting") if (r.get("cancel_ts") or 0)>now else ("rest","Checked at settle")
@@ -418,6 +429,9 @@ def shadow_view(so,sm,tr,v4=(),obs=()):
         '1&cent; better than the best bid (or joins the best bid when the spread is 1&cent;) and cancels it when the market&#8217;s day starts. It counts as filled only if Kalshi&#8217;s '
         'minute-by-minute history shows a trade or an offer reaching that price after the order, or going through it when the order only joined the queue. Makers pay no Kalshi fee on '
         'weather markets. Read the fill rate with the win rate: resting orders tend to fill when the price moves against them.</p>')%(round(EDGE*100),round(BANK))
+    return b
+def airport_panel(v4,obs):
+    """Shadow test 3: the airport forecast (candidate for the next version) against the market and v3."""
     rs=[r for r in v4 if r.get("result") in ("yes","no") and None not in (r.get("fc"),r.get("mid"),r.get("bid"),r.get("ask")) and r["ask"]-r["bid"]<=0.06+1e-9]
     if not v4: c4='<p class=empty>Starts with the next evening scan: a forecast made for the exact airport each rain market settles on (the National Blend of Models), calibrated on a year of history, logged for every rain market.</p>'
     elif not rs: c4='<p class=empty>%s logged so far. The first results come the afternoon after their market day.</p>'%s_(len(v4),"forecast")
@@ -432,6 +446,10 @@ def shadow_view(so,sm,tr,v4=(),obs=()):
                     ("Clear margin",("Yes" if clear(mg) else "Not yet") if mg else "\u2013","vs the market, needs 5+ market days" if not mg else "lead %.3f vs bar %.3f"%(-mg[0],tcrit(mg[2])*mg[1]),"")])
     c4+=('<p class=note>The candidate for a future version: the National Blend of Models forecast for the airport named in each market&#8217;s rules, '
          'calibrated on July 2025 to June 2026 and then frozen. Lower Brier is better. It never trades and never counts toward the gate; switching the bot to it needs your go-ahead and a fresh test.</p>')
+    return c4
+def shadow_view(so,sm,tr,v4=(),obs=()):
+    """Shadow tests from shadow.py: research only, never part of the gate."""
+    a,b,c4=moves_panel(sm,tr),maker_panel(so,tr),airport_panel(v4,obs)
     return ('<section class="panel shadow"><h2>Shadow tests <span>research only, never part of the gate</span></h2>'
             '<div class=sub><h3>Do prices move toward the forecast?</h3>%s</div><div class=sub><h3>Limit orders instead of paying the ask</h3>%s</div>'
             '<div class=sub><h3>Airport forecast (candidate for the next version)</h3>%s</div></section>')%(a,b,c4)

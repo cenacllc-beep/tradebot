@@ -8,6 +8,11 @@ Python 3.8+, standard library only."""
 from datetime import date
 
 STOP_DATE = date(2026, 11, 11)   # 28 market days (Oct 14 - Nov 10), judged once; moved from Oct 26 by the user on 2026-10-14
+# The user's decisions of 2026-11-06 (strategy.py holds the same values; tests/test_fix.py checks they agree): from
+# LOOK_DEADLINE, test-day markets still without a yes/no result are left out of the single look; TRADE_AFTER_LOOK: v3 rain
+# keeps paper-trading market days from STOP_DATE on whatever the look says (False = the Oct 28 rule: only after a pass).
+LOOK_DEADLINE = date(2026, 11, 18)
+TRADE_AFTER_LOOK = True
 
 # Student-t 97.5% critical values by degrees of freedom
 T975 = {1: 12.706, 2: 4.303, 3: 3.182, 4: 2.776, 5: 2.571, 6: 2.447, 7: 2.365, 8: 2.306, 9: 2.262, 10: 2.228,

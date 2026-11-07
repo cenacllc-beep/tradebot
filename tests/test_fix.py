@@ -71,7 +71,7 @@ rg=[{"ticker":t,"fc":f,"mid":m,"result":r} for t,f,m,r in c.execute("select tick
 assert dashboard.margin(rg)==mg, (dashboard.margin(rg),mg)
 # gate.py (used by the dashboard) and strategy.py's frozen copy must give identical answers (docs/REFACTOR.md stage 2)
 import gate, random as _r, datetime as _dt0
-assert gate.STOP_DATE==strategy.STOP_DATE and gate.T975==strategy.T975 and all(gate.tcrit(d)==strategy.tcrit(d) for d in range(0,60))
+assert gate.STOP_DATE==strategy.STOP_DATE and gate.LOOK_DEADLINE==strategy.LOOK_DEADLINE and gate.TRADE_AFTER_LOOK is strategy.TRADE_AFTER_LOOK and gate.T975==strategy.T975 and all(gate.tcrit(d)==strategy.tcrit(d) for d in range(0,60))
 _rng=_r.Random(11)
 for _ in range(300):
     rows=[("KXRAIN-26OCT%02d-C%d"%(_rng.randint(10,30),k),_rng.random(),_rng.random(),_rng.choice(("yes","no"))) for k in range(_rng.randint(0,60))]

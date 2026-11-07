@@ -1,4 +1,4 @@
-# Refactor: problem areas, strategy and stages 1 to 3 (2026-10-22 to 2026-11-05)
+# Refactor: problem areas, strategy and stages 1 to 4 (2026-10-22 to 2026-11-06)
 
 Brief from the user: improve code quality, scalability and maintainability **without changing functionality**. This
 file is the senior-engineer review that drove the work. docs/ARCHITECTURE.md describes the system itself.
@@ -243,3 +243,76 @@ refactor. It was reviewed under its own plan.
   - refactor live.py without the user's explicit instruction;
   - change a pre-registered scorer after its outcomes began.
 
+
+
+## 7. Stage 4 (2026-11-06): third review and changes
+The same brief came again on 2026-11-06 ("act like a senior engineer ... do not change functionality"), five days
+before the first possible real-money orders. That timing sets the bar: only changes that can be proved to change no
+output, and nothing on the order path or in the frozen forecast.
+
+### 7.1 Scale and data flow, measured
+- **Code:** about 6,200 lines of application code, 6,300 of research code and 5,800 of tests (41 test files).
+- **Data on the PC:**
+  - paper.db 3.4 MB;
+  - backups\ 180 files, 105 MB;
+  - research/data/discovery.db 238 MB, up from 214 MB a day earlier;
+  - logs 1.1 MB.
+- **Data flow:** unchanged from docs/ARCHITECTURE.md. Task Scheduler starts jobs.py. jobs.py runs the run.bat steps:
+  the scan (main.py to strategy.py, the decision ledger and paper.db), then shadow.py, then `live.py mirror`. Backups,
+  the export and dashboard.html follow; the cloud reporters read the log and the page.
+
+### 7.2 Critical problem areas, most severe first
+| # | Area | Problem | Impact | Status |
+|---|---|---|---|---|
+| 1 | Real money on a strategy with no demonstrated edge | Not a code problem, but the largest production risk. v3 runs low on rain; 27 of its 29 paper bets were "no rain", net -$6.91 of $15.98 staked. From Nov 11, live.py copies these bets (the user's decision of 2026-11-06). | Expected losses, capped at $25 at risk and a $2.50 daily loss stop | Told plainly. A live-only filter was offered (open). Every lock is unchanged |
+| 2 | Research catalogue growth | discovery.db grows about 24 MB a day, about 9 GB a year | PC disk and backups of the research folder | Pruning is a deletion: proposal 6.1 item 6 waits for the user |
+| 3 | Backup growth | 105 MB in 180 files after 24 days, growing with paper.db | Same | Retention proposal (6.1 item 2) waits for the user |
+| 4 | Frozen-path reliability | kalshi.py, nws.py and weather.py still make single-attempt calls | A lost market day on a flaky network | Waits until PLAN7 ends (6.4) |
+| 5 | Logs read as an interface | Unchanged (6.1 item 5) | | Documented |
+| 6 | Long multi-panel functions | freshness.checks (96 lines), control_view.section (99) and dashboard.shadow_view (75) each built several independent panels in one body, and this week's fixes kept landing in them | Slow, risky review; one panel's variables leak into the next | **Fixed** (7.3) |
+| 7 | Two new rule values in two places | TRADE_AFTER_LOOK and LOOK_DEADLINE live in strategy.py (the frozen copy) and gate.py (the dashboard's copy) | Drift | tests/test_fix.py checks they agree, the same pattern as the stop date |
+| 8 | Golden-master false alarms | Backup copies named by the clock second, and 24-hour labels such as "Nov 07 00:22", showed as thousands of differences | A real difference could hide in the noise | **Fixed**: golden.py skips paper_YYYYMMDD_HHMMSS copies (the databases they copy are compared directly), masks those labels, and runs the gatelook scenario too |
+| 9 | live.py (651 lines, dense style) | The only order path | A defect costs real money | Not refactored (rule). A static scan found no defect: the closure `skip` inside the order loop is called in the same iteration, so it binds the right order. Recommended instead: `.\run live status` and `test` on Nov 11, before the unlock |
+
+**Static scan.** ruff (pyflakes, bugbear and pylint error rules) over every editable module found no latent defect.
+The broad `except Exception` clauses are deliberate: the page and the jobs must fail safe. The remaining duplicated
+functions sit in frozen or pre-registered code (backtest, plan3, plan4, plan7, plan8, stationfc, nov11) and stay on
+purpose (6.2).
+
+### 7.3 What changed (no functional change)
+| File | Change |
+|---|---|
+| freshness.py | checks() now lists named sections in order: _backup_rows, _page_row, _marks_row, _lip_rows, _research_rows, _report_rows (19 lines instead of 96). |
+| dashboard.py | shadow_view() is assembled from moves_panel, maker_panel and airport_panel. |
+| control_view.py | section() is assembled from last_main_scan, status_parts, strategy_parts, latest_scan_parts, calibration_parts, risk_parts, position_parts, audit_items and postmortem_parts, in the same order (16 lines instead of 99). |
+| tests/golden.py | The masks and the scenario in 7.2 item 8. |
+
+**Known edge case (deliberate, unreachable):** control_view.section() used to read three tables before checking the
+strategy registry, so an empty registry plus a missing table raised KeyError. It now returns "" first.
+registry.REGISTRY is a non-empty constant, and dashboard.read_db always supplies the tables.
+
+The same release carries the user's rule decision of 2026-11-06 (strategy.TRADE_AFTER_LOOK, LOOK_DEADLINE). That is
+a deliberate behaviour change and is recorded separately in CHANGELOG.md; the proofs below compare code that already
+contains it.
+
+### 7.4 Proof
+- **Golden master.** Captured on a copy of the old code, then on the new code, then on the old code again, back to
+  back, across 16 scenario suites (including end_to_end, engines, freshness, shadow and gatelook):
+  - 167,461 data fields: 0 differences;
+  - 15,794 text pieces: 0 changed stretches.
+- **Real data.** Built from copies of the PC's paper.db, live.db, marks and research files, with old and new code:
+  - freshness.checks: identical;
+  - the page: 173,399 characters, identical once clock times are masked, in both the normal and the --live build.
+- **Full suite:** 41 tests pass.
+- **Independent code review** (CHANGELOG.md, 2026-11-06 21:45): no functional change from the refactor. It swapped the old
+  functions back in and compared on the real paper.db and 21 scenario databases, plus a symbol-table check. Its one
+  MUST was a stale safety text from the rule change, fixed, with a test.
+
+### 7.5 What is left
+- The user's decisions:
+  - backup retention and discovery.db pruning (7.2 items 2 and 3);
+  - whether live.py should skip "no rain" bets when v3 itself says 50% or more (7.2 item 1).
+- When PLAN7 ends: stage 2's frozen-path work, then the package and `python -m` entry points (6.4).
+- **Never:**
+  - refactor live.py without the user's explicit instruction;
+  - change a pre-registered scorer after its outcomes began.

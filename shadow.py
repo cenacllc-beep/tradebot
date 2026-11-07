@@ -257,11 +257,13 @@ def settle(c):
     # 2. filled orders: outcome
     fil=c.execute("select id,ticker,side,n,cost,fee from shadow_orders where status='filled'").fetchall()
     ms=_markets(sorted({r[1] for r in fil})) if fil else {}
+    if fil: import strategy   # one settlement rule for every ledger: yes, no, scalar and void (2026-11-06)
     for i,t,side,n,cost,f in fil:
-        r=(ms.get(t) or {}).get("result")
-        if r in ("yes","no"):
-            c.execute("update shadow_orders set status='settled',result=?,pnl=?,settle_ts=? where id=?",(r,(n if r==side else 0)-cost-f,now,i)); ns+=1
-            _audit_event(c,"shadow_orders:%d"%i,"settled",dict(result=r,pnl=(n if r==side else 0)-cost-f,won=r==side))
+        o=strategy.payout(ms.get(t) or {},side)
+        if o:
+            r=o[0]; pnl=strategy.settled_pnl(r,side,n,cost,f,o[1])
+            c.execute("update shadow_orders set status='settled',result=?,pnl=?,settle_ts=? where id=?",(r,pnl,now,i)); ns+=1
+            _audit_event(c,"shadow_orders:%d"%i,"settled",dict(result=r,pnl=pnl,won=(r==side) if r in ("yes","no") else pnl>0))
     # 3. price moves for every logged market whose day has started
     have={r[0] for r in c.execute("select ticker from shadow_moves where version=?",(VERSION,))}
     todo=[r for r in c.execute("select ticker,ts,fc,mid from obs where version=? and fc is not null and mid is not null",(VERSION,)).fetchall() if r[0] not in have]

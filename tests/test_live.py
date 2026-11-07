@@ -126,7 +126,9 @@ def settings(env,mirror_from=0):
     keys={"demo":{"key_id":"ed-key-1","key_file":ED_FILE},"prod":{"key_id":"rsa-key-1","key_file":RS_FILE}}
     json.dump({"env":env,"keys":keys,"mirror_from":{"demo":mirror_from,"prod":mirror_from}},open(live.SETTINGS,"w"))
 c=core.db()
-def paper(t,side="yes",price=0.42,n=3,version="v3",age=60,status="open"):
+def paper(t,side="yes",price=0.42,n=3,version="v3",age=60,status="open",fc=0.30):
+    if fc is not None:   # the scan logs v3's forecast for every market it trades (obs); the no-rain filter reads it
+        c.execute("insert or ignore into obs(ticker,version,ts,fc,mid,market_type) values(?,?,?,?,?,?)",(t,version,time.time()-age,fc,price,"rain"))
     cur=c.execute("insert into trades(ts,ticker,side,price,fair,n,cost,fee,version,status,pnl,result) values(?,?,?,?,?,?,?,?,?,?,?,?)",
                   (time.time()-age,t,side,price,0.6,n,n*price,core.fee(price,n),version,status,
                    -n*price-core.fee(price,n) if status=="settled" else None,"no" if status=="settled" else None)); c.commit(); return cur.lastrowid
@@ -296,7 +298,63 @@ F.badpos=True
 try: live.holding(live.client()[0],"KXRAINDCA-26OCT15-T0"); raise AssertionError("holding() must fail closed")
 except live.ExchangeError: pass
 F.badpos=False
+# Kalshi's scalar and void settlements (2026-11-06): the order closes with Kalshi's value, so its loss reaches the daily
+# stop and the drawdown pause and its cost stops counting as at risk; an unreadable value leaves it open, with a warning
+t="KXRAINDCA-26OCT15-T0"; r0=row(t); assert r0[6]>0 and r0[9] is None, r0
+risk0=live.local_at_risk(L,"demo"); day0=live.day_pnl(L,"demo")
+F.markets[t].update(status="finalized",result="scalar")   # no value yet
+out,_=run(live.sync); assert row(t)[9] is None and "no usable settlement value; left open" in out, out
+F.markets[t]["settlement_value_dollars"]="0.0100"
+out,_=run(live.sync); r1=row(t)
+side=r1[2]; exp=round(r1[6]*(0.01 if side=="yes" else 0.99)-r1[7]-r1[8],4)
+assert r1[9]=="scalar" and abs(r1[10]-exp)<1e-9, (r1, exp, out)
+assert abs(live.local_at_risk(L,"demo")-(risk0-r1[7]-r1[8]))<1e-9 and abs(live.day_pnl(L,"demo")-(day0+exp))<1e-9
+t2="KXRAINLIT-26OCT15-T0"; r2=row(t2); assert r2[6]>0 and r2[9] is None, r2
+F.markets[t2].update(status="finalized",result="void")
+out,_=run(live.sync); r2=row(t2); assert r2[9]=="void" and abs(r2[10]+r2[8])<1e-9, (r2, out)
 print("settle ok")
+
+# 8b. the user's no-rain filter (2026-11-06): a NO copy is skipped when v3 itself says rain 50%+, or when its forecast
+# cannot be read (fail closed); YES copies and NO copies under 50% go ahead; place() blocks it too, so no caller can skip it
+cases=(("KXRAINF1-26OCT15-T0","no",0.67,"skipped"),("KXRAINF2-26OCT15-T0","no",0.50,"skipped"),("KXRAINF3-26OCT15-T0","no",None,"skipped"),
+       ("KXRAINF4-26OCT15-T0","no",0.49,"executed"),("KXRAINF5-26OCT15-T0","yes",0.90,"executed"))
+ids={}
+for t,side,fc,_ in cases:
+    ids[t]=new(t,side=side,price=0.60 if side=="no" else 0.42,n=1,fc=fc)
+out,_=run(live.mirror)
+for t,side,fc,want in cases:
+    assert row(t)[5]==want, (t,row(t),out)
+assert "no-rain filter: v3 itself says rain 67%" in row("KXRAINF1-26OCT15-T0")[13] and "could not be read" in row("KXRAINF3-26OCT15-T0")[13], out
+n0=len(F.posts()); out,_=run(live.mirror); assert len(F.posts())==n0, "a skipped copy is never retried"
+t="KXRAINF6-26OCT15-T0"; pid=new(t,side="no",price=0.60,n=1,fc=0.80)
+try: live.place(live.client()[0],live.ldb(),"demo",pid,t,"no",1,60,note="x"); raise AssertionError("place() must apply the filter")
+except live.ExchangeError as e: assert "order blocked: no-rain filter" in str(e), e
+assert len(F.posts())==n0
+out,_=run(live.status); assert "Filter: 'no rain' paper bets are not copied when v3 itself says rain 50% or more" in out, out
+# the trade's own decision row (written with the trade) wins over an older first snapshot in obs
+import audit
+audit.ensure(c)
+for t,fc_obs,fc_dec in (("KXRAINF7-26OCT15-T0",0.30,0.70),("KXRAINF8-26OCT15-T0",0.70,0.30)):
+    pid=new(t,side="no",price=0.60,n=1,fc=fc_obs)
+    c.execute("insert into decisions(decision_id,scan_id,ts,strategy_id,mode,ticker,action,side,reason,p_model,trade_ref) values(?,?,?,?,?,?,?,?,?,?,?)",
+              ("d-"+t,"s1",time.time(),"forecast_alpha.rain.v3","paper",t,"TRADE_NO","no","TRADE",fc_dec,"trades:%d"%pid)); c.commit()
+    assert abs(live.v3_forecast(t,pid)-fc_dec)<1e-12 and abs(live.v3_forecast(t)-fc_obs)<1e-12
+# while the ledger exists, a NO trade without its decision row, or with an empty forecast in it, is not copied (review)
+t9="KXRAINF9-26OCT15-T0"; new(t9,side="no",price=0.60,n=1,fc=0.20)   # obs says 20%, but no decision row
+t10="KXRAINFA-26OCT15-T0"; pid10=new(t10,side="no",price=0.60,n=1,fc=0.20)
+c.execute("insert into decisions(decision_id,scan_id,ts,strategy_id,mode,ticker,action,side,reason,p_model,trade_ref) values(?,?,?,?,?,?,?,?,?,?,?)",
+          ("d-"+t10,"s1",time.time(),"forecast_alpha.rain.v3","paper",t10,"TRADE_NO","no","TRADE",None,"trades:%d"%pid10)); c.commit()
+out,_=run(live.mirror)
+assert row("KXRAINF7-26OCT15-T0")[5]=="skipped" and row("KXRAINF8-26OCT15-T0")[5]=="executed", out
+assert row(t9)[5]=="skipped" and row(t10)[5]=="skipped" and "could not be read" in row(t9)[13] and "could not be read" in row(t10)[13], out
+t="KXRAINFB-26OCT15-T0"; pid=new(t,side="no",price=0.60,n=1,fc=0.20)
+c.execute("insert into decisions(decision_id,scan_id,ts,strategy_id,mode,ticker,action,side,reason,p_model,trade_ref) values(?,?,?,?,?,?,?,?,?,?,?)",
+          ("d-"+t,"s1",time.time(),"forecast_alpha.rain.v3","paper",t,"TRADE_NO","no","TRADE",0.55,"trades:%d"%pid)); c.commit()
+n0=len(F.posts())
+try: live.place(live.client()[0],live.ldb(),"demo",pid,t,"no",1,60,note="x"); raise AssertionError("place() must read the decision row")
+except live.ExchangeError as e: assert "says rain 55%" in str(e), e
+assert len(F.posts())==n0
+print("no-rain filter ok")
 
 # 9. daily loss stop ($2.50) and drawdown pause
 L=live.ldb(); L.execute("insert into orders(ts,env,ticker,side,count,limit_cents,status,fill_count,cost,fees,result,pnl,settled_ts) values(?,?,?,?,?,?,?,?,?,?,?,?,?)",

@@ -18,7 +18,8 @@ real databases). Python 3.8+, standard library only."""
 import os, sys, re, json, math, shutil, sqlite3, subprocess
 
 SCENARIOS = ("structure", "lip", "discover", "micro", "combo", "longshot", "engines", "marks", "audit", "end_to_end",
-             "fix", "shadow", "learn", "freshness", "ohlc")   # learn, freshness and ohlc added 2026-11-05 (refactor stage 3)
+             "fix", "shadow", "learn", "freshness", "ohlc", "gatelook")   # learn, freshness and ohlc added 2026-11-05 (refactor
+# stage 3); gatelook 2026-11-06 (stage 4: it renders the dashboard's verdicts and the shadow panels)
 _TS = re.compile(r"\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?|\d{8}_\d{6}|backed up -> .*"
                  r"|WARNING: only \d of \d backups.*|skipped, already exists: .*")
 
@@ -26,7 +27,13 @@ _TS = re.compile(r"\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?|\d{8}_\d{6}
 _NOISE = re.compile(r"(backed up -> |skipped, already exists: |WARNING: only \d of \d backups|backups: \[)")
 # Inside a line: clock times on pages ("10:25 PM", "Updated Oct 23, 10:25 AM") and epoch seconds in embedded page data
 # ("now":1792771200.5). Masked token by token, so one changing number no longer hides a whole page line.
-_CLOCK = re.compile(r"\b\d{1,2}:\d{2} ?[AP]M\b|\b1[6-9]\d{8}(\.\d+)?\b|\b1[6-9]\d{11}\b")
+_CLOCK = re.compile(r"\b\d{1,2}:\d{2} ?[AP]M\b|\b1[6-9]\d{8}(\.\d+)?\b|\b1[6-9]\d{11}\b"
+                    r"|(?<=\b[A-Z][a-z]{2} \d{2} )\d{2}:\d{2}\b")   # and the time in 24-hour labels such as "Nov 07 00:22" (shadow.py;
+# the date stays compared; 2026-11-06)
+# Backup copies are named by the clock second (paper_YYYYMMDD_HHMMSS_<tag>.db), so the same copy has another name in
+# another run; they copy databases that are compared directly. Wherever they are written, only how many were made per
+# folder and tag is compared, so a missing backup (for example before a new table) still shows (2026-11-06, review r79).
+_BACKUP_NAME = re.compile(r"paper_\d{8}_\d{6}(?:_(.*?))?(?:\.db)?$")
 # A page body is one long line: split it at tag and JSON-item boundaries so it compares piece by piece.
 _SPLIT = re.compile(r"(?<=>)(?=<)|(?<=,)(?=\")")
 
@@ -68,6 +75,11 @@ def flatten(root):
             p = os.path.join(d, f)
             rel = os.path.relpath(p, root)
             if "offsite" in rel or "backups" in rel or "__pycache__" in rel or rel.endswith((".tmp", ".png")):
+                continue
+            bk = _BACKUP_NAME.match(f)
+            if bk:
+                key = (os.path.dirname(rel), "backup copies", bk.group(1) or "")
+                out[key] = out.get(key, 0) + 1
                 continue
             try:
                 if f.endswith(".db"):

@@ -126,9 +126,13 @@ def research_notes(notes):
     return '<h3>Research results (exploratory, not actionable)</h3><p class=note>The latest summary of each research tool. None of them trades; a pattern here earns only a written plan.</p>'+"".join(rows)
 def safety_line(now_ts,lip_samples=None):
     d=clock.bot_date(now_ts); stop=gate.STOP_DATE   # one source of the gate's rules (gate.py)
-    lock=("Real money: locked by date until Nov 11 (%d days). After that it also needs your own typed unlock, and the rain bot keeps paper trading"
-          " (so live.py has something to copy) only if the gate's single look passes."%(stop-d).days) if d<stop else \
-         "Real money: the date lock has passed; orders still need your own typed unlock (live.py status shows whether you gave it), and the rain bot paper-trades new market days only after a gate look that passed."
+    keep=getattr(gate,"TRADE_AFTER_LOOK",False)   # the user's decision of 2026-11-06 (False: the rule of 2026-10-28)
+    after=(" The rain bot keeps paper trading whatever the gate's single look says (your decision of Nov 6), so once you switch"
+           " live.py to prod and type the unlock, its bets are copied with real money." if keep else
+           " The rain bot keeps paper trading (so live.py has something to copy) only if the gate's single look passes.")
+    lock=("Real money: locked by date until Nov 11 (%d days). After that it also needs your own typed unlock."%(stop-d).days+after) if d<stop else \
+         ("Real money: the date lock has passed; orders still need your own typed unlock (live.py status shows whether you gave it)."
+          +(after if keep else " The rain bot paper-trades new market days only after a gate look that passed."))
     extra=("" if lip_samples is None else (" PLAN5 test L: %s"%lip_samples if isinstance(lip_samples,str) else
            " PLAN5 test L: %d market-hours sampled so far (interim, not actionable)."%lip_samples))
     return lock+" live.py copies v3 rain paper trades only; no research strategy can reach it."+extra
@@ -155,12 +159,14 @@ def structure_note(runs):
     r=runs[-1]; pos=[v for v in r.get("found",[]) if v.get("net",0)>0]; conf=[v for v in pos if (v.get("confirm") or {}).get("still")]
     return ('<h3>Market structure (research)</h3><p class=note>Last scan %s: %d open weather events, %d markets. Price inconsistencies positive after taker fees at listed prices: %d; still there in the live order book: %d. Nothing is traded: a basket can leave directional risk until every leg fills.</p>'%(
         when(r.get("ts")),r.get("events",0),r.get("markets",0),len(pos),len(conf)))
-def section(T,table,now_ts):
-    dec=T["decisions"]; scans=T["scans"]; ev=T["decision_events"]
-    if not registry.REGISTRY: return ""
+def last_main_scan(scans):
+    """The latest evening scan recorded in the ledger, or None."""
+    main_scans=[s for s in scans if s.get("kind")=="scan"]
+    return max(main_scans,key=lambda s:s["started_ts"]) if main_scans else None
+def status_parts(T,table,now_ts,last):
+    """Status line (last scan, settle, ledger size, blocks, forecast age, safety) and the freshness table."""
+    dec=T["decisions"]
     parts=[]
-    # status line
-    main_scans=[s for s in scans if s.get("kind")=="scan"]; last=max(main_scans,key=lambda s:s["started_ts"]) if main_scans else None
     settled=[r.get("settled_ts") for r in T["trades"] if r.get("settled_ts")]+[r.get("recorded_ts") for r in T["market_results"] if r.get("recorded_ts")]
     lines=["Last scan with the decision ledger: <b>%s</b>; last settle: <b>%s</b>; %d decisions recorded in total."%(when(last["started_ts"]) if last else "not yet",when(max(settled) if settled else None),T.get("decisions_total",len(dec)))]
     b=blocked(T)
@@ -172,13 +178,20 @@ def section(T,table,now_ts):
     lines.append(e(safety_line(now_ts,T.get("lip_samples"))))
     parts.append('<p class=note>%s</p>'%" ".join(lines))
     parts.append(freshness_panel(T.get("freshness"),table))
-    # strategies
+    return parts
+def strategy_parts(T,table):
+    """Each strategy's state and results, and the metrics by strategy."""
+    parts=[]
     parts.append('<h3>Strategies</h3><p class=note>Each strategy is kept separate. A forward test is <b>INTERIM - NOT ACTIONABLE</b> until its pre-set verdict date. No new strategy here can place orders. live.py copies only v3 rain paper trades: to Kalshi&#39;s demo exchange (fake money) any time, and to real money only on or after Nov 11 after your own typed unlock. The gate verdict is shown when you unlock; it does not stop you, so read it first.</p>'
                  +table(["Strategy","State","Win rate (settled)","Net P&amp;L","Per trade","Progress or rule"],strategy_rows(T),num=(2,3,4)))
     mrows,corr=metric_rows(T)
     if mrows: parts.append('<h3>Metrics by strategy</h3><p class=note>Settled paper trades only. Win rate counts settlements won; profitable counts trades that made money after fees. Expected is what the model\'s own chances said the trades were worth. Drawdown is the largest fall from a running high. The daily ratio is mean over standard deviation of daily P&amp;L, not annualized, and needs 5 days. %s Every figure is interim: read it with its sample size.</p>'%corr
                            +table(["Strategy","Settled","Won","Profitable","Net","Per contract","Realized vs expected","Brier","Max drawdown","Largest loss","Avg hold","Per $ per day","Daily ratio","Worst cluster"],mrows,num=(1,4,5,7,8,9,10,11)))
-    # selector on the latest scan
+    return parts
+def latest_scan_parts(T,table,last):
+    """The latest scan: what v3 traded, why it skipped the rest, and what the watching selector would have done."""
+    dec=T["decisions"]
+    parts=[]
     if last:
         ld=[d for d in dec if d["scan_id"]==last["scan_id"] and d["strategy_id"]=="forecast_alpha.rain.v3"]
         rc={}; mc={}
@@ -194,7 +207,10 @@ def section(T,table,now_ts):
             len(ld),when(last["started_ts"]),traded,meta_t,pct(1-meta_t/len(ld)) if ld else "n/a",", ".join("%s %d"%(e(k.replace("_"," ").lower()),v) for k,v in sorted(mc.items(),key=lambda x:-x[1])[:4]) or "none")
             +table(["Reason (v3 rule)","Markets","Meaning"],rows,"No markets in this scan.",num=(1,))
             +"<details><summary>Best candidates that were not traded</summary>"+table(["Market","Side","Chance","Price","Edge (pts)","Reason","In plain words"],crow,"None.",num=(2,3,4))+"</details>")
-    # calibration
+    return parts
+def calibration_parts(T,table):
+    """Calibration of the v3 rain forecast, with the market's scores beside it."""
+    parts=[]
     rows=[(r["fc"],1 if r["result"]=="yes" else 0) for r in T["obs"] if r.get("version")=="v3" and r.get("mtype")=="rain" and r.get("result") in ("yes","no") and r.get("fc") is not None]
     mrows=[(r["mid"],1 if r["result"]=="yes" else 0) for r in T["obs"] if r.get("version")=="v3" and r.get("mtype")=="rain" and r.get("result") in ("yes","no") and r.get("mid") is not None]
     if rows:
@@ -202,7 +218,10 @@ def section(T,table,now_ts):
         trow=[["%d-%d%%"%(b*10,b*10+10),str(n),pct(mp),pct(of),"%s-%s"%(pct(lo),pct(hi))] for b,n,mp,of,lo,hi in S["table"]]
         parts.append('<h3>Calibration: v3 rain forecast</h3><p class=note>When the forecast says X%%, how often does it rain? %d settled markets. Brier %.3f (market %.3f), log loss %.3f (market %.3f), calibration error %s. The range is a 95%% interval: with few markets per row it is wide, so read it before the rate.</p>'%(
             S["n"],S["brier"],M["brier"],S["logloss"],M["logloss"],pct(S["ece"],1))+table(["Forecast","Markets","Average forecast","Rained","95% range"],trow,num=(1,2,3)))
-    # risk and capital
+    return parts
+def risk_parts(T,table):
+    """Open positions grouped by shared weather (risk clusters), and capital use."""
+    parts=[]
     pos=[(r["ticker"],(r.get("cost") or 0)+(r.get("fee") or 0)) for r in T["trades"] if r.get("status")=="open"]
     pos+=[(r["ticker"],(r.get("cost") or 0)) for r in T["shadow_orders"] if r.get("status")=="filled"]
     ex=risk.exposure(pos); cnt={}
@@ -213,13 +232,17 @@ def section(T,table,now_ts):
                  +table(["Cluster","Positions","At risk","Note"],rrow,"No open positions.",num=(1,2))
                  +('<p class=note>Settled trades used %s of capital for %.0f hours on average; profit per dollar per day %s (%d trades).</p>'%(usd(cs["capital"]),cs["avg_hours"],
                    "n/a" if cs["per_dollar_day"] is None else "%+.1f%%"%(100*cs["per_dollar_day"]),cs["trades"]) if cs else ""))
-    # open positions at market prices (price convergence, research)
+    return parts
+def position_parts(T,table):
+    """Open positions at Kalshi prices (research notes only)."""
+    parts=[]
     cv=convergence_rows(T["trades"],T.get("marks"))
     if cv: parts.append('<h3>Open positions at Kalshi prices</h3><p class=note>Best and worst moments since entry, from the price snapshots. Hold, exit and watch notes are research only: no exit rule is in force, and v3 holds every trade to settlement.</p>'
                          +table(["Market","Side","Paid","Bid now","Fair at entry","Best","Worst","Now","Note"],cv,num=(2,3,4,5,6,7)))
-    parts.append(structure_note(T.get("structure_runs")))
-    parts.append(research_notes(T.get("research_notes")))
-    # audit trail
+    return parts
+def audit_items(T):
+    """(One <details> block per recent paper trade with its decision record, decision records by trade reference)."""
+    dec=T["decisions"]; ev=T["decision_events"]
     byref={d.get("trade_ref"):d for d in dec if d.get("trade_ref")}; evs={}
     for x in ev: evs.setdefault(x["decision_id"],[]).append(x)
     items=[]
@@ -239,7 +262,10 @@ def section(T,table,now_ts):
             outc=["%s: %s"%(x["kind"],e(", ".join("%s %s"%(k,v) for k,v in (_j(x.get("detail")) or {}).items()))) for x in sorted(evs.get(d["decision_id"],[]),key=lambda x:x["ts"])]
             items.append('<details><summary>%s</summary><p class=note>%s</p><dl class=audit>%s</dl>%s</details>'%(head,e(explain(d)),
                          "".join("<dt>%s</dt><dd>%s</dd>"%(e(a),e(str(b))) for a,b in facts),('<p class=note>After the decision: %s.</p>'%"; ".join(outc)) if outc else ""))
-    # post-mortem of settled trades (main bot)
+    return items,byref
+def postmortem_parts(T,table,byref):
+    """Why each settled main-bot trade won or lost (post-mortem codes)."""
+    parts=[]
     cal=calibration.Calib([(0.5*r["fc"]+0.5*r["mid"],1 if r["result"]=="yes" else 0) for r in T["obs"] if r.get("version")=="v3" and r.get("mtype")=="rain" and r.get("result") in ("yes","no") and r.get("fc") is not None and r.get("mid") is not None])
     pm=[]
     for r in T["trades"]:
@@ -252,6 +278,21 @@ def section(T,table,now_ts):
         parts.append('<h3>Why settled trades won or lost</h3><p class=note>Each settled paper trade, classified from its record. %s. One loss never changes a strategy by itself: changes need enough settled trades and a plan written first.</p>'%(
             ", ".join("%s: %d"%(e(postmortem.TEXT.get(k,k)),v) for k,v in sorted(sm.items(),key=lambda x:-x[1])))
             +table(["Market","Side","Paid","Fair at entry","P&amp;L","Causes"],prow,num=(2,3,4)))
+    return parts
+def section(T,table,now_ts):
+    """The control center panel (pure: builds HTML from the tables dashboard.read_db gave it)."""
+    if not registry.REGISTRY: return ""
+    last=last_main_scan(T["scans"])
+    parts=status_parts(T,table,now_ts,last)
+    parts+=strategy_parts(T,table)
+    parts+=latest_scan_parts(T,table,last)
+    parts+=calibration_parts(T,table)
+    parts+=risk_parts(T,table)
+    parts+=position_parts(T,table)
+    parts.append(structure_note(T.get("structure_runs")))
+    parts.append(research_notes(T.get("research_notes")))
+    items,byref=audit_items(T)
+    parts+=postmortem_parts(T,table,byref)
     parts.append('<h3>Audit trail</h3><p class=note>The exact snapshot behind each recent paper trade. Records are never changed; anything learned later is added below them.</p>'+("".join(items) or "<p class=note>No trades yet.</p>"))
     return '<section class="panel control" id=control><h2>Control center <span>strategies, selection, calibration, risk, audit</span></h2>%s</section>'%"".join(parts)
 CSS="""
