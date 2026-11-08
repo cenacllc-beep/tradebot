@@ -126,12 +126,24 @@ def settings(env,mirror_from=0):
     keys={"demo":{"key_id":"ed-key-1","key_file":ED_FILE},"prod":{"key_id":"rsa-key-1","key_file":RS_FILE}}
     json.dump({"env":env,"keys":keys,"mirror_from":{"demo":mirror_from,"prod":mirror_from}},open(live.SETTINGS,"w"))
 c=core.db()
-def paper(t,side="yes",price=0.42,n=3,version="v3",age=60,status="open",fc=0.30):
+SAME=object()
+def paper(t,side="yes",price=0.42,n=3,version="v3",age=60,status="open",fc=0.30,slices=None,mid=None,decision=True,dec_fc=SAME):
+    """A paper trade as the scan writes it: v3's forecast, the YES mid and the 24 hourly chances in obs (first snapshot
+    kept), and, once the decision ledger exists, the trade's decision row (p_model = dec_fc, default fc). By default the
+    hourly chances agree with the trade's side (the 6-hour filter passes): one 6-hour block 23 points above the YES mid
+    for YES or 23 below it for NO, the rest 0% (an edge of about 11 points, inside the 30-point veto)."""
+    if mid is None: mid=price if side=="yes" else 1-price
+    if slices is None: slices=[0]*12+[max(0,min(100,round((mid+(0.23 if side=="yes" else -0.23))*100)))]+[0]*11
     if fc is not None:   # the scan logs v3's forecast for every market it trades (obs); the no-rain filter reads it
-        c.execute("insert or ignore into obs(ticker,version,ts,fc,mid,market_type) values(?,?,?,?,?,?)",(t,version,time.time()-age,fc,price,"rain"))
+        c.execute("insert or ignore into obs(ticker,version,ts,fc,mid,market_type,slices) values(?,?,?,?,?,?,?)",(t,version,time.time()-age,fc,mid,"rain",json.dumps(slices)))
     cur=c.execute("insert into trades(ts,ticker,side,price,fair,n,cost,fee,version,status,pnl,result) values(?,?,?,?,?,?,?,?,?,?,?,?)",
                   (time.time()-age,t,side,price,0.6,n,n*price,core.fee(price,n),version,status,
-                   -n*price-core.fee(price,n) if status=="settled" else None,"no" if status=="settled" else None)); c.commit(); return cur.lastrowid
+                   -n*price-core.fee(price,n) if status=="settled" else None,"no" if status=="settled" else None)); pid=cur.lastrowid
+    if decision and c.execute("select 1 from sqlite_master where type='table' and name='decisions'").fetchone():
+        c.execute("insert into decisions(decision_id,scan_id,ts,strategy_id,mode,ticker,action,side,reason,mid,price,p_model,inputs,trade_ref) values(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                  ("auto-%d"%pid,"auto-%d"%pid,time.time(),"forecast_alpha.rain.v3","paper",t,"TRADE_"+side.upper(),side,"TRADE",mid,price,
+                   fc if dec_fc is SAME else dec_fc,json.dumps({"slices":slices}),"trades:%d"%pid))
+    c.commit(); return pid
 ph=lambda: hashlib.sha256(open(os.environ["PAPER_DB"],"rb").read()).hexdigest()
 def rows(): return live.ldb().execute("select paper_id,ticker,side,count,limit_cents,status,fill_count,cost,fees,result,pnl,client_order_id,env,note from orders order by id").fetchall()
 def row(t): return [x for x in rows() if x[1]==t][-1]
@@ -335,26 +347,106 @@ out,_=run(live.status); assert "Filter: 'no rain' paper bets are not copied when
 import audit
 audit.ensure(c)
 for t,fc_obs,fc_dec in (("KXRAINF7-26OCT15-T0",0.30,0.70),("KXRAINF8-26OCT15-T0",0.70,0.30)):
-    pid=new(t,side="no",price=0.60,n=1,fc=fc_obs)
-    c.execute("insert into decisions(decision_id,scan_id,ts,strategy_id,mode,ticker,action,side,reason,p_model,trade_ref) values(?,?,?,?,?,?,?,?,?,?,?)",
-              ("d-"+t,"s1",time.time(),"forecast_alpha.rain.v3","paper",t,"TRADE_NO","no","TRADE",fc_dec,"trades:%d"%pid)); c.commit()
+    pid=new(t,side="no",price=0.60,n=1,fc=fc_obs,dec_fc=fc_dec)
     assert abs(live.v3_forecast(t,pid)-fc_dec)<1e-12 and abs(live.v3_forecast(t)-fc_obs)<1e-12
 # while the ledger exists, a NO trade without its decision row, or with an empty forecast in it, is not copied (review)
-t9="KXRAINF9-26OCT15-T0"; new(t9,side="no",price=0.60,n=1,fc=0.20)   # obs says 20%, but no decision row
-t10="KXRAINFA-26OCT15-T0"; pid10=new(t10,side="no",price=0.60,n=1,fc=0.20)
-c.execute("insert into decisions(decision_id,scan_id,ts,strategy_id,mode,ticker,action,side,reason,p_model,trade_ref) values(?,?,?,?,?,?,?,?,?,?,?)",
-          ("d-"+t10,"s1",time.time(),"forecast_alpha.rain.v3","paper",t10,"TRADE_NO","no","TRADE",None,"trades:%d"%pid10)); c.commit()
+t9="KXRAINF9-26OCT15-T0"; new(t9,side="no",price=0.60,n=1,fc=0.20,decision=False)   # obs says 20%, but no decision row
+t10="KXRAINFA-26OCT15-T0"; pid10=new(t10,side="no",price=0.60,n=1,fc=0.20,dec_fc=None)
 out,_=run(live.mirror)
 assert row("KXRAINF7-26OCT15-T0")[5]=="skipped" and row("KXRAINF8-26OCT15-T0")[5]=="executed", out
 assert row(t9)[5]=="skipped" and row(t10)[5]=="skipped" and "could not be read" in row(t9)[13] and "could not be read" in row(t10)[13], out
-t="KXRAINFB-26OCT15-T0"; pid=new(t,side="no",price=0.60,n=1,fc=0.20)
-c.execute("insert into decisions(decision_id,scan_id,ts,strategy_id,mode,ticker,action,side,reason,p_model,trade_ref) values(?,?,?,?,?,?,?,?,?,?,?)",
-          ("d-"+t,"s1",time.time(),"forecast_alpha.rain.v3","paper",t,"TRADE_NO","no","TRADE",0.55,"trades:%d"%pid)); c.commit()
+t="KXRAINFB-26OCT15-T0"; pid=new(t,side="no",price=0.60,n=1,fc=0.20,dec_fc=0.55)
 n0=len(F.posts())
 try: live.place(live.client()[0],live.ldb(),"demo",pid,t,"no",1,60,note="x"); raise AssertionError("place() must read the decision row")
 except live.ExchangeError as e: assert "says rain 55%" in str(e), e
 assert len(F.posts())==n0
 print("no-rain filter ok")
+
+# 8c. the 6-hour filter (built 2026-11-07, shipped OFF by the user's choice; tested here switched on, then off again): a copy only when v3's hours in 6-hour blocks (PLAN9's v3-6h) give the paper
+# bot's own 8-point edge on the same side, against the price paid, from the trade's own decision row; fails closed
+assert live.AGREE_6H is False, "shipped off: the user's choice of 2026-11-07 22:11"
+live.AGREE_6H=True
+import importlib.util
+_path=list(sys.path)
+spec=importlib.util.spec_from_file_location("plan9_for_test",os.path.join(WORK,"research","plan9.py")); p9=importlib.util.module_from_spec(spec); spec.loader.exec_module(p9)
+sys.path[:]=_path
+import random
+rng=random.Random(7)
+for _ in range(2000):   # the same number as PLAN9's frozen definition (read-only import), on random hours
+    h=[rng.choice((0,0,5,10,20,30,40,50,60,70,80,90,100,rng.uniform(0,100))) for _ in range(24)]
+    assert abs(live.six_hour(h)-p9.v3_6h(p9.chances(json.dumps(h))))<1e-12, h
+assert live.six_hour([0]*24)==0.01 and live.six_hour([100]*24)==0.99 and abs(live.six_hour([30]*24)-(1-0.7**4))<1e-12
+assert abs(live.six_hour(json.dumps([0]*12+[50]+[0]*11))-0.5)<1e-12
+for bad in ([0]*23,[0]*25,[0]*23+[True],[0]*23+[float("nan")],[0]*23+[101],[0]*23+[-1],[0]*23+["5"],[0]*23+[None],"not json",None,{"a":1}):
+    assert live.six_hour(bad) is None, bad
+def tr(t,**kw):   # a market whose live price still lets the copy fill at the paper price
+    p=kw.get("price",0.42)
+    F.markets[t]=mk(t,bid=p-0.02,ask=p) if kw.get("side","yes")=="yes" else mk(t,bid=1-p,ask=1-p+0.02)
+    return paper(t,n=1,**kw)
+cases=(("KXRAING1-26OCT15-T0",dict(side="yes",price=0.31,mid=0.30,slices=[0]*12+[50]+[0]*11),"executed"),   # v3-6h 50%: +9 points
+       ("KXRAING2-26OCT15-T0",dict(side="yes",price=0.33,mid=0.30,slices=[0]*12+[50]+[0]*11),"skipped"),    # +7 points: not enough
+       ("KXRAING3-26OCT15-T0",dict(side="no",price=0.60,mid=0.40,fc=0.30,slices=[30]*24),"skipped"),        # v3 30%, but v3-6h 76%
+       ("KXRAING4-26OCT15-T0",dict(side="no",price=0.60,mid=0.40,fc=0.30,slices=[0]*12+[17]+[0]*11),"executed"),     # v3-6h 17%: +11.5 points
+       ("KXRAING5-26OCT15-T0",dict(side="yes",slices=[50]*23),"skipped"),                                  # 23 hours: unreadable
+       ("KXRAING6-26OCT15-T0",dict(side="yes",decision=False),"skipped"))                                  # no decision row
+line_ok=(live.BLEND*0.5+(1-live.BLEND)*0.30)-0.32>=live.MIN_EDGE   # exactly at the 8-point line: decided as strategy.scan does
+cases+=(("KXRAING9-26OCT15-T0",dict(side="yes",price=0.32,mid=0.30,slices=[0]*12+[50]+[0]*11),"executed" if line_ok else "skipped"),
+        ("KXRAINGV-26OCT15-T0",dict(side="yes",price=0.10,mid=0.10,slices=[0]*12+[50]+[0]*11),"skipped"),   # +20 points, but 40 from the mid: the veto
+        ("KXRAINGW-26OCT15-T0",dict(side="yes",price=0.20,mid=0.20,slices=[0]*12+[50]+[0]*11),"executed" if abs(0.5-0.20)<=live.VETO_MAX_GAP+1e-9 else "skipped"),   # 30 points: at the veto's line, decided as strategy.scan does
+        ("KXRAINGX-26OCT15-T0",dict(side="yes",price=0.19,mid=0.19,slices=[0]*12+[50]+[0]*11),"skipped"),   # 31 points: vetoed
+        ("KXRAINGH-26OCT15-T0",dict(side="yes",slices=[10**400]+[0]*23),"skipped"))                        # an integer too large for a float
+ids={}
+for t,kw,_ in cases: ids[t]=tr(t,**kw)
+# the decision row wins over an older first snapshot in obs (both ways)
+for t,obs_sl,dec_sl in (("KXRAINGO-26OCT15-T0",[30]*24,[0]*12+[17]+[0]*11),("KXRAINGP-26OCT15-T0",[0]*12+[17]+[0]*11,[30]*24)):
+    c.execute("insert into obs(ticker,version,ts,fc,mid,market_type,slices) values(?,?,?,?,?,?,?)",(t,"v3",time.time()-999,0.30,0.40,"rain",json.dumps(obs_sl)))
+    ids[t]=tr(t,side="no",price=0.60,mid=0.40,fc=0.30,slices=dec_sl)
+t7="KXRAING7-26OCT15-T0"; pid7=tr(t7,side="yes",decision=False)   # its decision row names the other side
+c.execute("insert into decisions(decision_id,scan_id,ts,strategy_id,mode,ticker,action,side,reason,mid,price,p_model,inputs,trade_ref) values(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+          ("d-"+t7,"s1",time.time(),"forecast_alpha.rain.v3","paper",t7,"TRADE_NO","no","TRADE",0.42,0.58,0.30,json.dumps({"slices":[50]*24}),"trades:%d"%pid7))
+t8="KXRAING8-26OCT15-T0"; pid8=tr(t8,side="yes",decision=False)   # its decision row has no inputs
+c.execute("insert into decisions(decision_id,scan_id,ts,strategy_id,mode,ticker,action,side,reason,mid,price,p_model,inputs,trade_ref) values(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+          ("d-"+t8,"s1",time.time(),"forecast_alpha.rain.v3","paper",t8,"TRADE_YES","yes","TRADE",0.42,0.42,0.30,None,"trades:%d"%pid8)); c.commit()
+out,_=run(live.mirror)
+for t,_,want in cases: assert row(t)[5]==want, (t,row(t),out)
+assert row(t7)[5]=="skipped" and row(t8)[5]=="skipped", out
+assert row("KXRAINGO-26OCT15-T0")[5]=="executed" and row("KXRAINGP-26OCT15-T0")[5]=="skipped", out
+assert "the bot's veto" in row("KXRAINGV-26OCT15-T0")[13] and "could not be read" in row("KXRAINGH-26OCT15-T0")[13], out
+assert "6-hour filter: v3's hours in 6-hour blocks say rain 50%, an edge of +7.0 points on YES at 33c" in row("KXRAING2-26OCT15-T0")[13], row("KXRAING2-26OCT15-T0")
+assert "say rain 76%" in row("KXRAING3-26OCT15-T0")[13] and "could not be read" in row("KXRAING5-26OCT15-T0")[13], out
+assert "could not be read" in row("KXRAING6-26OCT15-T0")[13] and "could not be read" in row(t7)[13] and "could not be read" in row(t8)[13], out
+assert all(r[5]!="skipped" or "6-hour filter" in r[13] for r in rows() if r[1].startswith("KXRAING")), "only the 6-hour filter skipped these"
+# place() applies it too, so no caller can skip it; the no-rain filter still comes first
+t="KXRAINGA-26OCT15-T0"; pid=tr(t,side="no",price=0.60,mid=0.40,fc=0.30,slices=[30]*24); n0=len(F.posts())
+try: live.place(live.client()[0],live.ldb(),"demo",pid,t,"no",1,60,note="x"); raise AssertionError("place() must apply the 6-hour filter")
+except live.ExchangeError as e: assert "order blocked: 6-hour filter" in str(e), e
+t="KXRAINGB-26OCT15-T0"; pid=tr(t,side="no",price=0.60,mid=0.40,fc=0.55,slices=[30]*24)
+try: live.place(live.client()[0],live.ldb(),"demo",pid,t,"no",1,60,note="x"); raise AssertionError("place() must apply the no-rain filter")
+except live.ExchangeError as e: assert "order blocked: no-rain filter" in str(e), e
+assert len(F.posts())==n0
+# without the decision ledger (an old paper.db), the scan's log gives the mid and the hours, and the trade its price
+import sqlite3
+old=os.path.join(OUT,"old_paper.db"); o=sqlite3.connect(old)
+o.execute("create table obs(ticker text,version text,mid real,slices text)"); o.execute("create table trades(id integer primary key,ticker text,side text,price real)")
+o.execute("insert into obs values('KXRAINH1-26OCT15-T0','v3',0.30,?)",(json.dumps([0]*12+[50]+[0]*11),)); o.execute("insert into trades values(1,'KXRAINH1-26OCT15-T0','yes',0.31)")
+o.execute("insert into trades values(2,'KXRAINH2-26OCT15-T0','yes',0.31)"); o.commit(); o.close()
+real_paper=live.PAPER; live.PAPER=old
+assert live.trade_inputs("KXRAINH1-26OCT15-T0","yes",1)==(0.30,0.31,json.dumps([0]*12+[50]+[0]*11)) and live.agree_reason("KXRAINH1-26OCT15-T0","yes",1) is None
+assert live.trade_inputs("KXRAINH1-26OCT15-T0","no",1) is None and live.trade_inputs("KXRAINH2-26OCT15-T0","yes",2) is None   # wrong side; no log row
+assert live.trade_inputs("KXRAINH1-26OCT15-T0","yes",None) is None and "could not be read" in live.agree_reason("KXRAINH1-26OCT15-T0","maybe",1)
+live.PAPER=real_paper
+# the switch: with AGREE_6H off, the same skipped trade would be copied (only the user can change it)
+real_agree=live.agree_reason; live.agree_reason=lambda *a: (_ for _ in ()).throw(RecursionError("deep"))
+assert "could not be checked (RecursionError)" in live.filter_reason("KXRAING1-26OCT15-T0","yes",ids["KXRAING1-26OCT15-T0"]); live.agree_reason=real_agree
+live.AGREE_6H=False; assert live.filter_reason("KXRAING2-26OCT15-T0","yes",ids["KXRAING2-26OCT15-T0"]) is None; live.AGREE_6H=True
+assert live.filter_reason("KXRAING2-26OCT15-T0","yes",ids["KXRAING2-26OCT15-T0"])
+out,_=run(live.status); assert "Filter: a paper bet is copied only if v3's hours in 6-hour blocks also give the bot's 8-point edge on the same side, within its 30-point veto" in out and "End rule:" in out, out
+live.AGREE_6H=False   # as shipped: the same trade is copied, and status says the check is off
+assert live.filter_reason("KXRAING2-26OCT15-T0","yes",ids["KXRAING2-26OCT15-T0"]) is None
+out,_=run(live.status); assert "the 6-hour check is off" in out and "6-hour blocks also give" not in out, out
+assert "End rule: on real money, a 25% drawdown" in out and "%%" not in out, out   # no unformatted percent signs
+t="KXRAINGZ-26OCT15-T0"; tr(t,side="no",price=0.60,mid=0.40,fc=0.30,slices=[30]*24); out,_=run(live.mirror); assert row(t)[5]=="executed", out
+print("6-hour filter ok")
 
 # 9. daily loss stop ($2.50) and drawdown pause
 L=live.ldb(); L.execute("insert into orders(ts,env,ticker,side,count,limit_cents,status,fill_count,cost,fees,result,pnl,settled_ts) values(?,?,?,?,?,?,?,?,?,?,?,?,?)",
@@ -363,7 +455,8 @@ t="KXRAINJAX-26OCT15-T0"; new(t); n0=len(F.posts()); out,_=run(live.mirror); ass
 L.execute("update orders set settled_ts=? where ticker='X1'",(time.time()-3*86400,)); L.execute("insert into orders(ts,env,ticker,side,count,limit_cents,status,fill_count,cost,fees,result,pnl,settled_ts) values(?,?,?,?,?,?,?,?,?,?,?,?,?)",
           (time.time(),"demo","X2","yes",1,50,"executed",1,4,0,"no",-4.0,time.time()-2*86400)); L.commit()
 v,p,paused=live.value_track(L,"demo"); assert paused and p>=25, (v,p)
-out,_=run(live.mirror); assert "drawdown pause" in out, out
+out,_=run(live.mirror); assert "drawdown pause" in out and "TRIAL ENDED" not in out and "ends the real-money trial" not in out, out
+assert L.execute("select count(*) from events where kind in ('trial_end','lock')").fetchone()[0]==0, "a demo drawdown never locks real money"
 live.event(L,"demo","resume"); assert not live.value_track(L,"demo")[2]
 out,_=run(live.mirror); assert row(t)[5]=="executed", out
 print("stops ok")
@@ -414,7 +507,72 @@ except live.ExchangeError as e: assert "locked" in str(e)
 live.today=real_today
 print("real-money locks ok")
 
+# 11b. the user's end rule (2026-11-07): on real money the 25% drawdown ends the trial: real money locks again (once per
+#      pause), restarting needs both typed commands (resume and unlock); a failed lock still leaves the pause in charge
+live.today=lambda: date(2026,11,11); L=live.ldb()
+F.pos.clear(); F.extra=0.0   # room under the $25 cap: the shared fake holds every earlier section's positions
+def ends(): return L.execute("select count(*) from events where env='prod' and kind='trial_end'").fetchone()[0]
+answers=iter(["UNLOCK REAL MONEY"]); out,code=run(live.unlock); assert not code and "Unlocked" in out and "trial ENDED" not in out and "a 25% drawdown ends the trial" in out, (out,code)
+L.execute("insert into orders(ts,env,ticker,side,count,limit_cents,status,fill_count,cost,fees,result,pnl,settled_ts) values(?,?,?,?,?,?,?,?,?,?,?,?,?)",
+          (time.time(),"prod","X3","yes",1,50,"executed",1,7,0,"no",-7.0,time.time()-2*86400)); L.commit()   # value $18 < 75% of $25
+assert live.value_track(L,"prod")[2] and live.unlocked(L) and ends()==0
+t="KXRAINEND1-26OCT15-T0"; new(t,age=0); n0=len(F.posts())
+real_save=live.save_settings; live.save_settings=lambda s: (_ for _ in ()).throw(PermissionError("denied"))
+real_event=live.event; live.event=lambda *a,**k: (_ for _ in ()).throw(live.sqlite3.OperationalError("disk I/O error"))
+out,_=run(live.mirror); live.event=real_event   # neither lock could be written: the pause still stops it; tried again next run
+assert "WARNING: could not lock real money" in out and "drawdown pause" in out and len(F.posts())==n0 and ends()==0, out
+out,_=run(live.mirror); live.save_settings=real_save   # only the settings file fails: live.db's lock alone holds (review)
+assert "REAL-MONEY TRIAL ENDED" in out and "could not write the settings file (PermissionError)" in out and "run .\\run live lock to clear" in out and len(F.posts())==n0 and ends()==1, out
+assert json.load(open(live.SETTINGS)).get("prod_unlock") and not live.unlocked(L)
+run(live.lock); assert json.load(open(live.SETTINGS)).get("prod_unlock") is None
+out,_=run(live.mirror); assert "TRIAL ENDED" not in out and ends()==1 and len(F.posts())==n0, out   # once per pause
+out,_=run(live.status); assert "Real-money trial: ENDED" in out and "ends the real-money trial" in out, out
+# unlocking again alone is not enough: the pause stays until resume, and it does not lock a second time
+answers=iter(["UNLOCK REAL MONEY"]); out,code=run(live.unlock); assert not code and "trial ENDED at the 25% drawdown" in out, (out,code)
+out,_=run(live.mirror); assert "trial ended at the 25% drawdown" in out and "resume" in out and len(F.posts())==n0 and ends()==1 and live.unlocked(L), out
+# open bets that settle as wins can lift the pause by itself: real money stays locked until resume (review MUST 1)
+L.execute("insert into orders(ts,env,ticker,side,count,limit_cents,status,fill_count,cost,fees,result,pnl,settled_ts) values(?,?,?,?,?,?,?,?,?,?,?,?,?)",
+          (time.time(),"prod","X5","yes",1,50,"executed",1,1,0,"yes",2.0,time.time())); L.commit()
+assert not live.value_track(L,"prod")[2] and live.unlocked(L)
+t="KXRAINEND0-26OCT15-T0"; new(t,age=0,n=1); out,_=run(live.mirror); assert "trial ended" in out and len(F.posts())==n0, out
+try: live.place(live.client()[0],live.ldb(),"prod",None,t,"yes",1,42,note="x"); raise AssertionError("place() must refuse after the trial ended")
+except live.ExchangeError as e: assert "trial ended" in str(e), e
+answers=iter(["RESUME"]); out,code=run(live.resume); assert not code and "Resumed on prod" in out and "still locked" not in out, (out,code)
+t="KXRAINEND2-26OCT15-T0"; new(t,age=0,n=1); out,_=run(live.mirror)   # END0 too: it was opened after the unlock
+assert len(F.posts())==n0+2 and F.posts()[-1][5]=="api.elections.kalshi.com" and row(t)[12]=="prod" and row("KXRAINEND0-26OCT15-T0")[5]=="executed", out   # both typed: orders again
+# a later drawdown found by sync ends it again; resume alone then says real money is still locked
+L.execute("insert into orders(ts,env,ticker,side,count,limit_cents,status,fill_count,cost,fees,result,pnl,settled_ts) values(?,?,?,?,?,?,?,?,?,?,?,?,?)",
+          (time.time(),"prod","X4","yes",1,50,"executed",1,6,0,"no",-6.0,time.time())); L.commit()
+out,_=run(live.sync); assert "REAL-MONEY TRIAL ENDED" in out and ends()==2 and not live.unlocked(L), out
+answers=iter(["RESUME"]); out,code=run(live.resume); assert not code and "Real money is still locked" in out, (out,code)
+t="KXRAINEND3-26OCT15-T0"; new(t,age=0); out,_=run(live.mirror); assert len(F.posts())==n0+2 and "locked" in out, out
+L.execute("update orders set settled_ts=? where env='prod' and ticker in ('X4','X5')",(time.time()-2*86400,)); L.commit()   # out of the daily loss stop's 24 hours
+answers=iter(["UNLOCK REAL MONEY"]); out,code=run(live.unlock); assert not code and "trial ENDED" not in out, (out,code)   # resume, then unlock: orders again
+F.pos.clear(); F.extra=0.0   # room under the $25 cap (the shared fake holds every earlier section's positions)
+t="KXRAINEND4-26OCT15-T0"; new(t,age=0,n=1); out,_=run(live.mirror); assert len(F.posts())==n0+3 and row(t)[12]=="prod", out
+# the lock event written but its trial_end record not: locked, said plainly, and the next run records it
+L.execute("insert into orders(ts,env,ticker,side,count,limit_cents,status,fill_count,cost,fees,result,pnl,settled_ts) values(?,?,?,?,?,?,?,?,?,?,?,?,?)",
+          (time.time(),"prod","X6","yes",1,50,"executed",1,8,0,"no",-8.0,time.time())); L.commit()
+def only_trial_end(c_,env_,kind,detail=""):
+    if kind=="trial_end": raise live.sqlite3.OperationalError("disk full")
+    return real_event(c_,env_,kind,detail)
+live.event=only_trial_end; out,_=run(live.mirror); live.event=real_event
+assert "TRIAL ENDED" in out and "trial_end record" in out and ends()==2 and not live.unlocked(L) and len(F.posts())==n0+3, out
+out,_=run(live.mirror); assert "TRIAL ENDED" in out and ends()==3, out
+# resume runs the end rule first: a drawdown whose locks could not be written still ends the trial before the resume
+answers=iter(["RESUME"]); out,code=run(live.resume); assert not code and "Real money is still locked" in out, (out,code)
+answers=iter(["UNLOCK REAL MONEY"]); run(live.unlock); assert live.unlocked(L)
+L.execute("insert into orders(ts,env,ticker,side,count,limit_cents,status,fill_count,cost,fees,result,pnl,settled_ts) values(?,?,?,?,?,?,?,?,?,?,?,?,?)",
+          (time.time(),"prod","X7","yes",1,50,"executed",1,9,0,"no",-9.0,time.time())); L.commit()
+live.save_settings=lambda s: (_ for _ in ()).throw(PermissionError("denied")); live.event=lambda *a,**k: (_ for _ in ()).throw(live.sqlite3.OperationalError("disk I/O error"))
+out,_=run(live.mirror); live.save_settings=real_save; live.event=real_event; assert "WARNING: could not lock" in out and ends()==3, out
+answers=iter(["RESUME"]); out,code=run(live.resume)
+assert not code and out.index("REAL-MONEY TRIAL ENDED")<out.index("Resumed on prod") and "still locked" in out and ends()==4 and not live.unlocked(L), (out,code)
+run(live.lock); live.today=real_today
+print("end rule ok")
+
 # 12. demo test order refuses on prod, works on demo; use; setup never echoes a pasted key; status; piped unlock refused
+F.pos.clear(); F.extra=0.0   # room under the $25 cap: the earlier sections' fake positions are not this section's subject (review)
 out,code=run(live.demo_order); assert code and "only on the demo" in str(code)
 out,code=run(live.use,"nope"); assert code
 out,code=run(live.use,"demo"); assert not code and json.load(open(live.SETTINGS))["env"]=="demo"

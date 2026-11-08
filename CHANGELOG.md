@@ -1694,3 +1694,77 @@ unfamiliar codebase ... do not change functionality. only upgrade the code quali
   - research/PLAN9.md 2383e0d5fe1d75ab7e94c50d40d11a86e64261ffccfd8dddd21d0295b946502e
   - research/plan9.py fd1454af16fe07ef294a7d4f2ca1667c5ab1a4cfd7764bd79e272d1b307edb64
   - The identity record is stored on the PC at the deploy, before 2026-11-08 00:50 UTC.
+
+## 2026-11-07 22:00 (local) - two live-only rules: the 6-hour filter and the end of the real-money trial at the drawdown
+- User: "does this mean our system still needs improvements? what would you recommend?", then "implement your
+  recommendations to improve the bot". The recommendations: leave v3 unchanged (gate, PLAN7); keep the no-rain filter;
+  a second live-only filter from v3's own hours in 6-hour blocks (my lean: yes); the 25% drawdown as the end of the
+  real-money trial; then wait for PLAN7, PLAN8 and PLAN9 without tuning. Taken as his yes to the two open choices.
+- Told before building: by the bot's real rule (edge against the ask, not the mid that my first screen used), the
+  6-hour filter passes only 3 of the 36 v3 rain paper trades (2 settled: won 1, -$0.38), against 14 settled (won 5,
+  -$1.21) for the no-rain filter alone. So real money will be quiet (about one bet every 4-5 nights), and the filter
+  would not have made more money on the trades so far; its point is fewer bets while the price beats v3.
+- live.py (the only file changed in code):
+  - AGREE_6H: filter_reason() now applies, after the no-rain filter, agree_reason(): v3-6h (six_hour(), PLAN9's
+    definition, checked against plan9.v3_6h on 2,000 random cases) blended 50/50 with the mid must give the paper bot's
+    8-point edge (config.BLEND, config.MIN_EDGE, strategy.scan's own test) on the same side against the price paid.
+    trade_inputs() reads the trade's own decision row (it must name the same market and side); without the decision
+    ledger, obs and the trade, as v3_forecast() does. Unreadable inputs or hours: no copy. Checked in mirror() and in
+    place(), on demo and prod.
+  - END_ON_DRAWDOWN: end_trial() locks real money (settings mark, then a lock event, then a trial_end event) the first
+    time the 25% drawdown pause is on since the last resume; mirror() runs it before the lock check and sync() after
+    settlements. A failed lock prints a warning; the pause still stops every order and the next run tries again.
+    stops() says on prod that the trial ended and that restarting needs resume and unlock; status() shows both rules
+    and an ended trial; unlock() and resume() print the facts (unlock's disclosure now names the filters and the end
+    rule). No requirement of unlock, resume, lock or any limit changed.
+- Not changed: strategy.py, weather.py, nws.py (model_version and PLAN7/PLAN9 identities), shadow.py and kalshi.py
+  (PLAN8 identity), config.py, paper trading, the gate, the dashboard.
+- Checks: tests/test_live.py sections 8c (filter: pass/skip at the 8-point line, side flip, unreadable hours, no
+  decision row, wrong side, no inputs, place() blocks, the obs path, the switch, status) and 11b (end rule: failed lock
+  then lock, once per pause, unlock alone not enough, resume then unlock restarts orders, a drawdown found by sync ends
+  it again, resume alone says still locked, demo untouched); the paper() helper now writes the hourly chances and a
+  decision row as the scan does. Full suite: 42 tests pass. On a copy of the PC's paper.db (read-only, unchanged), the
+  deployed code skips exactly the trades counted by hand: 3 of 36 would be copied.
+
+## 2026-11-07 22:45 (local) - independent code review of the two live-only rules (agents/code-reviewer.md)
+- MUST 1 (fixed): after the trial ended, the drawdown pause could lift by itself when open bets settled as wins, and
+  then a typed unlock alone restarted real money, against the rule's "resume and unlock". Now lock_reason() keeps real
+  money locked while trial_end stands (until a resume), so place() enforces it too. New test: trial ends, unlock alone,
+  a winning settlement lifts the pause, mirror and place() still refuse. A mutation check (the new line removed) makes
+  the test fail.
+- SHOULD 2 (fixed): a failed settings write stopped end_trial() before live.db's lock. The settings mark and the live.db
+  lock event are now separate tries (either alone locks); the message says which could not be written. Tests: both
+  fail (warning, pause still stops orders, nothing recorded), only the settings file fails (live.db lock holds).
+- SHOULD 3 (fixed): the test's $25-cap headroom in section 12 was thin after the new fixtures; section 12 now starts
+  with the fake exchange's positions cleared.
+- COULD 4 (fixed): an integer too large for a float in the stored hours crashed mirror(); _num() now rejects it, and
+  any unexpected error in the 6-hour check becomes "could not be checked; not copied" without stopping other copies.
+- COULD 5 (applied, only removes orders): the 6-hour check now also applies the bot's 30-point veto (VETO_MAX_GAP,
+  imported from strategy.py, which is unchanged) to v3-6h, so "the same bet by the bot's own rule" is the whole rule.
+  On the real record it changes nothing: still 3 of 36 trades pass. The test fixtures' default hours were moved inside
+  the veto.
+- COULD 6 (fixed): tests at the exact 8-point line (decided as strategy.scan decides), the decision row winning over
+  obs both ways, live.db unwritable, and the demo check moved to section 9 where a demo drawdown really runs mirror.
+- COULD 7: stops() no longer claims "locked again" (it may not be). Left: the dashboard tile and the control center's
+  safety line do not mention the two filters (live status does); presentation only, left to keep this release to
+  live.py. Also left: the demo pause lifts by itself on recovery (older behaviour; CLAUDE.md 3a says "until resume").
+- After the fixes: full suite 42 tests pass; on the copy of the PC's paper.db the code copies the same 3 of 36.
+- Re-review of the fixes (same reviewer): no MUST left; nothing loosens a lock; both restart orders work. Its COULDs,
+  applied (each only tightens or clarifies): end_trial names the record it could not write (the lock or the trial_end
+  record) and, when only the settings file failed, tells you to run `.\run live lock` (which retries it); resume() on
+  real money runs the end rule before writing the resume, so a drawdown whose locks failed earlier still ends the
+  trial; tests at the veto's exact 30-point line and 31 points, resume-then-unlock restarting orders, the trial_end
+  record failing (locked, retried next run), and resume ending the trial first. Left (very unlikely): live.db
+  unwritable for the whole time the pause lasts, while only the settings file can be written: the settings mark keeps
+  real money locked, but then a typed unlock alone (without resume) would restart it. Full suite: 42 tests pass.
+
+## 2026-11-07 22:20 (local) - the 6-hour filter ships off (the user's choice)
+- User, 22:11: "we don't need fewer bets... we need more successful winning bets". live.AGREE_6H = False before the
+  deploy; the code stays, reviewed and tested both ways (tests/test_live.py 8c switches it on for its checks, then off,
+  and asserts the shipped value). status() says "the 6-hour check is off". The end rule (END_ON_DRAWDOWN) and the
+  no-rain filter stay on. No threshold, limit or lock changed.
+- On a copy of the PC's paper.db, with the shipped settings, live.py would copy 16 of 36 v3 rain paper trades (14
+  settled: won 5, where the prices paid implied 5.5 wins; -$1.21 on paper) and skip 20 by the no-rain filter (17
+  settled: won 1, where the prices implied 2.5; -$6.65). Full suite: 42 tests pass.
+- Deploy check (01:12): `live.py status` on the PC printed "25%%" in the new end-rule line (a literal string, not
+  %-formatted). Fixed, with a test that status shows no "%%"; redeployed before any scan used it.

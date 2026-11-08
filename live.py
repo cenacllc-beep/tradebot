@@ -11,7 +11,7 @@ rain trades on your Kalshi account, at the paper price or better, never more con
   .\\run live use demo     (or: use prod) switch exchange
   .\\run live unlock       real money, Nov 11 or later only: shows the gate verdict, then you type the phrase
   .\\run live lock         stop real-money orders again (always allowed)
-  .\\run live resume       restart after a 25% drawdown pause (you type it)
+  .\\run live resume       restart after a 25% drawdown pause (you type it; on real money, unlock again too)
 
 Locks: a KILL file stops everything. The demo exchange (fake money) works any time. The real exchange places orders only
 when ALL hold: today is on or after the stop date (Nov 11, 2026), the exchange is set to prod, and you ran `unlock`
@@ -22,6 +22,8 @@ no more than the paper count, one bot order per market (checked on Kalshi too, s
 cause a second order), at most $25 at risk across the whole account (Kalshi's own position figures; missing figures stop
 the run), enough cash, a daily loss stop of $2.50, and a pause after a 25% drawdown from the bot's peak. Since
 2026-11-06 (your rule): no "no rain" copy when v3 itself says rain 50% or more (SKIP_NO_FROM; fails closed).
+Since 2026-11-07 (your rules): on real money the 25% drawdown ends the trial: real money locks again, and starting again
+needs both your resume and your unlock (END_ON_DRAWDOWN). A 6-hour check (AGREE_6H) is built but off, by your choice.
 
 Your key never goes in this folder: settings live in %USERPROFILE%\\.kalshi\\settings.json (or the KALSHI_ENV,
 KALSHI_KEY_ID, KALSHI_KEY_FILE environment variables) and the key file must sit outside this folder. Nothing here prints,
@@ -35,10 +37,10 @@ from urllib.parse import urlparse
 import requests
 HERE=os.path.dirname(os.path.abspath(__file__))
 if HERE not in sys.path: sys.path.insert(0,HERE)
-from config import DB, DAILY_LOSS_LIMIT
+from config import DB, DAILY_LOSS_LIMIT, BLEND, MIN_EDGE   # BLEND and MIN_EDGE: the paper bot's own rule, for the 6-hour filter
 import kalshi
 from core import fee, killed   # Kalshi taker fee (rounded up to the cent); the kill switch (one rule for every file)
-from strategy import STOP_DATE, started, close_time, payout, settled_pnl, STRATEGY_RAIN   # payout/settled_pnl: yes, no, scalar and void (2026-11-06)
+from strategy import STOP_DATE, started, close_time, payout, settled_pnl, STRATEGY_RAIN, VETO_MAX_GAP   # payout/settled_pnl: yes, no, scalar and void (2026-11-06); VETO_MAX_GAP: the bot's 30-point veto, for the 6-hour filter
 
 BASES={"demo":"https://external-api.demo.kalshi.co/trade-api/v2",     # Kalshi demo exchange, fake money
        "prod":"https://api.elections.kalshi.com/trade-api/v2"}        # real exchange (the bot already reads prices here)
@@ -52,7 +54,23 @@ MIRROR_HOURS=12           # only paper trades opened in the last 12 hours are co
 # was right stays measurable. It applies on every exchange, so the demo rehearses the real setup, and it only ever
 # removes orders. It fails closed: a NO trade whose forecast cannot be read is not copied.
 SKIP_NO_FROM=0.50
-GIVE_UP=1800              # an order still not found on Kalshi after 30 minutes counts as never placed
+# The user's rules of 2026-11-07 ("implement your recommendations"), both live-only; paper, v3 and the gate are unchanged.
+# AGREE_6H: a paper trade is copied only when v3's own 24 hourly chances, combined in 6-hour blocks (PLAN9's "v3-6h",
+# research/PLAN9.md section 3), would have made the same bet by the paper bot's own rule (strategy.scan): blend 50/50
+# with the mid, then 8+ points of edge on the same side against the price the paper trade paid, and v3-6h within the
+# bot's 30-point veto of the mid (strategy.VETO_MAX_GAP; added after the review, it only removes orders). The inputs are those the
+# trade was decided on (its decision row; without the decision ledger, the scan's log). v3-6h is never below v3, so it
+# mostly removes "no rain" bets. It was picked after looking at the same days, so it is untested (PLAN9 tests v3-6h on
+# new markets). It fails closed (unreadable inputs: no copy), applies on every exchange, and only ever removes orders.
+# OFF since the user's answer of 2026-11-07 22:11, before it was deployed ("we don't need fewer bets... we need more
+# successful winning bets"): it would have cut real bets to about 3 in 36. Built, reviewed and tested; switching it on
+# needs his word.
+AGREE_6H=False
+# END_ON_DRAWDOWN: on real money, the first time the 25% drawdown pause is on (since the last resume), real money locks
+# again exactly as `.\run live lock` does: the trial ends. Starting again needs both of the user's typed commands,
+# resume and unlock (unchanged). It only ever locks; the demo exchange keeps the plain pause.
+END_ON_DRAWDOWN=True
+GIVE_UP=1800             # an order still not found on Kalshi after 30 minutes counts as never placed
 UNLOCK_PHRASE="UNLOCK REAL MONEY"
 def _abs(p): return p if os.path.isabs(p) else os.path.join(HERE,p)   # paths never depend on the current folder
 PAPER=_abs(DB)
@@ -284,6 +302,8 @@ def lock_reason(c,env,s=None):
     if killed(): return "KILL file present"
     if env=="prod":
         if today()<STOP_DATE: return "real money is locked until %s (then your call: .\\run live unlock)"%STOP_DATE
+        if END_ON_DRAWDOWN and trial_ended(c):   # review 2026-11-07: the pause can lift by itself when open bets settle as wins
+            return "the real-money trial ended at the 25% drawdown (your rule of 2026-11-07): type .\\run live resume and .\\run live unlock yourself to start again"
         if not unlocked(c,s): return "real money is locked: run .\\run live unlock yourself (it shows the gate verdict first)"
     return None
 def stops(c,env):
@@ -291,8 +311,47 @@ def stops(c,env):
     if m and m[1]=="mismatch": return "position mismatch (%s); check on Kalshi. The next sync clears it if they agree, or type .\\run live resume"%m[2]
     if day_pnl(c,env)<=-DAILY_STOP+1e-9: return "daily loss stop: settled losses in the last 24 hours reached $%.2f"%DAILY_STOP
     v,p,paused=value_track(c,env)
-    if paused: return "drawdown pause: the bot's value $%.2f is more than 25%% below its peak $%.2f (review, then .\\run live resume)"%(v,p)
+    if paused:
+        if env=="prod" and END_ON_DRAWDOWN:
+            return "drawdown pause: the bot's value $%.2f is more than 25%% below its peak $%.2f. Your rule of 2026-11-07: this ends the real-money trial; starting again needs .\\run live resume and .\\run live unlock, both typed by you"%(v,p)
+        return "drawdown pause: the bot's value $%.2f is more than 25%% below its peak $%.2f (review, then .\\run live resume)"%(v,p)
     return None
+def trial_ended(c):
+    """The real-money trial's end (live.db's trial_end event since the last prod resume), or None."""
+    e=last_event(c,"prod",("resume","trial_end"))
+    return e if e and e[1]=="trial_end" else None
+def end_trial(c,env):
+    """END_ON_DRAWDOWN: lock real money the first time the drawdown pause is on (once per pause, until the next resume),
+    as `.\\run live lock` does. The settings mark and live.db's lock event are two separate tries, because either one
+    alone locks (review 2026-11-07); trial_end is written with the lock event, and while it stands lock_reason() keeps
+    real money locked until a resume, even if the pause lifts by itself. Returns a line to print, or None. While neither
+    could be written, the drawdown pause still stops every order and the next run tries again."""
+    if env!="prod" or not END_ON_DRAWDOWN: return None
+    v,p,paused=value_track(c,env)
+    if not paused or trial_ended(c): return None
+    done,failed=[],[]
+    try:
+        if os.path.exists(SETTINGS): s=read_settings(); s["prod_unlock"]=None; save_settings(s)
+        done.append("settings file")
+    except (OSError,ValueError) as e: failed.append("settings file (%s)"%type(e).__name__)
+    try: event(c,"prod","lock","drawdown: the real-money trial ended (your rule of 2026-11-07)"); done.append("live.db")
+    except sqlite3.Error as e: failed.append("live.db lock (%s)"%type(e).__name__)
+    else:
+        try: event(c,"prod","trial_end","value $%.2f, peak $%.2f"%(v,p))
+        except sqlite3.Error as e: failed.append("live.db trial_end record (%s; the next run tries again)"%type(e).__name__)
+    if not done:
+        return "WARNING: could not lock real money after the drawdown (%s); the drawdown pause still stops every order, and the next run tries again"%"; ".join(failed)
+    note=""
+    if failed:
+        note="; could not write the %s, the other lock holds"%", ".join(failed)
+        if "settings file" not in done: note+="; run .\\run live lock to clear the settings file's unlock too"
+    return ("REAL-MONEY TRIAL ENDED: the bot's value $%.2f is more than 25%% below its peak $%.2f, so real money is locked again "
+            "(your rule of 2026-11-07%s). Paper and the forward tests go on. Starting again needs .\\run live resume and .\\run live unlock, both typed by you."
+            %(v,p,note))
+def end_trial_line(c,env):
+    try: return end_trial(c,env)
+    except (OSError,ValueError,sqlite3.Error) as e:   # reading live.db failed: the pause (or the read error) still stops orders
+        return "WARNING: could not check the end rule (%s)"%type(e).__name__
 
 # ---------- orders ----------
 def paper_ro():
@@ -321,14 +380,77 @@ def v3_forecast(t,paper_id=None):
         return fc if fc is not None and 0.0<=fc<=1.0 else None   # NaN or out of range: unreadable
     except (sqlite3.Error,TypeError,ValueError): return None
     finally: p.close()
-def filter_reason(t,side,paper_id=None):
-    """Why the user's no-rain filter (SKIP_NO_FROM) keeps this copy from being placed, or None to go ahead."""
-    if side!="no": return None
-    fc=v3_forecast(t,paper_id)
-    if fc is None: return "no-rain filter: v3's forecast for this market could not be read (not copied, to be safe)"
-    if fc>=SKIP_NO_FROM-1e-12:
-        return "no-rain filter: v3 itself says rain %d%% (your rule of 2026-11-06: no 'no rain' copies from %d%%)"%(round(fc*100),round(SKIP_NO_FROM*100))
+def _num(x,lo,hi):
+    """x as a float when it is a real number from lo to hi (not a bool, NaN or infinity), else None."""
+    if isinstance(x,bool) or not isinstance(x,(int,float)): return None
+    try: x=float(x)
+    except OverflowError: return None   # an integer too large for a float (review 2026-11-07)
+    return x if lo<=x<=hi else None
+def six_hour(slices):
+    """PLAN9's v3-6h (research/PLAN9.md section 3) from v3's 24 hourly chances in percent (a list or its JSON text):
+    1 - (1 - b1)(1 - b2)(1 - b3)(1 - b4), b = the highest chance in hours 0-5, 6-11, 12-17 and 18-23, clipped to
+    [0.01, 0.99] like v3. None unless there are exactly 24 numbers from 0 to 100."""
+    try: v=json.loads(slices) if isinstance(slices,str) else slices
+    except ValueError: return None
+    if not isinstance(v,list) or len(v)!=24: return None
+    h=[_num(x,0.0,100.0) for x in v]
+    if any(x is None for x in h): return None
+    q=1.0
+    for i in range(0,24,6): q*=1.0-max(h[i:i+6])/100.0
+    return min(max(1.0-q,0.01),0.99)
+def trade_inputs(t,side,paper_id):
+    """(mid, price paid, v3's 24 hourly chances) that paper trade paper_id was decided on, read-only from paper.db, or
+    None when they cannot be read. While the decision ledger exists, only the trade's own decision row counts (written in
+    the same savepoint as the trade; it must name this market and side). Without the ledger, the scan's log (obs) gives
+    the mid and the chances and the paper trade its price, as v3_forecast() does."""
+    if paper_id is None: return None
+    p=paper_ro()
+    if p is None: return None
+    try:
+        if p.execute("select 1 from sqlite_master where type='table' and name='decisions'").fetchone():
+            r=p.execute("select ticker,side,mid,price,inputs from decisions where trade_ref=? and strategy_id=? order by ts desc limit 1",
+                        ("trades:%d"%paper_id,STRATEGY_RAIN)).fetchone()
+            if not r or r[0]!=t or r[1]!=side: return None
+            mid,price=r[2],r[3]
+            inp=json.loads(r[4]) if isinstance(r[4],str) else None
+            sl=inp.get("slices") if isinstance(inp,dict) else None
+        else:
+            o=p.execute("select mid,slices from obs where ticker=? and version='v3'",(t,)).fetchone()
+            pt=p.execute("select ticker,side,price from trades where id=?",(paper_id,)).fetchone()
+            if not o or not pt or pt[0]!=t or pt[1]!=side: return None
+            mid,sl,price=o[0],o[1],pt[2]
+        mid,price=_num(mid,0.0,1.0),_num(price,0.0,1.0)
+        if mid is None or price is None or sl is None: return None
+        return mid,price,sl
+    except (sqlite3.Error,TypeError,ValueError,AttributeError): return None
+    finally: p.close()
+def agree_reason(t,side,paper_id):
+    """Why the 6-hour filter (AGREE_6H) keeps this copy from being placed, or None to go ahead."""
+    x=trade_inputs(t,side,paper_id) if side in ("yes","no") else None
+    if x is None: return "6-hour filter: the inputs this trade was decided on could not be read (not copied, to be safe)"
+    mid,price,sl=x; p6=six_hour(sl)
+    if p6 is None: return "6-hour filter: v3's hourly chances for this market could not be read (not copied, to be safe)"
+    fair=BLEND*p6+(1-BLEND)*mid
+    q=fair if side=="yes" else 1-fair
+    if q-price<MIN_EDGE:   # the paper bot's own tests (strategy.scan), with v3-6h in place of v3
+        return "6-hour filter: v3's hours in 6-hour blocks say rain %d%%, an edge of %+.1f points on %s at %dc, not the %d needed (your rule of 2026-11-07)"%(
+            round(p6*100),(q-price)*100,side.upper(),round(price*100),round(MIN_EDGE*100))
+    if abs(p6-mid)>VETO_MAX_GAP+1e-9:
+        return "6-hour filter: v3's hours in 6-hour blocks say rain %d%%, more than %d points from the market's %d%% (the bot's veto; your rule of 2026-11-07)"%(
+            round(p6*100),round(VETO_MAX_GAP*100),round(mid*100))
     return None
+def filter_reason(t,side,paper_id=None):
+    """Why one of the user's filters keeps this copy from being placed, or None to go ahead: the no-rain filter
+    (SKIP_NO_FROM, 2026-11-06), then the 6-hour filter (AGREE_6H, 2026-11-07)."""
+    if side=="no":
+        fc=v3_forecast(t,paper_id)
+        if fc is None: return "no-rain filter: v3's forecast for this market could not be read (not copied, to be safe)"
+        if fc>=SKIP_NO_FROM-1e-12:
+            return "no-rain filter: v3 itself says rain %d%% (your rule of 2026-11-06: no 'no rain' copies from %d%%)"%(round(fc*100),round(SKIP_NO_FROM*100))
+    if not AGREE_6H: return None
+    try: return agree_reason(t,side,paper_id)
+    except Exception as e:   # anything unexpected in the stored inputs: fail closed, and never stop the other copies
+        return "6-hour filter: could not be checked (%s); not copied, to be safe"%type(e).__name__
 def cents_for(price): return int(math.floor(price*100+1e-6))   # never above the paper price (0.427 -> 42c)
 def record(c,row_id,o,note=None,v2=False):
     """Store Kalshi's answer and return the money used (cost + fees, never less than fills x limit price + fee formula,
@@ -424,7 +546,9 @@ def candidates(since):
 def mirror():
     s,env,k=load_settings()
     if not ready(k): return print("live: no Kalshi account set up (paper only)")
-    c=ldb(); why=lock_reason(c,env,s)
+    c=ldb(); msg=end_trial_line(c,env)   # END_ON_DRAWDOWN (2026-11-07): before the lock check, so a drawdown locks first
+    if msg: print("live (%s): %s"%(env,msg)); s=read_settings()
+    why=lock_reason(c,env,s)
     if why: return print("live (%s): no orders: %s"%(env,why))
     cl,_=client()
     since=float((s.get("mirror_from") or {}).get(env) or 0)   # plus the 12-hour window in candidates()
@@ -499,6 +623,8 @@ def sync():
             print("  %s: Kalshi says %s with result %r and no usable settlement value; left open (check it on Kalshi)"%(t,safe(m.get("status")),safe(m.get("result"))))
         elif m.get("status") in ("active","open"): still_open.add(t)
     c.commit()
+    msg=end_trial_line(c,env)   # END_ON_DRAWDOWN (2026-11-07): settlements are what move the bot's value
+    if msg: print("live (%s): %s"%(env,msg))
     reconcile(cl,c,env,still_open)
     tot=c.execute("select coalesce(sum(pnl),0),count(*) from orders where env=? and settled_ts is not null",(env,)).fetchone()
     print("live (%s): %d settled now; %d settled in all, net %s$%.2f after fees"%(env,n,tot[1],"+" if tot[0]>=0 else "-",abs(tot[0])))
@@ -520,6 +646,11 @@ def status():
     if k.get("key_id"): print("Key ID: %s...  key file: %s (%s)"%(k["key_id"][:4],k.get("key_file"),"found" if os.path.isfile(k.get("key_file") or "") else "MISSING"))
     print("Orders: "+((lock_reason(c,env,s) or "allowed") if ready(k) else "none (no %s account set up yet)"%env))
     print("Filter: 'no rain' paper bets are not copied when v3 itself says rain %d%% or more (your rule of 2026-11-06)"%round(SKIP_NO_FROM*100))
+    if AGREE_6H: print("Filter: a paper bet is copied only if v3's hours in 6-hour blocks also give the bot's %d-point edge on the same side, within its %d-point veto (your rule of 2026-11-07)"%(round(MIN_EDGE*100),round(VETO_MAX_GAP*100)))
+    else: print("Filter: the 6-hour check is off (your choice of 2026-11-07)")
+    if END_ON_DRAWDOWN: print("End rule: on real money, a 25% drawdown from the peak ends the trial and locks real money again (your rule of 2026-11-07)")
+    e=trial_ended(c)
+    if e: print("Real-money trial: ENDED on %s (%s). Starting again needs .\\run live resume and .\\run live unlock, both typed by you."%(time.strftime("%Y-%m-%d %H:%M",time.localtime(e[0])),e[2]))
     why=stops(c,env)
     if why: print("Paused: "+why)
     if ready(k):
@@ -608,7 +739,8 @@ def unlock():
     print("Paper test result (judged once on %s):"%STOP_DATE); lines=gate_lines(); [print("  "+l) for l in lines]
     passed=any(l.startswith("GATE") and "passed (paper only)" in l for l in lines)
     if not passed: print("\nThe gate did NOT pass. By the project rules (CLAUDE.md section 11) that means no edge was demonstrated and no real money. This is still your call.")
-    print("\nIf you go ahead: copies of the paper rain trades, at most $%.0f at risk at once, daily loss stop, pause after a 25%% drawdown. Not financial advice; you can lose the money."%MAX_AT_RISK)
+    if trial_ended(c): print("\nThe real-money trial ENDED at the 25% drawdown (your rule of 2026-11-07). Real money also stays locked until you type .\\run live resume.")
+    print("\nIf you go ahead: copies of the paper rain trades that pass your filters, at most $%.0f at risk at once, daily loss stop, and a 25%% drawdown ends the trial (real money locks again). Not financial advice; you can lose the money."%MAX_AT_RISK)
     if input('Type "%s" to allow real-money orders: '%UNLOCK_PHRASE).strip()!=UNLOCK_PHRASE: sys.exit("Not unlocked.")
     t=event(c,"prod","unlock","gate %s"%("passed" if passed else "NOT passed")); s["prod_unlock"]=t; save_settings(s)
     print("Unlocked (recorded in %s and %s). The next scan copies paper rain trades to your real account. Undo any time: .\\run live lock"%(LIVE_DB,SETTINGS))
@@ -621,7 +753,12 @@ def resume():
     s,env,k=load_settings()
     if not interactive(): need_terminal("resume","Resume")
     if input("Type RESUME to restart orders after the drawdown pause: ").strip()!="RESUME": sys.exit("Not resumed.")
-    event(ldb(),env,"resume"); print("Resumed on %s."%env)
+    c=ldb()
+    if env=="prod":   # the end rule first, so a drawdown whose lock could not be written earlier still ends the trial (review)
+        msg=end_trial_line(c,env)
+        if msg: print(msg)
+    event(c,env,"resume"); print("Resumed on %s."%env)
+    if env=="prod" and not unlocked(c): print("Real money is still locked (for example after the drawdown ended the trial): .\\run live unlock, typed by you, starts it again.")
 def demo_order(*args):
     """demo-order [no] [TICKER]: 1 fake contract of YES (default) or NO, then show Kalshi's position for that market,
     so a NO test proves that a V2 ask opens a NO position (shown as a negative position)."""
