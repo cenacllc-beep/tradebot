@@ -2,8 +2,9 @@
 From 2026-11-11 the gate is judged once and stored in paper.db. Sections 1-10 check the Oct 28 rule (TRADE_AFTER_LOOK
 False, no cutoff): v3 rain paper-trades market days from Nov 11 on only after a stored look that passed, and the
 limit-order ledger mirrors it. Section 11 checks the user's decision of 2026-11-06 (the shipped setting): v3 rain keeps
-paper-trading whatever the look says, the look is still taken and stored once, the ledger stays stopped, and test-day
-markets still unsettled on Nov 18 are left out of the look.
+paper-trading whatever the look says, the look is still taken and stored once, and test-day markets still unsettled on
+Nov 18 are left out of the look; and the user's decision of 2026-11-09 (shadow.MAKER_AFTER_LOOK, shipped True): the
+limit-order ledger keeps placing paper orders too (False restores the Oct 28 rule).
 python test_gatelook.py WORK OUT"""
 import os, sys, io, json, random, sqlite3, contextlib, shutil
 import datetime as _dt
@@ -15,7 +16,8 @@ import core, kalshi, strategy, shadow, audit
 STOP = strategy.STOP_DATE
 assert str(STOP) == "2026-11-11" and "GATE_NOT_PASSED" in audit.REASONS
 assert strategy.TRADE_AFTER_LOOK is True and strategy.LOOK_DEADLINE == _dt.date(2026, 11, 18), "the user's decision of 2026-11-06"
-strategy.TRADE_AFTER_LOOK = False; strategy.LOOK_DEADLINE = None   # sections 1-10: the Oct 28 rule; section 11 restores the shipped values
+assert shadow.MAKER_AFTER_LOOK is True, "the user's decision of 2026-11-09: paper research continues after the look"
+strategy.TRADE_AFTER_LOOK = False; strategy.LOOK_DEADLINE = None; shadow.MAKER_AFTER_LOOK = False   # sections 1-10: the Oct 28 rule; section 11 restores the shipped values
 
 class FakeDate(_dt.date):
     T = None
@@ -272,9 +274,16 @@ def n_orders(c):
 n0 = n_orders(c)
 kalshi.markets = lambda *a, **k: [mk(D12, "EEE")]
 c.execute("insert into obs(ticker,version,ts,fc,mid,market_type) values(?,?,?,?,?,?)", ("KXRAIN-%s-EEE" % D12.strftime("%y%b%d").upper(), "v3", 0, 0.71, 0.41, "rain")); c.commit()
+shadow.MAKER_AFTER_LOOK = True   # the shipped setting (2026-11-09): the ledger keeps placing paper orders after a failed look
 _, out = quiet(shadow.scan, c)
-assert n_orders(c) == n0 == 0, out
-assert ("GATE_NOT_PASSED",) in c.execute("select reason from decisions where strategy_id='maker_spread.rain.v3'").fetchall(), out
+assert n_orders(c) == n0 + 1 == 1, out
+assert ("GATE_NOT_PASSED",) not in c.execute("select reason from decisions where strategy_id='maker_spread.rain.v3'").fetchall(), out
+shadow.MAKER_AFTER_LOOK = False   # the switch still restores the Oct 28 rule
+kalshi.markets = lambda *a, **k: [mk(D12, "FFF")]
+c.execute("insert into obs(ticker,version,ts,fc,mid,market_type) values(?,?,?,?,?,?)", ("KXRAIN-%s-FFF" % D12.strftime("%y%b%d").upper(), "v3", 0, 0.71, 0.41, "rain")); c.commit()
+_, out = quiet(shadow.scan, c)
+assert n_orders(c) == 1 and ("GATE_NOT_PASSED",) in c.execute("select reason from decisions where strategy_id='maker_spread.rain.v3'").fetchall(), out
+shadow.MAKER_AFTER_LOOK = True
 D = dashboard.read_db(os.path.join(OUT, "keep.db")); html = dashboard.build_page(D)
 assert "did not pass" in html and "keeps paper-trading" in html and "opens no new paper trades" not in html
 import html as _html
@@ -308,5 +317,5 @@ for flag in (True, False):
 strategy.TRADE_AFTER_LOOK = True
 assert "you decided to trade real money" in nov11.money_line(False) and "nothing to copy" not in nov11.money_line(False)
 print("user's decision of 2026-11-06: v3 keeps paper-trading after a pending, failed or unworkable look; the look is stored once;"
-      " the limit-order ledger stays stopped; the Nov 18 cutoff leaves out a never-settled test-day market: ok")
+      " the Nov 18 cutoff leaves out a never-settled test-day market; since 2026-11-09 the limit-order ledger keeps going too: ok")
 print("stop date single look: all checks passed")

@@ -32,7 +32,7 @@ REGISTRY=[
    "Past data: market Brier 0.102 beat the forecast's 0.122; the rule lost 4.4c (taker) and 2.7c (maker) a contract","2026-10-14",
    why="Market prices beat the forecast on 10,885 past markets; logged, not traded, since 2026-10-14"),
  S("maker_spread.rain.v3","v3","maker_spread","FORWARD_TEST","paper","CLAUDE.md section 5a","2026-10-14",
-   "Shadow limit-order ledger on the v3 signal; research only, never part of the gate","no orders for market days from 2026-11-11 on unless the gate's single look passed (2026-10-28); v3 rain itself keeps trading since 2026-11-06",notes="Fills assume full size and ignore the queue (optimistic)."),
+   "Shadow limit-order ledger on the v3 signal; research only, never part of the gate","keeps placing its paper orders after the gate's single look (user, 2026-11-09: paper research continues); until then the Oct 28 rule stopped it after a failed look",notes="Fills assume full size and ignore the queue (optimistic)."),
  S("forecast_alpha.rain.v4","v4","forecast_alpha","FORWARD_TEST","research","research/PLAN.md amendment 2026-10-14","2026-10-14",
    "Airport-forecast lead: futility at 60 market days (mean limit-order profit per day not above 0 drops it); verdict at 110 market days (weekly block bootstrap 95% interval above 0)",
    "110 market days"),

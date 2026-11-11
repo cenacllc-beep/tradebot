@@ -266,6 +266,83 @@ def live_record():
         lc.close()
     return out,data
 
+# ---------- the real-money filters, judged on paper; recent trades explained (added 2026-11-09) ----------
+# The user, 2026-11-09: "are we learning from trades won and lost?". Paper keeps every v3 bet, including the ones live.py
+# does not copy, so each filter can be judged on the bets it removed. Both filters were chosen after looking at market
+# days up to Nov 6, so only market days from FORWARD_FROM on are a fair read; the rest is shown apart. Descriptive only:
+# no group here is screened or flagged (the report's screen above is unchanged), and nothing here changes the bot.
+FORWARD_FROM="26NOV07"
+def _mkey(day):
+    try: return datetime.strptime(day,"%y%b%d").date()
+    except (TypeError,ValueError): return None
+def filters_record():
+    L=["","## Real-money filters, judged on paper (v3 rain)",""]
+    try:
+        import live   # the same functions that decide real orders; read-only here (paper.db opened read-only)
+    except Exception as ex:
+        return L+["Could not load live.py's filters (%s)."%type(ex).__name__],{}
+    c=ro(DB)
+    if c is None: return L+["No paper.db yet."],{}
+    tr=rows(c,"select id,ticker,side,price,n,status,result,pnl from trades where version='v3' and ticker like 'KXRAIN%' order by id")
+    dec={r["trade_ref"]:r for r in rows(c,"select trade_ref,p_model,mid,inputs from decisions where trade_ref like 'trades:%' and strategy_id='forecast_alpha.rain.v3'")}
+    v4={r["ticker"]:r["fc"] for r in rows(c,"select ticker,fc from v4_obs")}
+    c.close()
+    fwd=_mkey(FORWARD_FROM); G={}; recent=[]
+    for t in tr:
+        try:
+            why=live.filter_reason(t["ticker"],t["side"],t["id"])   # exactly what live.py would do with this bet today
+            six=live.agree_reason(t["ticker"],t["side"],t["id"])    # the 6-hour check, whether it is switched on or not
+        except Exception as ex:
+            why="could not be checked (%s)"%type(ex).__name__; six=why
+        copied=why is None
+        d=dec.get("trades:%d"%t["id"]) or {}
+        try: sl=(json.loads(d["inputs"]) if isinstance(d.get("inputs"),str) else {}).get("slices")
+        except (ValueError,AttributeError): sl=None
+        label=(why or "").split(":")[0] or "passes"
+        if why and "could not be" in why: label="inputs unreadable"   # fail-closed, not a judgement of the filter (review 2026-11-11)
+        t.update(copied=copied,why=label,v3=d.get("p_model"),mid=d.get("mid"),
+                 p6=live.six_hour(sl) if sl is not None else None,air=v4.get(t["ticker"]),day=mday(t["ticker"]))
+        k=_mkey(t["day"])
+        per="unknown market day" if not (k and fwd) else "from %s (fair read)"%FORWARD_FROM if k>=fwd else "before %s (where the filters were found)"%FORWARD_FROM
+        sub=None
+        if copied and not live.AGREE_6H:
+            sub=("passes the filters, and the 6-hour check (off) would pass" if six is None else
+                 "passes the filters, 6-hour check (off): inputs unreadable" if "could not be" in six else "passes the filters, the 6-hour check (off) would not pass")
+        for g in ("passes the filters (would be copied)" if copied else "filtered out (%s)"%t["why"],sub):
+            if g is None: continue
+            s=G.setdefault((per,g),dict(trades=0,settled=0,won=0,implied=0.0,pnl=0.0))
+            s["trades"]+=1
+            if t["status"]=="settled" and t["result"] in ("yes","no"):
+                s["settled"]+=1; s["won"]+=t["result"]==t["side"]; s["implied"]+=t["price"]; s["pnl"]+=t["pnl"] or 0
+        if t["status"]=="settled": recent.append(t)
+    L+=["Paper keeps every v3 bet; live.py copies only those that pass its filters. \"Passes the filters\" is not \"was copied\": a real "
+        "copy also needs the price not to have moved, a seller, room under the cap and an unlocked account. \"Inputs unreadable\" are "
+        "older trades without a decision row; live.py would not copy them, but that says nothing about the filter. \"Implied\" is the number of wins the prices paid "
+        "expected; more wins than that is an edge, fewer is a leak. Both filters were chosen after looking at market days up to Nov 6, "
+        "so only the rows from %s on are a fair read. Small numbers: a few lucky long shots swing these rows."%FORWARD_FROM,"",
+        "| Period | Group | Trades | Settled | Won | Implied | Paper P&L |","|---|---|---:|---:|---:|---:|---:|"]
+    for (per,g),s in sorted(G.items(),key=lambda kv:(not kv[0][0].startswith("from"),kv[0][1])):
+        L.append("| %s | %s | %d | %d | %d | %.1f | %+.2f |"%(per,g,s["trades"],s["settled"],s["won"],s["implied"],s["pnl"]))
+    L+=["","### The 10 newest settled v3 rain trades, explained","",
+        "What each view said was the chance of rain when the bet was made: v3 (the bot's forecast), Kalshi's price (mid), v3's own hours "
+        "in 6-hour blocks, and the airport forecast. The last column asks whether the other two views, put through the bot's own rule "
+        "in place of v3 (50/50 blend with the price, 8 points of edge against the price paid, within the 30-point veto), would have made the same bet. "
+        "The airport forecast is its first log for the market. "
+        "\"0 of 2\" means the bet came from v3 alone.","",
+        "| Market | Bet | v3 | Price | v3 6-hour | Airport | Result | P&L | Filters | Others that would bet too |","|---|---|---:|---:|---:|---:|---|---:|---|---|"]
+    pc=lambda x:"%d%%"%round(100*x) if isinstance(x,(int,float)) else "-"
+    for t in recent[-10:][::-1]:
+        others=[x for x in (t["p6"],t["air"]) if isinstance(x,(int,float))]
+        lone=""
+        if isinstance(t["mid"],(int,float)) and others:
+            def bets(p):   # the bot's own rule (strategy.scan) with this view in place of v3, against the price paid
+                fair=live.BLEND*p+(1-live.BLEND)*t["mid"]
+                return ((fair if t["side"]=="yes" else 1-fair)-t["price"])>=live.MIN_EDGE and abs(p-t["mid"])<=live.VETO_MAX_GAP+1e-9
+            lone="%d of %d"%(sum(1 for x in others if bets(x)),len(others))
+        L.append("| %s | %s x%s at %dc | %s | %s | %s | %s | %s | %+.2f | %s | %s |"%(t["ticker"],t["side"].upper(),t["n"],round(100*t["price"]),pc(t["v3"]),pc(t["mid"]),pc(t["p6"]),pc(t["air"]),
+                 ("won" if t["result"]==t["side"] else "lost") if t["result"] in ("yes","no") else str(t["result"]),t["pnl"] or 0,"passes" if t["copied"] else "filtered out: "+t["why"],lone or "-"))
+    return L,{"%s / %s"%k:v for k,v in G.items()}
+
 # ---------- past data (research/data) ----------
 def past_record():
     sys.path.insert(0,os.path.join(HERE,"research"))
@@ -303,6 +380,9 @@ def main():
     except AttributeError: pass
     past="--past" in sys.argv
     items,data=live_record()
+    try: fl,data["filters"]=filters_record()
+    except Exception as ex: fl=["","## Real-money filters, judged on paper","","Could not be worked out (%r)."%ex]   # never stops the report
+    items.append(fl)
     if past: items+=past_record()
     secs=[x for x in items if isinstance(x,dict)]
     G=sum(1 for sec in secs for _,_,s in groups_of(sec) if not s["too_few"])   # groups screened in this report

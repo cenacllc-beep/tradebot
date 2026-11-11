@@ -57,6 +57,11 @@ def _state(c):
     lost=c.execute("select coalesce(sum(pnl),0) from shadow_orders where status='settled' and settle_ts>=?",(time.time()-86400,)).fetchone()[0]
     return BANKROLL+pnl-opn,opn,lost      # resting orders reserve cash and count toward the cap, like real ones would
 
+# The user, 2026-11-09: "we also want to continue paper trade research even when we switch to real money, to help improve
+# our strategies, accuracy and winnings". Like strategy.TRADE_AFTER_LOOK (2026-11-06) for v3, this ledger now keeps
+# placing its hypothetical limit orders for market days from the stop date on whatever the gate's single look says.
+# False restores the Oct 28 rule (no orders after a failed or pending look). Research only: never the gate, never live.py.
+MAKER_AFTER_LOOK=True
 def _after_stop_allowed(c):
     """The main bot's rule (strategy.py, pre-committed 2026-10-28): market days from the stop date on only after the gate's
     stored single look passed. Read only here (the main scan, which runs first, stores the look). Any error: no."""
@@ -79,7 +84,7 @@ def scan(c):
     except Exception as ex: print("v4 station forecast skipped (the main bot is not affected): %r"%ex)
     cash,opn,lost=_state(c)
     if lost<=-DAILY_LOSS_LIMIT*BANKROLL: return print("shadow maker: daily loss limit hit, no new orders")
-    after=_after_stop_allowed(c)   # mirrors the main bot: market days from the stop date on only after a passed gate look
+    after=MAKER_AFTER_LOOK or _after_stop_allowed(c)   # the Oct 28 rule mirrored the main bot; since 2026-11-09 the ledger keeps going (MAKER_AFTER_LOOK)
     fc={t:p for t,p in c.execute("select ticker,fc from obs where version=? and fc is not null",(VERSION,))}
     done={r[0] for r in c.execute("select ticker from shadow_orders where strategy=?",(STRATEGY,))}
     k=seen=0

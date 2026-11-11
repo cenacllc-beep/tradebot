@@ -1768,3 +1768,40 @@ unfamiliar codebase ... do not change functionality. only upgrade the code quali
   settled: won 1, where the prices implied 2.5; -$6.65). Full suite: 42 tests pass.
 - Deploy check (01:12): `live.py status` on the PC printed "25%%" in the new end-rule line (a literal string, not
   %-formatted). Fixed, with a test that status shows no "%%"; redeployed before any scan used it.
+
+## 2026-11-11 11:30 (local) - r81: paper research continues after the look; learning report judges the filters; PLAN10 written
+- User, 2026-11-09: "implement your recommendations above. we also want to continue paper trade research even when we
+  switch to real money ... write the HRRR plan with a $1000000 target ... investigate why we lost [Providence Nov 7,
+  Seattle Nov 8] ... are we learning from trades won and lost?". Work stopped on Nov 9 at a usage limit and resumed
+  on Nov 11 ("intelligently resume the above").
+- The two losses (read-only): both "no rain" at 7c with the price at 94% rain; v3 said 72% and 70%; v3's 6-hour
+  version (90%, 88%) and the airport forecast (91%, 99%) agreed with the price. v3's low lean. Real money would not
+  have made either bet (no-rain filter; moved price).
+- shadow.py: MAKER_AFTER_LOOK = True. The limit-order paper ledger keeps placing its hypothetical orders after the
+  gate's look (False restores the Oct 28 rule). v4_log and _t (PLAN8's identity) are byte-identical. strategy.py is
+  untouched (model_version, PLAN7); its comments about the old ledger rule are left on purpose. registry.py: the
+  ledger's note updated.
+- learn.py: new read-only section "Real-money filters, judged on paper": passes the filters / filtered out / inputs
+  unreadable, before and from market day Nov 7 (when the filters were chosen), with wins against the wins the prices
+  implied; and the 10 newest settled trades explained (v3, price, v3 6-hour, airport forecast, and how many of the
+  other two views would have made the same bet by the bot's rule, veto included). It asks live.py's own functions;
+  the pattern screen is unchanged (same group count on the same database).
+- research/PLAN10.md (HRRR on PLAN.md's past markets), written before any HRRR data. SHA-256 at its freeze:
+  69208ee2904271f79d185f31c6a24598da67fe29dbcf7666aa09291fa234ff08. Its code, the install and the download wait for the user's yes.
+- Independent statistics review of PLAN10 (agents/statistician.md): MUST 1, the holdout was scored before with a
+  correlated blend, so a pass is at most "a lead on reused past data: justifies PLAN10F only" (false-pass rate about
+  4-7%, not 2.5%); a paired comparison with the airport-forecast blend added. MUST 2, the base market set N0, the 10%
+  rules and the West Palm Beach re-code defined. SHOULDs applied: T is descriptive (the money test moves to PLAN10F);
+  power for realistic gains stated; section 10 labels the 5-a-night column an upper bound, drops the long-shot row and
+  adds that the 25% end rule stops the road to $1,000,000 (34% within a year of nightly bets even with a very good
+  edge); the fitted model is committed before any holdout download; HRRR version and retirement checks; the five-test
+  line is a report only. The money table was recomputed by the reviewer and matches.
+- Independent code review of r81 (agents/code-reviewer.md): no MUST. Fixed: the "others that would bet too" column
+  now applies the 30-point veto; trades whose inputs cannot be read are their own group, not counted as the filter's
+  skips; labels say "passes the filters", not "copied" (a real copy also needs price, seller, cap and unlock); the
+  registry text; result shown as it is for scalar or void. Left: the airport column uses the first log of the market
+  (footnoted). Verified by the reviewer: frozen files and PLAN8's function hashes identical, importing live.py has no
+  side effects, both databases unchanged, mutation check on the ledger switch.
+- Seen on the PC: on the demo exchange every copy since Nov 8 was skipped ("no price to buy at", or a price unrelated
+  to the real market). Demo books are thin; noted in CLAUDE.md section 8. The gate look is still pending (no stored
+  look yet). Full suite: 42 tests pass.

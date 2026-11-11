@@ -49,6 +49,19 @@ c.execute("insert into trades(ts,ticker,side,price,fair,n,cost,fee,status,result
 c.execute(open(os.path.join(WORK,"shadow.py")).read().split('"shadow_orders":"',1)[1].split('",\n',1)[0].replace('"\n            "','').replace('" "',''))
 c.execute("insert into shadow_orders(ts,ticker,strategy,version,side,price,fair,fc,bid,ask,improved,n,cost,fee,status,result,pnl) values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
           (time.time(),"KXRAIN-26OCT15-NYC","maker","v3","no",0.40,0.55,0.35,0.58,0.62,1,2,0.80,0,"settled","no",1.20))
+# the real-money filters judged on paper (2026-11-09): three trades with their decision rows and airport forecasts
+import audit; assert audit.ensure(c)
+c.execute(open(os.path.join(WORK,"shadow.py")).read().split('"v4_obs":"',1)[1].split('",\n',1)[0])
+for t,side,price,v3,mid,hours,air,res in (("KXRAIN-26NOV08-FLA","no",0.07,0.70,0.94,[50]*24,0.99,"yes"),    # v3 alone: skipped by the no-rain filter
+                                          ("KXRAIN-26NOV08-FLB","yes",0.07,0.25,0.06,[0]*12+[31]+[0]*11,0.02,"yes"),   # copied; the 6-hour view agrees
+                                          ("KXRAIN-26NOV06-FLC","no",0.48,0.27,0.54,[0]*24,0.16,"no")):   # copied, before the fair-read date
+    n=2; pnl=(n if res==side else 0)-n*price-core.fee(price,n)
+    c.execute("insert into obs(ticker,version,ts,fc,mid,result,market_type) values(?,?,?,?,?,?,?)",(t,"v3",time.time(),v3,mid,res,"rain"))
+    pid=c.execute("insert into trades(ts,ticker,side,price,fair,n,cost,fee,status,result,pnl,version,settled_ts) values(?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                  (time.time(),t,side,price,0.5,n,n*price,core.fee(price,n),"settled",res,pnl,"v3",time.time())).lastrowid
+    c.execute("insert into decisions(decision_id,scan_id,ts,strategy_id,mode,ticker,action,side,reason,mid,price,p_model,inputs,trade_ref) values(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+              ("d-"+t,"s-"+t,time.time(),"forecast_alpha.rain.v3","paper",t,"TRADE_"+side.upper(),side,"TRADE",mid,price,v3,json.dumps({"slices":hours}),"trades:%d"%pid))
+    c.execute("insert into v4_obs(ticker,ts,station,fc,mid) values(?,?,?,?,?)",(t,time.time(),"K"+t[-3:],air,mid))
 c.commit(); c.close()
 L=sqlite3.connect(os.path.join(OUT,"live.db")); L.execute("create table orders(id integer primary key,ts real,env text,paper_id integer,ticker text,side text,count integer,limit_cents integer,client_order_id text,order_id text,status text,fill_count real,cost real,fees real,note text,result text,pnl real,settled_ts real)")
 L.execute("insert into orders(env,ticker,side,count,limit_cents,status,fill_count,cost,fees) values('demo','KXRAIN-26OCT15-DEN','no',5,12,'partial',1,0.11,0.0069)")
@@ -59,7 +72,7 @@ r=subprocess.run([sys.executable,os.path.join(WORK,"learn.py")],capture_output=T
 assert r.returncode==0, r.stdout+r.stderr
 assert hashlib.sha256(open("paper.db","rb").read()).hexdigest()==h and hashlib.sha256(open("live.db","rb").read()).hexdigest()==hl, "learn.py must not change the databases"
 md=open(os.path.join(res,"learning.md"),encoding="utf-8").read(); js=json.load(open(os.path.join(res,"learning.json"),encoding="utf-8"))
-assert ("LEARNING: paper v3 rain %d settled"%(35*6)) in r.stdout and "groups flagged (a screen, not a test)" in r.stdout, r.stdout
+assert ("LEARNING: paper v3 rain %d settled"%(35*6+3)) in r.stdout and "groups flagged (a screen, not a test)" in r.stdout, r.stdout
 flags=md.split("## Patterns worth a written test")[1]
 for want in ("By situation","Losses by story","By city","Forecast vs market on every logged market","demo: 1 orders placed, 1 of 5 contracts filled",
              "Limit-order test","| NO | 1 |","Patterns worth a written test","no price to buy at 1","1 settled trade(s) left out","overall: judged by its own plan",
@@ -67,6 +80,16 @@ for want in ("By situation","Losses by story","By city","Forecast vs market on e
     assert want in md, (want,md[:3000])
 assert "By city / WIN:" in flags and " / all" not in flags and "[past" not in flags, flags
 assert js["screen"]["groups"]>0 and any("WIN" in f for f in js["screen"]["flagged"]), js["screen"]
+fl=md.split("## Real-money filters, judged on paper (v3 rain)")[1].split("## Patterns worth")[0]
+assert "| from 26NOV07 (fair read) | filtered out (no-rain filter) | 1 | 1 | 0 | 0.1 | -0.15 |" in fl, fl
+assert "| from 26NOV07 (fair read) | passes the filters (would be copied) | 1 | 1 | 1 | 0.1 | +1.85 |" in fl and "passes the filters, and the 6-hour check (off) would pass | 1 | 1 | 1 |" in fl, fl
+assert "| before 26NOV07 (where the filters were found) | passes the filters (would be copied) |" in fl, fl
+assert "| before 26NOV07 (where the filters were found) | filtered out (inputs unreadable) |" in fl and "filtered out (no-rain filter) | 7" not in fl, fl   # old trades without a decision row are their own group
+rows_=[l for l in fl.splitlines() if l.startswith("| KXRAIN-26NOV0")]
+assert rows_[0].startswith("| KXRAIN-26NOV06-FLC | NO x2 at 48c | 27% | 54% | 1% | 16% | won |") and rows_[0].endswith("| passes | 0 of 2 |"), rows_   # newest first by trade id; both other views are outside the 30-point veto
+assert "| KXRAIN-26NOV08-FLA | NO x2 at 7c | 70% | 94% | 94% | 99% | lost | -0.15 | filtered out: no-rain filter | 0 of 2 |" in fl, fl
+assert "| KXRAIN-26NOV08-FLB | YES x2 at 7c | 25% | 6% | 31% | 2% | won | +1.85 | passes | 1 of 2 |" in fl, fl
+assert js["filters"] and "screen" in js
 shadow=[l for l in md.split("## Limit-order test")[1].splitlines() if l.startswith("| NO | 1 |")][0]
 assert "| 55% |" in shadow, shadow   # the ledger's own blend, not 0%
 print("learn.py: all checks passed")
