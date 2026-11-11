@@ -14,7 +14,7 @@ Tradebot is a batch-oriented research and paper-trading system for Kalshi's dail
 
 **Hard boundaries, each enforced in code and tests:**
 1. **live.py is the only code that can send an order.** It copies new v3 rain paper trades only. It is locked to
-   Kalshi's demo exchange until 2026-11-11 and the user's own typed unlock, under a $25 cap.
+   Kalshi's demo exchange until 2026-11-11 and the user's own typed unlock, under a $50 at-risk cap ($25 until 2026-11-11; the loss stops stay on $25).
 2. **v3 is frozen.** That covers the estimator, the blend, the edge rule, the veto and the gate:
    strategy.py, weather.py, nws.py, kalshi.py, core.py and config.py. It is judged once, by the stored gate look on the
    stop date. Its code also stays unchanged while PLAN7 runs (research/PLAN7.md section 3).

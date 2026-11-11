@@ -1,6 +1,6 @@
 """Kalshi account connection and order placing (added 2026-10-14 at the user's request; see CLAUDE.md section 3a).
 The ONLY file in this project that can place an order. It copies the paper bot: after each scan it places the same
-rain trades on your Kalshi account, at the paper price or better, never more contracts, never more than $25 at risk.
+rain trades on your Kalshi account, at the paper price or better, never more contracts, never more than $50 at risk (the cap; $25 until 2026-11-11).
 
   .\\run live setup        connect an account (you type the key ID and the key file location; run it yourself)
   .\\run live test         signed read-only check: balance and open positions
@@ -19,7 +19,7 @@ yourself in a terminal (not a script); the unlock is recorded both in live.db an
 old live.db cannot undo a later `lock`. Limits on every order: rain markets only, version v3, the market's day has not
 begun, buy only, limit price no higher than the paper price (immediate-or-cancel, so nothing rests on the book), count
 no more than the paper count, one bot order per market (checked on Kalshi too, so a lost or restored live.db cannot
-cause a second order), at most $25 at risk across the whole account (Kalshi's own position figures; missing figures stop
+cause a second order), at most $50 at risk across the whole account (Kalshi's own position figures; missing figures stop
 the run), enough cash, a daily loss stop of $2.50, and a pause after a 25% drawdown from the bot's peak. Since
 2026-11-06 (your rule): no "no rain" copy when v3 itself says rain 50% or more (SKIP_NO_FROM; fails closed).
 Since 2026-11-07 (your rules): on real money the 25% drawdown ends the trial: real money locks again, and starting again
@@ -44,8 +44,11 @@ from strategy import STOP_DATE, started, close_time, payout, settled_pnl, STRATE
 
 BASES={"demo":"https://external-api.demo.kalshi.co/trade-api/v2",     # Kalshi demo exchange, fake money
        "prod":"https://api.elections.kalshi.com/trade-api/v2"}        # real exchange (the bot already reads prices here)
-MAX_AT_RISK=25.0          # dollars at risk across the account at once (user decision 2026-10-14)
-DAILY_STOP=DAILY_LOSS_LIMIT*MAX_AT_RISK   # $2.50 of settled losses in 24 hours stops new orders
+MAX_AT_RISK=50.0          # dollars at risk across the account at once. $25 by the user's decision of 2026-10-14; raised to $50
+                          # on 2026-11-11 at his explicit instruction ("we need to use the $25 promotional credit given, so raise
+                          # it to $50 for placing orders"). Only this cap moved: the loss stops below stay on his own $25.
+STAKE=25.0                # the user's own money: the base of the daily loss stop, the bot's value and the doubling reminder
+DAILY_STOP=DAILY_LOSS_LIMIT*STAKE   # $2.50 of settled losses in 24 hours stops new orders (unchanged)
 DRAWDOWN_PAUSE=0.25       # pause after the bot's value falls 25% from its peak (CLAUDE.md 11a)
 MIRROR_HOURS=12           # only paper trades opened in the last 12 hours are copied
 # The user's rule of 2026-11-06 ("yes" to the no-rain filter, with real money from Nov 12): a NO ("no rain") paper trade
@@ -291,11 +294,11 @@ def value_track(c,env):
     r=last_event(c,env,("resume",)); since=r[0] if r else 0
     cum,peak=0.0,None
     for ts,p in c.execute("select settled_ts,pnl from orders where env=? and settled_ts is not null order by settled_ts,id",(env,)).fetchall():
-        if ts>=since and peak is None: peak=MAX_AT_RISK+cum
+        if ts>=since and peak is None: peak=STAKE+cum
         cum+=p or 0
-        if ts>=since: peak=max(peak,MAX_AT_RISK+cum)
-    if peak is None: peak=MAX_AT_RISK+cum if since else max(MAX_AT_RISK,MAX_AT_RISK+cum)
-    v=MAX_AT_RISK+cum; return v,peak,v<(1-DRAWDOWN_PAUSE)*peak
+        if ts>=since: peak=max(peak,STAKE+cum)
+    if peak is None: peak=STAKE+cum if since else max(STAKE,STAKE+cum)
+    v=STAKE+cum; return v,peak,v<(1-DRAWDOWN_PAUSE)*peak
 
 # ---------- locks ----------
 def lock_reason(c,env,s=None):
@@ -454,7 +457,7 @@ def filter_reason(t,side,paper_id=None):
 def cents_for(price): return int(math.floor(price*100+1e-6))   # never above the paper price (0.427 -> 42c)
 def record(c,row_id,o,note=None,v2=False):
     """Store Kalshi's answer and return the money used (cost + fees, never less than fills x limit price + fee formula,
-    so a missing or odd price cannot hide money from the $25 cap). v2=True only for the V2 create-order answer, whose
+    so a missing or odd price cannot hide money from the cap). v2=True only for the V2 create-order answer, whose
     average_fill_price is a YES price (verified on demo 2026-10-14: a NO buy is a YES sell, so its cost is 1 - price).
     For orders found later through GET /portfolio/orders, whose price fields have not been verified for V2 orders, the
     cost and fee are estimated at the limit (an upper bound). Prices above the limit are not believed."""
@@ -659,7 +662,7 @@ def status():
     q=c.execute("select count(*),coalesce(sum(fill_count),0),coalesce(sum(case when settled_ts is not null then pnl end),0),coalesce(sum(case when fill_count>0 and result is null then cost+fees end),0) from orders where env=? and status not in ('skipped','rejected','not placed')",(env,)).fetchone()
     print("This bot on %s: %d orders, %d contracts filled, open cost $%.2f, settled net %s$%.2f"%(env,q[0],q[1],q[3],"+" if q[2]>=0 else "-",abs(q[2])))
     v,p,_=value_track(c,env)
-    if v>=2*MAX_AT_RISK: print("REMINDER: the bot's value has doubled ($%.2f). The rules say: withdraw your original $%.0f now."%(v,MAX_AT_RISK))
+    if v>=2*STAKE: print("REMINDER: the bot's value has doubled ($%.2f). The rules say: withdraw your original $%.0f now."%(v,STAKE))
     print("Paper gate (v3 rain):"); [print("  "+l) for l in gate_lines()]
 def test_connection():
     cl,env=client()

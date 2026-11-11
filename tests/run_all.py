@@ -17,7 +17,7 @@ TESTS=[("test_fix.py",[],"daily loss stop, migration, clear margin, single-look 
        ("test_plan3.py",["null"],"PLAN3 tests A and B find none when there is none"),
        ("test_plan4.py",["edge"],"PLAN4 copy tests find planted skill"),
        ("test_plan4.py",["null"],"PLAN4 copy tests find none when there is none"),
-       ("test_live.py",[],"Kalshi orders against a fake exchange: locks, $25 cap"),
+       ("test_live.py",[],"Kalshi orders against a fake exchange: locks, the at-risk cap"),
        ("test_kill.py",[],"kill switch: KILL or KILL.txt halts every trading step"),
        ("test_structure.py",[],"market-structure scanner: ladders, bucket sums, fees, order-book confirmation"),
        ("test_longshot.py",[],"favorite/longshot calibration finds a planted bias (exploratory)"),

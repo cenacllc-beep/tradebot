@@ -288,7 +288,7 @@ def live_tile():
     unl=ev is not None and ev[1]=="unlock" and date.today()>=STOP
     head=("%s <small>settled, %s</small>"%(plus(out[0][2]),"real money" if out[0][0]=="Real" else "demo, fake money")) if out else "Connected"
     detail=" ".join(x[1]+"." for x in out) or "No orders yet."
-    return '<div><dt>Kalshi account</dt><dd class="%s">%s</dd><p>%s %s At most $25 at risk at once.</p></div>'%(
+    return '<div><dt>Kalshi account</dt><dd class="%s">%s</dd><p>%s %s At most $50 at risk at once.</p></div>'%(
         "neg" if out and out[0][2]<-0.004 else ("pos" if out and out[0][2]>0.004 else ""),head,e(detail),
         ("Real money is unlocked, but the kill switch halts all orders." if killed() else
          "<b class=neg>Real money is unlocked.</b> Orders go out while the exchange is set to prod (<code>.\\run live status</code> shows it). Stop: <code>.\\run live lock</code>.") if unl else lock)

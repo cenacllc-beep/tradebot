@@ -1,4 +1,4 @@
-"""live.py against a fake Kalshi exchange: signatures (Ed25519 and RSA-PSS), every lock, the $25 cap, copying rules,
+"""live.py against a fake Kalshi exchange: signatures (Ed25519 and RSA-PSS), every lock, the at-risk cap ($50 since 2026-11-11), copying rules,
 no double orders (also after a lost ledger), unknown outcomes, partial fills, missing fields, settlement, loss stops,
 setup input checks; paper.db never changes. python test_live.py WORK OUT"""
 import os, sys, json, time, base64, hashlib, io, contextlib, uuid, math, subprocess, re
@@ -208,13 +208,14 @@ assert row(t7)[5]=="executed" and [p for p in F.posts() if p[3]["ticker"]==t7][0
 assert len(F.posts())==3, out
 print("skips ok")
 
-# 5. the $25 cap uses Kalshi's own exposure (resting buys too); cash; missing fields and exchange errors stop everything
-F.set_total(24.5); t="KXRAINDCA-26OCT15-T0"; new(t,n=5)
+# 5. the cap uses Kalshi's own exposure (resting buys too); cash; missing fields and exchange errors stop everything
+assert live.MAX_AT_RISK==50.0 and live.STAKE==25.0 and abs(live.DAILY_STOP-2.5)<1e-9   # the cap is $50 since 2026-11-11 (user); the loss stops stay on his own $25
+F.set_total(live.MAX_AT_RISK-0.5); t="KXRAINDCA-26OCT15-T0"; new(t,n=5)
 out,_=run(live.mirror); assert row(t)[5]=="executed" and row(t)[3]==1, (out,row(t))
-F.set_total(24.9); t="KXRAINATL-26OCT15-T0"; new(t)
+F.set_total(live.MAX_AT_RISK-0.1); t="KXRAINATL-26OCT15-T0"; new(t)
 out,_=run(live.mirror); assert row(t)[5]=="skipped" and "no room" in out, out
-F.set_total(None); F.balance=30; t="KXRAINHOU-26OCT15-T0"; new(t)
-out,_=run(live.mirror); assert row(t)[5]=="skipped", out
+F.set_total(None); F.balance=30; t="KXRAINHOU-26OCT15-T0"; new(t)   # the fake's balance is in cents: $0.30 of cash
+out,_=run(live.mirror); assert row(t)[5]=="skipped" and "cash $0.30" in row(t)[13], (out,row(t))
 F.balance=100000
 cl,_=live.client(); base=live.at_risk(cl)
 F.orders.append({"order_id":"u1","client_order_id":"mine-1","ticker":"KXOTHER","side":"no","action":"buy","status":"resting","remaining_count":2,"no_price":40,"yes_price":60})
@@ -510,7 +511,7 @@ print("real-money locks ok")
 # 11b. the user's end rule (2026-11-07): on real money the 25% drawdown ends the trial: real money locks again (once per
 #      pause), restarting needs both typed commands (resume and unlock); a failed lock still leaves the pause in charge
 live.today=lambda: date(2026,11,11); L=live.ldb()
-F.pos.clear(); F.extra=0.0   # room under the $25 cap: the shared fake holds every earlier section's positions
+F.pos.clear(); F.extra=0.0   # room under the cap: the shared fake holds every earlier section's positions
 def ends(): return L.execute("select count(*) from events where env='prod' and kind='trial_end'").fetchone()[0]
 answers=iter(["UNLOCK REAL MONEY"]); out,code=run(live.unlock); assert not code and "Unlocked" in out and "trial ENDED" not in out and "a 25% drawdown ends the trial" in out, (out,code)
 L.execute("insert into orders(ts,env,ticker,side,count,limit_cents,status,fill_count,cost,fees,result,pnl,settled_ts) values(?,?,?,?,?,?,?,?,?,?,?,?,?)",
@@ -548,7 +549,7 @@ answers=iter(["RESUME"]); out,code=run(live.resume); assert not code and "Real m
 t="KXRAINEND3-26OCT15-T0"; new(t,age=0); out,_=run(live.mirror); assert len(F.posts())==n0+2 and "locked" in out, out
 L.execute("update orders set settled_ts=? where env='prod' and ticker in ('X4','X5')",(time.time()-2*86400,)); L.commit()   # out of the daily loss stop's 24 hours
 answers=iter(["UNLOCK REAL MONEY"]); out,code=run(live.unlock); assert not code and "trial ENDED" not in out, (out,code)   # resume, then unlock: orders again
-F.pos.clear(); F.extra=0.0   # room under the $25 cap (the shared fake holds every earlier section's positions)
+F.pos.clear(); F.extra=0.0   # room under the cap (the shared fake holds every earlier section's positions)
 t="KXRAINEND4-26OCT15-T0"; new(t,age=0,n=1); out,_=run(live.mirror); assert len(F.posts())==n0+3 and row(t)[12]=="prod", out
 # the lock event written but its trial_end record not: locked, said plainly, and the next run records it
 L.execute("insert into orders(ts,env,ticker,side,count,limit_cents,status,fill_count,cost,fees,result,pnl,settled_ts) values(?,?,?,?,?,?,?,?,?,?,?,?,?)",
@@ -572,7 +573,7 @@ run(live.lock); live.today=real_today
 print("end rule ok")
 
 # 12. demo test order refuses on prod, works on demo; use; setup never echoes a pasted key; status; piped unlock refused
-F.pos.clear(); F.extra=0.0   # room under the $25 cap: the earlier sections' fake positions are not this section's subject (review)
+F.pos.clear(); F.extra=0.0   # room under the cap: the earlier sections' fake positions are not this section's subject (review)
 out,code=run(live.demo_order); assert code and "only on the demo" in str(code)
 out,code=run(live.use,"nope"); assert code
 out,code=run(live.use,"demo"); assert not code and json.load(open(live.SETTINGS))["env"]=="demo"
@@ -644,6 +645,7 @@ r=subprocess.run([sys.executable,os.path.join(WORK,"backup.py"),"badlive"],captu
 assert r.returncode==3 and any("badlive" in f and f.startswith("paper_") for f in os.listdir("backups")), r.stdout+r.stderr
 r=subprocess.run([sys.executable,os.path.join(WORK,"dashboard.py"),"--no-open"],capture_output=True,text=True,env=env,encoding="utf-8",errors="replace"); assert r.returncode==0, r.stderr
 html=open("dashboard.html",encoding="utf-8").read(); assert "Kalshi account" in html and "Demo:" in html and "Real:" in html, "account tile"
+assert "At most $%.0f at risk at once."%live.MAX_AT_RISK in html, "the tile names live.py's cap"
 
 # run() checked after every command that paper.db did not change; the fake checked every request's headers and signature
 assert all(r[12] in ("demo","prod") for r in rows())

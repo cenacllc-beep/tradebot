@@ -1805,3 +1805,21 @@ unfamiliar codebase ... do not change functionality. only upgrade the code quali
 - Seen on the PC: on the demo exchange every copy since Nov 8 was skipped ("no price to buy at", or a price unrelated
   to the real market). Demo books are thin; noted in CLAUDE.md section 8. The gate look is still pending (no stored
   look yet). Full suite: 42 tests pass.
+
+## 2026-11-11 16:45 (local) - r82: live.py's at-risk cap raised from $25 to $50 (the user's explicit instruction)
+- User, 11:06: "we need to use the $25 promotional credit given, so raise it to $50 for placing orders."
+  A limit in live.py loosened at his explicit instruction (CLAUDE.md section 3).
+- live.py: MAX_AT_RISK = 50.0. Only the cap moved. A new constant STAKE = 25.0 (his own money) keeps everything else
+  that used the old value as its base exactly as before: the daily loss stop (DAILY_STOP = $2.50), the bot's value and
+  drawdown peak (the 25% end rule still trips after about $6.25 of net loss), and the doubling reminder.
+  dashboard.py: the account tile says $50. README.md and docs/ARCHITECTURE.md updated.
+- Told plainly: this changes no order the bot places today. Copies never exceed the paper count, and paper holds at
+  most $3.75 open at once (MAX_OPEN_PCT x BANKROLL), so the cap only matters next to his own manual positions. Making
+  bets bigger is a separate sizing decision and was not taken.
+- Left on purpose, still saying $25: research/nov11.py (the pre-registered Nov 11 report, pinned by its test),
+  strategy.py comments (model_version, PLAN7), research/PLAN10.md (frozen). research/lip.py's $25 is a research figure.
+- Independent code review (agents/code-reviewer.md): the live.py change is correct and only the cap moves; mutation
+  checks (cap removed, room on STAKE, daily stop on the cap, value on the cap, cash check removed) each fail the tests.
+  Its findings, applied: deploy the three code files apart from the dashboard redesign (reviewed separately as r83);
+  CLAUDE.md sections 3a and 12 and this entry; the cash test restored to the fake's $0.30 with the note asserted; a
+  test that the dashboard tile names live.py's cap; stale "$25 cap" wording in tests. Full suite: 42 tests pass.
