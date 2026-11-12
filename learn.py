@@ -343,6 +343,94 @@ def filters_record():
                  ("won" if t["result"]==t["side"] else "lost") if t["result"] in ("yes","no") else str(t["result"]),t["pnl"] or 0,"passes" if t["copied"] else "filtered out: "+t["why"],lone or "-"))
     return L,{"%s / %s"%k:v for k,v in G.items()}
 
+# ---------- closing-price scorecard (2026-11-12) ----------
+# How far Kalshi's price moved toward the side the bot bought between our evening scan and the start of the market's own day
+# (shadow.py's shadow_moves: mid at the scan, mid at close_time - 24h, from Kalshi's minute candles). Positive = the price later
+# moved the bot's way. Descriptive only: not a test, not part of the gate, and it changes nothing in the bot.
+# shadow_moves.mid_scan comes from obs, which keeps the FIRST snapshot of a market, so a trade is measured only when it was
+# bought at that same scan (trades.ts within SAME_SCAN_SECS of shadow_moves.scan_ts).
+MOVE_MIN_DAYS,MOVE_GAP,SAME_SCAN_SECS=20,0.08,600
+def move_toward(side,mid_scan,mid_start):
+    """Cents the mid moved toward `side` (yes: up is toward; no: down is toward)."""
+    d=100.0*(mid_start-mid_scan)
+    return d if side=="yes" else -d
+def moves_data(c):
+    """None when shadow_moves is missing or has no usable v3 rain row; else dict(trades, dis, cover).
+    trades: v3 rain paper trades (settled and open; the first trade per market) bought at the scan that shadow_moves measured.
+    dis: every logged v3 rain market (traded or not) where the forecast and the scan mid were 8+ points apart, on the forecast's side.
+    cover: why the other trades are not measured."""
+    sm={r["ticker"]:r for r in rows(c,"select ticker,scan_ts,fc,mid_scan,mid_start,status from shadow_moves where version='v3' and ticker like 'KXRAIN%'")}
+    ok={k:m for k,m in sm.items() if m["status"]=="ok" and m["mid_scan"] is not None and m["mid_start"] is not None}
+    if not ok: return None
+    tr=[]; cover=dict(total=0,measured=0,wide=0,no_data=0,not_started=0,later_scan=0); seen=set()
+    for t in rows(c,"select id,ts,ticker,side,price from trades where version='v3' and ticker like 'KXRAIN%' and side in ('yes','no') order by id"):
+        if t["ticker"] in seen: continue
+        seen.add(t["ticker"]); cover["total"]+=1
+        m=sm.get(t["ticker"])
+        if m is None: cover["not_started"]+=1
+        elif m["status"]=="wide": cover["wide"]+=1
+        elif t["ticker"] not in ok: cover["no_data"]+=1
+        elif t["ts"] is None or m["scan_ts"] is None or abs(t["ts"]-m["scan_ts"])>SAME_SCAN_SECS: cover["later_scan"]+=1
+        else:
+            cover["measured"]+=1; m=ok[t["ticker"]]
+            tr.append(dict(day=mday(t["ticker"]),ticker=t["ticker"],side=t["side"],price=t["price"],mid_scan=m["mid_scan"],mid_start=m["mid_start"],
+                           move=move_toward(t["side"],m["mid_scan"],m["mid_start"])))
+    dis=[]
+    for k,m in ok.items():
+        if m["fc"] is not None and abs(m["fc"]-m["mid_scan"])>=MOVE_GAP-1e-9:
+            side="yes" if m["fc"]>m["mid_scan"] else "no"
+            dis.append(dict(day=mday(k),ticker=k,side=side,price=None,mid_scan=m["mid_scan"],mid_start=m["mid_start"],move=move_toward(side,m["mid_scan"],m["mid_start"])))
+    return dict(trades=tr,dis=dis,cover=cover)
+def move_stats(ts):
+    """n, mean move (cents, mean of the day means), its standard error clustered by market day, t (None when it is not a finite number), shares toward / away."""
+    n=len(ts)
+    if not n: return dict(n=0,days=0,mean=None,se=None,t=None,same_every_day=False,toward=0,against=0)
+    m,u=level(ts,lambda t:t["move"]); se=cse(u); t=ratio(m,se)
+    fin=t is not None and math.isfinite(t)
+    return dict(n=n,days=len(u),mean=m,se=se,t=t if fin else None,same_every_day=bool(t is not None and not fin),
+                toward=sum(1 for x in ts if x["move"]>1e-9),against=sum(1 for x in ts if x["move"]<-1e-9))
+def move_reading(s):
+    """One plain sentence, two-sided. A direction is named only when the day-clustered mean is away from zero by the Student-t cutoff
+    (97.5%, never below 2.0) on MOVE_MIN_DAYS or more market days."""
+    if s["n"]==0: return "No trade has a measured move yet, so there is nothing to read."
+    cut=max(2.0,tcrit(0.025,s["days"]-1)) if s["days"]>1 else None
+    far=s["same_every_day"] or (s["t"] is not None and cut is not None and abs(s["t"])>=cut)
+    if s["days"]>=MOVE_MIN_DAYS and far and s["mean"]>0:
+        return ("The price moved the bot's way by more than chance would explain over %d market days. That is worth a proper test on new markets; "
+                "it is not a sign of skill by itself.")%s["days"]
+    if s["days"]>=MOVE_MIN_DAYS and far and s["mean"]<0:
+        return "The price moved away from the bot's side by more than chance would explain over %d market days."%s["days"]
+    return ("No clear move either way so far (a direction is named only when the day-averaged move is %.1f or more standard errors from zero over %d or more market days; here %d market days)."
+            %(max(2.0,tcrit(0.025,s["days"]-1)) if s["days"]>1 else 2.0,MOVE_MIN_DAYS,s["days"]))
+def moves_record():
+    L=["","## Closing-price scorecard (v3 rain)",""]
+    c=ro(DB)
+    if c is None: return L+["No paper.db yet."],{}
+    try: got=moves_data(c)
+    finally: c.close()
+    if not got: return L+["No price moves recorded yet (shadow_moves is missing or empty), so there is no scorecard."],{}
+    tr,dis,cv=got["trades"],got["dis"],got["cover"]
+    L+=["Between our evening scan and the start of the market's own day, did Kalshi's price move toward the side the bot bought? "
+        "Cents of move toward the bot's side: positive means the price later moved the bot's way, negative means it moved away. "
+        "A caution: the bot buys exactly where the evening price is far from its forecast, so a noisy evening price drifting back gives a positive move with no skill at all; "
+        "and the bot pays the ask plus the fee, so a move smaller than that is not profit. "
+        "The standard error counts each market day once, because cities on one day share weather. Settled and open trades are counted together, once per market, "
+        "and only when the bot bought at the same scan that the price record starts from. "
+        "This is descriptive, not a test, and it changes nothing in the bot.","",
+        "%d of %d v3 rain trades measured (%d wide spread at the day start, %d no price data, %d day not started yet, %d bought at a later scan: not measured)."%(
+            cv["measured"],cv["total"],cv["wide"],cv["no_data"],cv["not_started"],cv["later_scan"]),"",
+        "| Group | Moves measured | Market days | Mean move (cents) | Std. error (cents) | Moved toward the bot | Moved away |","|---|---:|---:|---:|---:|---:|---:|"]
+    D={}
+    fmt=lambda x:"-" if x is None else "%+.2f"%x
+    for name,ts in (("All bets",tr),("Bets on YES",[t for t in tr if t["side"]=="yes"]),("Bets on NO",[t for t in tr if t["side"]=="no"]),
+                    ("Every logged market with a forecast gap of 8+ points (traded or not), on the forecast's side; raw forecast vs mid, not the bot's betting rule, and it mixes days before and after the Oct 28 veto",dis)):
+        s=move_stats(ts); D[name]=s
+        L.append("| %s | %d | %d | %s | %s | %s | %s |"%(name,s["n"],s["days"],fmt(s["mean"]),"-" if s["se"] is None else "%.2f"%s["se"],
+                 "-" if not s["n"] else "%d (%.0f%%)"%(s["toward"],100.0*s["toward"]/s["n"]),"-" if not s["n"] else "%d (%.0f%%)"%(s["against"],100.0*s["against"]/s["n"])))
+    D["coverage"]=cv
+    L+=["","Reading: "+move_reading(D["All bets"]),""]
+    return L,D
+
 # ---------- past data (research/data) ----------
 def past_record():
     sys.path.insert(0,os.path.join(HERE,"research"))
@@ -383,6 +471,9 @@ def main():
     try: fl,data["filters"]=filters_record()
     except Exception as ex: fl=["","## Real-money filters, judged on paper","","Could not be worked out (%r)."%ex]   # never stops the report
     items.append(fl)
+    try: ml,data["closing_price"]=moves_record()
+    except Exception as ex: ml=["","## Closing-price scorecard (v3 rain)","","Could not be worked out (%r)."%ex]   # never stops the report
+    items.append(ml)
     if past: items+=past_record()
     secs=[x for x in items if isinstance(x,dict)]
     G=sum(1 for sec in secs for _,_,s in groups_of(sec) if not s["too_few"])   # groups screened in this report

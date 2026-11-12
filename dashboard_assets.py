@@ -187,9 +187,10 @@ var btn=document.createElement('button'); btn.className='tbtop'; btn.type='butto
 btn.addEventListener('click',function(){pin=null;window.scrollTo({top:0,behavior:still?'auto':'smooth'});try{if(links.length)links[0][1].focus({preventScroll:true})}catch(e){}}); document.body.appendChild(btn);
 function mark(){var y=window.scrollY||0,cur=null; btn.classList.toggle('on',y>900);
   var ct=0; links.forEach(function(p){var t=p[0].getBoundingClientRect().top; if(t<=90&&(!cur||t>ct+2)){cur=p;ct=t}});   // side by side: the first one
-  if(cur&&pin)links.forEach(function(p){if(p[0]===pin&&Math.abs(p[0].getBoundingClientRect().top-ct)<=2)cur=p});
+  if(cur&&pin)links.forEach(function(p){var r=p[0].getBoundingClientRect(); if(p[0]===pin&&(Math.abs(r.top-ct)<=2||(r.top>=-2&&r.top<innerHeight*.6&&innerHeight+y>=document.documentElement.scrollHeight-2)))cur=p});   // a last section too short to reach the top: the clicked link stays marked
   [].slice.call(document.querySelectorAll('.tbrv:not(.tbin)')).forEach(function(el){var r=el.getBoundingClientRect(); if(r.top<innerHeight&&r.bottom>0)el.classList.add('tbin')});   // backstop: nothing on screen stays hidden
   links.forEach(function(p){var on=p===cur; if(p[1].classList.contains('on')!==on){p[1].classList.toggle('on',on); if(on)p[1].setAttribute('aria-current','true');else p[1].removeAttribute('aria-current'); if(on)nav.scrollLeft=Math.max(0,p[1].offsetLeft-40)   /* instant: a gliding menu would keep firing scroll events, which hide the page's tooltips */}})}
+['wheel','touchstart','keydown'].forEach(function(t){window.addEventListener(t,function(ev){if(t!=='keydown'||!ev.target.closest||!ev.target.closest('.tbnav'))pin=null},{passive:true})});   // the viewer scrolls by hand: the clicked link no longer wins
 var tick=false; window.addEventListener('scroll',function(){if(!tick){tick=true;requestAnimationFrame(function(){tick=false;mark()})}},{passive:true}); mark();
 if(!still&&'IntersectionObserver' in window){
   var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('tbin');io.unobserve(e.target)}})},{rootMargin:'0px 0px -6% 0px',threshold:0});

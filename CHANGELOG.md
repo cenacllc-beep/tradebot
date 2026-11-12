@@ -1838,3 +1838,25 @@ unfamiliar codebase ... do not change functionality. only upgrade the code quali
   - SHOULD/COULD: Holm's order spelled out with one bootstrap, the denominator, one market per station and day, the gauge-is-not-the-settlement cases, adverse selection, the conservative delays, the disclosure of earlier price reads, three more descriptive lines.
   - Frozen. SHA-256: 244f408a67232fd78f01aa759e9ccc7ced7e986fa6ef79c0618b165a04dbe3f6
 - No rule, limit, lock or threshold changed. v3 (weather.py, nws.py, strategy.py) and live.py untouched.
+
+## 2026-11-12 08:45 (local) - r84: closing-price scorecard in the learning report (read-only)
+- learn.py: new section "Closing-price scorecard (v3 rain)" (moves_data, move_stats, move_reading, moves_record): for each
+  v3 rain paper trade, how many cents Kalshi's mid moved toward the side the bot bought between the evening scan and the
+  market's day start (shadow_moves, already measured at each settle). Mean over market days with its day-clustered
+  standard error, split by side, plus the same for every logged market where the raw forecast and the mid differed by 8+
+  points. Numbers also go to learning.json (closing_price). It reads paper.db read-only and cannot stop the report.
+- Independent code review (agents/code-reviewer.md): 2 MUST, 3 SHOULD, 5 COULD, all applied.
+  - MUST: a trade bought at a later scan than the market's first snapshot was credited with a move from before it
+    bought; now only trades within 10 minutes of that snapshot count, the rest are listed as not measured.
+  - MUST: the wording presented a positive average as skill. It now says a noisy evening price drifting back toward
+    any sensible forecast gives a positive move with no skill, and that the bot pays the ask plus the fee.
+  - Also: a coverage line, first trade per market only, an infinite t no longer written to JSON, the Student-t line
+    (never below 2.0) with 20+ market days, stronger tests (8 mutations each fail).
+- Descriptive, not a test: it changes nothing in the bot. No rule, limit or threshold changed; v3 and live.py untouched.
+- Same release, dashboard_assets.py (presentation only): yesterday's menu check failed on today's test data. When the
+  last section is too short to reach the top of the window, clicking its menu link marked the section above it. Now the
+  clicked link stays marked while the page sits at the bottom with that section in view; scrolling by hand (wheel,
+  touch, keys outside the menu) releases it. Independent review (agents/code-reviewer.md): 1 MUST (a clicked link could
+  stay marked after scrolling by hand), fixed with a lower bound and the release on hand scrolling, plus a test that
+  fails without the fix. tests/ui_checks.py waits for smooth scrolls by polling instead of fixed pauses.
+  66 checks pass at 390 dark touch and 1100 light; full suite passes.

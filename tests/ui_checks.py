@@ -82,15 +82,27 @@ with sync_playwright() as p:
     # redesign layer (r83): menu, reveal, back-to-top, print
     nl=pg.locator(".tbnav a")
     if nl.count()>2:
-        k=nl.count()-1; want=nl.nth(k).inner_text(); nl.nth(k).click(); pg.wait_for_timeout(900)
+        k=nl.count()-1; want=nl.nth(k).inner_text(); nl.nth(k).click()
+        for _ in range(30):
+            pg.wait_for_timeout(150)
+            if pg.locator(".tbnav a.on").all_inner_texts()==[want]: break
         ck("menu click marks its own link",pg.locator(".tbnav a.on").all_inner_texts()==[want],"%s | %s"%(want,pg.locator(".tbnav a.on").all_inner_texts()))
+        if nl.count()>3:   # a middle link, then scroll by hand to the bottom: the clicked link must not stay marked
+            nl.nth(1).click(); pg.wait_for_timeout(1500)
+            for _ in range(60): pg.mouse.wheel(0,1500); pg.wait_for_timeout(20)
+            pg.wait_for_timeout(500)
+            ck("hand scrolling releases the clicked link",pg.locator(".tbnav a.on").all_inner_texts()!=[nl.nth(1).inner_text()],pg.locator(".tbnav a.on").all_inner_texts())
         pg.set_viewport_size({"width":341,"height":150}); pg.wait_for_timeout(200)
         H=pg.evaluate("document.documentElement.scrollHeight"); y=0
         while y<H: pg.evaluate("y=>window.scrollTo(0,y)",y); pg.wait_for_timeout(25); y+=140
         pg.wait_for_timeout(200)
         ck("no section stays hidden",pg.locator(".tbrv:not(.tbin)").count()==0,pg.locator(".tbrv:not(.tbin)").count())
         ck("back-to-top shown",pg.evaluate("getComputedStyle(document.querySelector('.tbtop')).visibility")=="visible")
-        pg.locator(".tbtop").click(); pg.wait_for_timeout(1200)
+        pg.locator(".tbtop").click()
+        for _ in range(40):
+            pg.wait_for_timeout(150)
+            if pg.evaluate("window.scrollY")<5: break
+        pg.wait_for_timeout(400)
         ck("back-to-top returns",pg.evaluate("window.scrollY")<5,pg.evaluate("window.scrollY"))
         ck("back-to-top hides",pg.evaluate("getComputedStyle(document.querySelector('.tbtop')).visibility")=="hidden")
         pg.emulate_media(media="print")

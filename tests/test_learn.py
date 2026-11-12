@@ -62,6 +62,26 @@ for t,side,price,v3,mid,hours,air,res in (("KXRAIN-26NOV08-FLA","no",0.07,0.70,0
     c.execute("insert into decisions(decision_id,scan_id,ts,strategy_id,mode,ticker,action,side,reason,mid,price,p_model,inputs,trade_ref) values(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
               ("d-"+t,"s-"+t,time.time(),"forecast_alpha.rain.v3","paper",t,"TRADE_"+side.upper(),side,"TRADE",mid,price,v3,json.dumps({"slices":hours}),"trades:%d"%pid))
     c.execute("insert into v4_obs(ticker,ts,station,fc,mid) values(?,?,?,?,?)",(t,time.time(),"K"+t[-3:],air,mid))
+# closing-price scorecard: shadow_moves for the trades above (2026-11-12). Moves are set per ticker so the sign and clustering are known.
+c.execute(open(os.path.join(WORK,"shadow.py")).read().split('"shadow_moves":"',1)[1].split('",\n',1)[0].replace('"\n            "','').replace('" "',''))
+for t,fc,ms,me,st in (("KXRAIN-26NOV08-FLA",0.70,0.94,0.90,"ok"),   # NO bet, price fell 4c: toward the bot
+                      ("KXRAIN-26NOV08-FLB",0.25,0.06,0.10,"ok"),   # YES bet, price rose 4c: toward
+                      ("KXRAIN-26NOV06-FLC",0.27,0.54,0.58,"ok"),   # NO bet, price rose 4c: away
+                      ("KXRAIN-26NOV06-FLD",0.50,0.52,0.60,"ok"),   # gap under 8 points, no trade: not in the disagreement row
+                      ("KXRAIN-26NOV06-FLE",0.80,0.30,0.35,"wide"),   # wide spread at the day start (mid_start still filled in): not counted; it has a YES trade
+                      ("KXRAIN-26NOV06-FLJ",0.60,0.40,0.45,"ok"),   # no trade; forecast says yes, price rose 5c: counts in the disagreement row only
+                      ("KXRAIN-26NOV06-FLH",0.50,0.52,0.50,"ok"),   # only a v2 trade
+                      ("KXRAIN-26NOV06-FLK",0.50,0.52,None,"no_data")):   # a trade, no price at the day start
+    c.execute("insert into shadow_moves(ticker,version,scan_ts,fc,mid_scan,start_ts,mid_start,status) values(?,?,?,?,?,?,?,?)",(t,"v3",time.time(),fc,ms,time.time(),me,st))
+# a trade opened long after the first snapshot (mid_scan is the first snapshot): must not be credited. Price moved 40c toward its side.
+c.execute("insert into shadow_moves(ticker,version,scan_ts,fc,mid_scan,start_ts,mid_start,status) values(?,?,?,?,?,?,?,?)",("KXRAIN-26NOV06-FLI","v3",time.time()-5*3600,0.50,0.52,time.time(),0.92,"ok"))
+# another model version's price record for the same market as FLB, with a huge move: must never be used
+c.execute("insert into shadow_moves(ticker,version,scan_ts,fc,mid_scan,start_ts,mid_start,status) values(?,?,?,?,?,?,?,?)",("KXRAIN-26NOV08-FLB","v9",time.time(),0.25,0.06,time.time(),0.60,"ok"))
+for tk_,sd,ver in (("KXRAIN-26NOV06-FLE","yes","v3"),("KXRAIN-26NOV06-FLI","yes","v3"),("KXRAIN-26NOV06-FLK","no","v3"),
+                   ("KXRAIN-26NOV06-FLH","yes","v2"),    # another version's trade: not counted
+                   ("KXRAIN-26NOV06-FLC","no","v3")):    # a second trade on a market already traded: counted once
+    c.execute("insert into trades(ts,ticker,side,price,fair,n,cost,fee,status,result,pnl,version,settled_ts) values(?,?,?,?,?,?,?,?,?,?,?,?,?)",
+              (time.time(),tk_,sd,0.5,0.6,1,0.5,0.02,"open",None,None,ver,None))
 c.commit(); c.close()
 L=sqlite3.connect(os.path.join(OUT,"live.db")); L.execute("create table orders(id integer primary key,ts real,env text,paper_id integer,ticker text,side text,count integer,limit_cents integer,client_order_id text,order_id text,status text,fill_count real,cost real,fees real,note text,result text,pnl real,settled_ts real)")
 L.execute("insert into orders(env,ticker,side,count,limit_cents,status,fill_count,cost,fees) values('demo','KXRAIN-26OCT15-DEN','no',5,12,'partial',1,0.11,0.0069)")
@@ -92,4 +112,47 @@ assert "| KXRAIN-26NOV08-FLB | YES x2 at 7c | 25% | 6% | 31% | 2% | won | +1.85 
 assert js["filters"] and "screen" in js
 shadow=[l for l in md.split("## Limit-order test")[1].splitlines() if l.startswith("| NO | 1 |")][0]
 assert "| 55% |" in shadow, shadow   # the ledger's own blend, not 0%
+cp=md.split("## Closing-price scorecard (v3 rain)")[1].split("## Patterns worth")[0]
+assert "| All bets | 3 | 2 | +0.00 | 4.00 |" in cp and "| Bets on YES | 1 | 1 | +4.00 |" in cp and "| Bets on NO | 2 | 2 | +0.00 |" in cp, cp   # day means: Nov 8 = +4 (FLA, FLB), Nov 6 = -4 (FLC): mean 0, clustered se 4
+assert "| 2 (67%) | 1 (33%) |" in cp and "No clear move either way so far" in cp and "descriptive, not a test" in cp and "closing_price" in js, cp
+assert js["closing_price"]["All bets"]["n"]==3 and (lambda r:r[2:5]==[" 4 "," 2 "," +2.25 "])([l for l in cp.splitlines() if l.startswith("| Every logged market")][0].split("|"))   # FLA +4, FLB +4, FLC -4, FLJ +5: day means 4 and 0.5 (flipping the side gives -2.25). FLD is under 8 points, FLE is wide
+assert "3 of 217 v3 rain trades measured (1 wide spread at the day start, 1 no price data, 211 day not started yet, 1 bought at a later scan: not measured)" in cp, cp
+assert "no skill at all" in cp and "pays the ask plus the fee" in cp and "A bettor with skill" not in cp and "label" not in cp and "raw forecast vs mid, not the bot's betting rule" in cp, cp
+assert js["closing_price"]["coverage"]["later_scan"]==1 and "Infinity" not in json.dumps(js["closing_price"],allow_nan=True)
+# unit checks: sign for yes and no, day clustering, the reading, missing table
+assert learn.move_toward("yes",0.40,0.46)==6.000000000000003 or abs(learn.move_toward("yes",0.40,0.46)-6)<1e-9
+assert abs(learn.move_toward("no",0.40,0.46)+6)<1e-9 and abs(learn.move_toward("no",0.40,0.34)-6)<1e-9
+ts=[dict(day="A",move=10.0)]*9+[dict(day="B",move=0.0)]   # a day with 9 bets weighs the same as a day with 1
+s=learn.move_stats(ts); assert abs(s["mean"]-5.0)<1e-9 and s["days"]==2 and s["toward"]==9 and s["n"]==10, s
+ts=[dict(day="D%d"%(i%25),move=2.0+(i%3)-1) for i in range(100)]; s=learn.move_stats(ts)
+r=learn.move_reading(s); assert s["days"]==25 and s["t"]>2 and "moved the bot's way by more than chance" in r and "not a sign of skill" in r and "hint of skill" not in r, r
+s=learn.move_stats([dict(day="D%d"%i,move=2.0+(i%3)-1) for i in range(15)]); assert "No clear move" in learn.move_reading(s)   # strong but only 15 days
+assert "No clear move" in learn.move_reading(learn.move_stats([dict(day="D%d"%i,move=(-1)**i*3.0) for i in range(40)]))
+r=learn.move_reading(learn.move_stats([dict(day="D%d"%(i%25),move=-(2.0+(i%3)-1)) for i in range(100)])); assert "moved away from the bot's side" in r and "bot's way" not in r, r   # two-sided
+assert "nothing to read" in learn.move_reading(learn.move_stats([]))
+s=learn.move_stats([dict(day="D%d"%i,move=3.0) for i in range(25)])   # the same every day: t is infinite, so it is stored as None and the JSON stays valid
+assert s["t"] is None and s["same_every_day"] and "moved the bot's way" in learn.move_reading(s); json.dumps(s,allow_nan=False)
+# one failing section must not stop the report
+real=learn.moves_record
+def boom(): raise RuntimeError("boom")
+learn.moves_record=boom; od=learn.OUTDIR; learn.OUTDIR=os.path.join(OUT,"res_boom"); sa=sys.argv; sys.argv=["learn.py"]
+try: learn.main()
+finally: learn.moves_record=real; learn.OUTDIR=od; sys.argv=sa
+mb=open(os.path.join(OUT,"res_boom","learning.md"),encoding="utf-8").read()
+assert "Closing-price scorecard" in mb and "Could not be worked out" in mb and "# Learning report" in mb
+tmp=os.path.join(OUT,"nomoves.db"); x=sqlite3.connect(tmp); x.execute("create table trades(id integer primary key,ticker text,side text,price real,version text)"); x.commit(); x.close()
+old=learn.DB; learn.DB=tmp
+try: ml,d=learn.moves_record()
+finally: learn.DB=old
+assert d=={} and any("shadow_moves is missing or empty" in l for l in ml), ml
+x=sqlite3.connect(tmp); x.execute("create table shadow_moves(ticker text,version text,scan_ts real,fc real,mid_scan real,start_ts real,bid_start real,ask_start real,mid_start real,status text)"); x.commit(); x.close()
+learn.DB=tmp
+try: ml,d=learn.moves_record()
+finally: learn.DB=old
+assert d=={} and any("empty" in l for l in ml), ml   # an empty table says so too
+# learn.py opens paper.db read-only: a write through its connection must fail
+cro=learn.ro(os.path.join(OUT,"paper.db"))
+try: cro.execute("create table zz(a)"); raise SystemExit("learn.ro allowed a write")
+except sqlite3.OperationalError: pass
+cro.close()
 print("learn.py: all checks passed")
