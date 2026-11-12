@@ -1823,3 +1823,18 @@ unfamiliar codebase ... do not change functionality. only upgrade the code quali
   Its findings, applied: deploy the three code files apart from the dashboard redesign (reviewed separately as r83);
   CLAUDE.md sections 3a and 12 and this entry; the cash test restored to the fake's $0.30 with the note asserted; a
   test that the dashboard tile names live.py's cap; stale "$25 cap" wording in tests. Full suite: 42 tests pass.
+
+## 2026-11-12 08:30 (local) - r83: dashboard redesign layer reviewed and fixed; PLAN11 revised after its statistics review and frozen
+- **r83 (dashboard_assets.py, presentation only; no text or number on the page changes).** Independent review (fresh agent, Chromium at 320 to 1100 px, light and dark): 3 MUST, 7 SHOULD, 4 COULD.
+  - Fixed (MUST): a very tall section could stay invisible on a small or zoomed window (observer threshold 0 plus a backstop in the scroll handler); the printed page lost its title (print rule resets the gradient text); the sticky menu covered anchor targets and focused controls (`html{scroll-padding-top}`).
+  - Fixed (SHOULD): the wrong menu link was marked when two sections sit side by side (first of the row, or the clicked one); fallbacks for browsers without `background-clip:text` or `color-mix`; the back-to-top button is not focusable while hidden and hands focus to the menu; a menu click moves focus to its section and sets `aria-current`; the tooltip sits above the button; the title's gradient now spans the word (inline-block).
+  - Left: menu entries per sub-heading, hover rules under `(hover:hover)`, the fixed page gradient on iOS, the dead `#tbsecN` hashes on load (all cosmetic).
+  - Tests: tests/ui_checks.py has 6 new checks (menu click, no hidden section at 341x150, back-to-top shown/returns/hides, print title): 65 checks pass at 390 dark touch and 1100 light; full suite passes.
+- **PLAN11 (research/PLAN11.md), statistics review: 4 MUST, 7 SHOULD, 3 COULD, all applied before any of its data.**
+  - M1: a third pass condition, the exact win-rate lower bound over signal days against the mean cost, because many small wins and no loss would pass the t and bootstrap by luck; the power it implies is stated (G is almost surely not confirmable in 119 days).
+  - M2: the gauge rule pinned (hourly Pxxxx group only, no summing, the boundary report ignored, traces and corrections out).
+  - M3: the price pinned (candle ending at t + 1, else within 5 minutes, else no trade; 0 < bid < ask) and the day start read from the market itself.
+  - M4: radar readings pinned (colour table to dBZ, index 0 = no echo, great-circle distance, 150 km search, exact stamps, a 4-pixel minimum against clutter; P cannot fire on a newly formed cell). The grid is 12200 x 5400 per IEM's documentation, not "about 1 km".
+  - SHOULD/COULD: Holm's order spelled out with one bootstrap, the denominator, one market per station and day, the gauge-is-not-the-settlement cases, adverse selection, the conservative delays, the disclosure of earlier price reads, three more descriptive lines.
+  - Frozen. SHA-256: 244f408a67232fd78f01aa759e9ccc7ced7e986fa6ef79c0618b165a04dbe3f6
+- No rule, limit, lock or threshold changed. v3 (weather.py, nws.py, strategy.py) and live.py untouched.

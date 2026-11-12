@@ -1,5 +1,6 @@
 """Static CSS and JavaScript of the dashboard page (moved out of dashboard.py 2026-10-23, refactor stage 2; the text
-is unchanged). Presentation only: no data, no network, no file access."""
+is unchanged). Presentation only: no data, no network, no file access. 2026-11-11: a redesign layer at the end of CSS
+and JS (section menu, animations, back-to-top), added at the user's request; it changes no text or number."""
 CSS="""
 /* Layout: a forecast-desk briefing. The plain-language verdict and the test calendar lead, then the next actions,
    then the evidence (charts), then the records. Left-aligned, one column on phones.
@@ -117,6 +118,41 @@ td.empty{color:var(--mut);white-space:normal}
 #tip{position:fixed;pointer-events:none;background:var(--ink);color:var(--page);padding:7px 10px;border-radius:8px;font-size:12.5px;line-height:1.4;max-width:290px;opacity:0;transition:opacity .1s;z-index:9}
 :focus-visible{outline:2px solid var(--acc);outline-offset:2px}
 @media(prefers-reduced-motion:reduce){#tip{transition:none}}
+
+/* ---- 2026-11-11 redesign layer (user: "a better modern, animated, user friendly design"). Presentation only: it adds a
+   sticky section menu, entrance and meter animations, hover feedback and a back-to-top button. No text or number on
+   the page changes, nothing is hidden without JavaScript, and "reduce motion" turns every animation off. ---- */
+body{background:radial-gradient(1200px 520px at 12% -8%,color-mix(in srgb,var(--fc) 13%,transparent),transparent 62%),
+ radial-gradient(900px 480px at 96% -4%,color-mix(in srgb,var(--mk) 9%,transparent),transparent 60%),var(--page);background-attachment:fixed}
+.top h1{font-size:26px}
+@supports((-webkit-background-clip:text) or (background-clip:text)){.top h1{display:inline-block;background:linear-gradient(92deg,var(--ink) 0%,var(--acc) 85%);-webkit-background-clip:text;background-clip:text;color:transparent}}
+.panel{border-radius:18px;box-shadow:0 0 0 1px var(--ring),0 1px 2px rgba(16,24,40,.04),0 10px 28px -18px rgba(16,24,40,.28);transition:box-shadow .25s ease,transform .25s ease}
+.panel:hover{box-shadow:0 0 0 1px var(--ring),0 2px 4px rgba(16,24,40,.05),0 18px 40px -20px rgba(16,24,40,.36)}
+.gate li{transition:transform .2s ease,box-shadow .2s ease}
+.gate li:hover{transform:translateY(-2px);box-shadow:0 0 0 1px var(--ring),0 10px 22px -14px rgba(16,24,40,.35)}
+.chip{transition:transform .15s ease,filter .15s ease}a.chip:hover{transform:translateY(-1px);filter:brightness(1.05)}
+.chip.live::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--good);box-shadow:0 0 0 0 color-mix(in srgb,var(--good) 60%,transparent);animation:tbpulse 2.2s ease-out infinite}
+@keyframes tbpulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--good) 55%,transparent)}70%,100%{box-shadow:0 0 0 9px transparent}}
+.meter i{transform-origin:left center;animation:tbgrow .9s cubic-bezier(.2,.7,.2,1) both}
+@keyframes tbgrow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+.tbnav{position:sticky;top:0;z-index:20;margin-inline:-16px;padding:8px 16px;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;
+ background:var(--page);background:color-mix(in srgb,var(--page) 93%,transparent);backdrop-filter:saturate(1.4) blur(10px);-webkit-backdrop-filter:saturate(1.4) blur(10px);border-bottom:1px solid var(--ring)}
+.tbnav::-webkit-scrollbar{display:none}
+@media(min-width:720px){.tbnav{margin-inline:-28px;padding-inline:28px}}
+.tbnav a{flex:none;font-size:13px;font-weight:600;color:var(--ink2);text-decoration:none;padding:8px 13px;border-radius:99px;min-height:36px;display:inline-flex;align-items:center;transition:background .2s ease,color .2s ease}
+.tbnav a:hover{background:var(--sunk);color:var(--ink)}
+.tbnav a.on{background:var(--ink);color:var(--page)}
+.tbnav a:focus-visible,.tbtop:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+html{scroll-padding-top:64px}
+#tip{z-index:30}
+.tbrv{opacity:0;transform:translateY(14px)}
+.tbrv.tbin{opacity:1;transform:none;transition:opacity .55s ease,transform .55s cubic-bezier(.2,.7,.2,1)}
+.tbtop{position:fixed;right:16px;bottom:16px;z-index:21;width:44px;height:44px;border-radius:50%;border:0;cursor:pointer;font-size:18px;line-height:1;
+ background:var(--ink);color:var(--page);box-shadow:0 8px 22px -8px rgba(16,24,40,.5);opacity:0;visibility:hidden;pointer-events:none;transform:translateY(8px);transition:opacity .25s ease,transform .25s ease,visibility 0s .25s}
+.tbtop.on{opacity:1;visibility:visible;pointer-events:auto;transform:none;transition:opacity .25s ease,transform .25s ease,visibility 0s}
+@media(prefers-reduced-motion:reduce){.tbrv,.tbrv.tbin{opacity:1;transform:none;transition:none}
+ .meter i,.chip.live::before{animation:none}.panel,.gate li,.chip,.tbnav a,.tbtop{transition:none}.gate li:hover,a.chip:hover{transform:none}}
+@media print{.tbnav,.tbtop{display:none}.tbrv{opacity:1;transform:none}.top h1{background:none;color:var(--ink)}}
 """
 JS="""
 if(document.body.getAttribute('data-live')&&location.protocol==='file:'){   // run watch rebuilds dashboard_live.html every 5 minutes
@@ -129,4 +165,39 @@ document.addEventListener('mousemove',function(ev){var n=ev.target.closest&&ev.t
 document.addEventListener('focusin',function(ev){var n=ev.target.closest&&ev.target.closest('[data-tip]');if(!n){t.style.opacity=0;return}var r=n.getBoundingClientRect();show(n,r.left,r.bottom)});
 document.addEventListener('focusout',function(){t.style.opacity=0});
 document.addEventListener('scroll',function(){t.style.opacity=0},true);})();
+
+/* 2026-11-11 redesign layer: section menu, entrance animation, back-to-top. Presentation only; fails quiet. */
+(function(){try{
+var wrap=document.querySelector('.wrap'); if(!wrap)return;
+var still=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+var secs=[].slice.call(wrap.querySelectorAll('section')).filter(function(s){return s.querySelector('h2')||s.classList.contains('hero')});
+var pin=null;   // the section whose menu link was last clicked: it wins when two sections sit side by side
+var nav=document.createElement('nav'); nav.className='tbnav'; nav.setAttribute('aria-label','Sections'); var links=[];
+secs.forEach(function(s,i){
+  var h=s.querySelector('h2'),name='';
+  if(h){for(var n=h.firstChild;n;n=n.nextSibling){if(n.nodeType===3)name+=n.textContent}name=name.trim()||h.textContent.trim()}
+  if(s.classList.contains('hero'))name='Verdict';
+  if(!name)return;
+  if(!s.id)s.id='tbsec'+i; s.setAttribute('data-tbsec','1');
+  var a=document.createElement('a'); a.href='#'+s.id; a.textContent=name.length>26?name.slice(0,24).trim()+'\u2026':name; a.addEventListener('click',function(ev){ev.preventDefault();pin=s;s.classList.add('tbin');try{s.tabIndex=-1;s.focus({preventScroll:true})}catch(e){}s.scrollIntoView({behavior:still?'auto':'smooth',block:'start'});if(history.replaceState)history.replaceState(null,'','#'+s.id)});
+  nav.appendChild(a); links.push([s,a]);
+});
+var top=wrap.querySelector('.top'); if(links.length>2){if(top&&top.nextSibling)wrap.insertBefore(nav,top.nextSibling);else wrap.insertBefore(nav,wrap.firstChild)}
+var btn=document.createElement('button'); btn.className='tbtop'; btn.type='button'; btn.setAttribute('aria-label','Back to top'); btn.textContent='\u2191';
+btn.addEventListener('click',function(){pin=null;window.scrollTo({top:0,behavior:still?'auto':'smooth'});try{if(links.length)links[0][1].focus({preventScroll:true})}catch(e){}}); document.body.appendChild(btn);
+function mark(){var y=window.scrollY||0,cur=null; btn.classList.toggle('on',y>900);
+  var ct=0; links.forEach(function(p){var t=p[0].getBoundingClientRect().top; if(t<=90&&(!cur||t>ct+2)){cur=p;ct=t}});   // side by side: the first one
+  if(cur&&pin)links.forEach(function(p){if(p[0]===pin&&Math.abs(p[0].getBoundingClientRect().top-ct)<=2)cur=p});
+  [].slice.call(document.querySelectorAll('.tbrv:not(.tbin)')).forEach(function(el){var r=el.getBoundingClientRect(); if(r.top<innerHeight&&r.bottom>0)el.classList.add('tbin')});   // backstop: nothing on screen stays hidden
+  links.forEach(function(p){var on=p===cur; if(p[1].classList.contains('on')!==on){p[1].classList.toggle('on',on); if(on)p[1].setAttribute('aria-current','true');else p[1].removeAttribute('aria-current'); if(on)nav.scrollLeft=Math.max(0,p[1].offsetLeft-40)   /* instant: a gliding menu would keep firing scroll events, which hide the page's tooltips */}})}
+var tick=false; window.addEventListener('scroll',function(){if(!tick){tick=true;requestAnimationFrame(function(){tick=false;mark()})}},{passive:true}); mark();
+if(!still&&'IntersectionObserver' in window){
+  var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('tbin');io.unobserve(e.target)}})},{rootMargin:'0px 0px -6% 0px',threshold:0});
+  [].slice.call(wrap.children).forEach(function(el){
+    if(el===nav||el.tagName==='SCRIPT'||el.classList.contains('top'))return;
+    if(el.getBoundingClientRect().top<innerHeight)return;   // what is already on screen never flashes
+    el.classList.add('tbrv'); io.observe(el)});
+  setTimeout(function(){[].slice.call(document.querySelectorAll('.tbrv')).forEach(function(el){if(el.getBoundingClientRect().top<innerHeight)el.classList.add('tbin')})},1200);
+}
+}catch(e){}})();
 """

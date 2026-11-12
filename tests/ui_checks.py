@@ -79,6 +79,23 @@ with sync_playwright() as p:
         ck("tooltips (hover/tap)",pg.evaluate("getComputedStyle(document.getElementById('tip')).opacity")=="1",pg.evaluate("document.getElementById('tip').textContent")[:50])
     w0=pg.locator("#acct-chart svg").get_attribute("viewBox"); pg.set_viewport_size({"width":max(320,min(W,700)-60),"height":900}); pg.wait_for_timeout(350)
     ck("chart redraws on resize",pg.locator("#acct-chart svg").get_attribute("viewBox")!=w0,"%s -> %s"%(w0,pg.locator("#acct-chart svg").get_attribute("viewBox")))
+    # redesign layer (r83): menu, reveal, back-to-top, print
+    nl=pg.locator(".tbnav a")
+    if nl.count()>2:
+        k=nl.count()-1; want=nl.nth(k).inner_text(); nl.nth(k).click(); pg.wait_for_timeout(900)
+        ck("menu click marks its own link",pg.locator(".tbnav a.on").all_inner_texts()==[want],"%s | %s"%(want,pg.locator(".tbnav a.on").all_inner_texts()))
+        pg.set_viewport_size({"width":341,"height":150}); pg.wait_for_timeout(200)
+        H=pg.evaluate("document.documentElement.scrollHeight"); y=0
+        while y<H: pg.evaluate("y=>window.scrollTo(0,y)",y); pg.wait_for_timeout(25); y+=140
+        pg.wait_for_timeout(200)
+        ck("no section stays hidden",pg.locator(".tbrv:not(.tbin)").count()==0,pg.locator(".tbrv:not(.tbin)").count())
+        ck("back-to-top shown",pg.evaluate("getComputedStyle(document.querySelector('.tbtop')).visibility")=="visible")
+        pg.locator(".tbtop").click(); pg.wait_for_timeout(1200)
+        ck("back-to-top returns",pg.evaluate("window.scrollY")<5,pg.evaluate("window.scrollY"))
+        ck("back-to-top hides",pg.evaluate("getComputedStyle(document.querySelector('.tbtop')).visibility")=="hidden")
+        pg.emulate_media(media="print")
+        ck("print shows the title",pg.evaluate("getComputedStyle(document.querySelector('.top h1')).color")!="rgba(0, 0, 0, 0)",pg.evaluate("getComputedStyle(document.querySelector('.top h1')).color"))
+        pg.emulate_media(media="screen")
     ck("no errors after all clicks",not errs,errs[:2])
     b.close()
 bad=[r for r in res if not r[1]]
