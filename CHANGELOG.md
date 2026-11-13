@@ -1953,3 +1953,22 @@ unfamiliar codebase ... do not change functionality. only upgrade the code quali
   accepts its new hash b3b713a71ae7 with the reason. tests/test_plan10.py's fake decoder now answers like the real one
   ("sfc" unless read as a number), so the old code fails the test. No rule, threshold or statistic of PLAN10 changed;
   no feature had been computed with the old code.
+
+## 2026-11-13 14:05 (local) - r88: the real-money chart now works like the paper account's
+- The user (13:44): "real money graph like paper account is still missing". The r87 chart was a static drawing. Now the
+  real-money section opens like the paper account: the bot's value in large type with its change, an interactive
+  stepped chart (time ranges 1D, 1W, 1M, ALL; drag or arrow keys to read past values), bet markers you can hover or tap
+  (bets of one scan or one settle share a marker), a legend, then the tiles (open bets, settled bets, daily stop, 25%
+  end rule), the calendar and the tables. The value is live.py's: $25 plus the net of settled bets, so the line moves
+  only when Kalshi settles a bet. Without JavaScript a static drawing of the same chart shows.
+- It has its own element names (rv-*, rrng): the paper chart's script grabs `.rng` and `.seg` buttons page-wide, and
+  sharing those names would have let it take over the real-money buttons (found while building; a test guards it).
+- The other reported item, "Data checks: 1 out of date", is accurate and is not hidden: the Nov 12 evening scan did not
+  run (the laptop was offline from 7:20 PM to 1:01 AM). Only tonight's scan (8:50 PM to 1 AM) can clear it: a scan at
+  another time would log tomorrow's markets with afternoon prices, and the bot keeps each market's first snapshot.
+- Presentation only. No rule, limit, lock or threshold changed; live.py, v3 and paper.db untouched.
+- Review (agents/code-reviewer.md): no MUST; applied: the label's date is the first real order's (not the unlock's);
+  without JavaScript the range buttons and drag/hover help are hidden and the static markers carry their text as SVG
+  titles; the crosshair clears when the pointer reaches a marker; arrow keys and Escape work from a focused marker;
+  one minus sign style in the static and live headlines. tests/test_real_view.py guards the class names, the embedded
+  data and the value at each time against live.py's rule.

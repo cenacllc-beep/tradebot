@@ -93,6 +93,20 @@ assert html_.count('class="mk won"') + html_.count('class="mk lost"') == 2      
 assert "3 bets placed" in html_ and "2 bets settled" in html_ and "Washington" in html_
 assert "Paper bets not copied with real money (1)" in html_ and "Demo exchange (fake money): 1 filled order;" in html_
 assert "Unlocked" in html_ and "1 won, 2 lost" in html_
+# the interactive chart: its own names (the paper chart's script grabs .rng/.seg buttons page-wide), safe embedded data
+import re
+assert 'id=rv-data' in html_ and 'id=rv-rng' in html_ and 'id=rv-chart' in html_ and "rv-static" in html_
+assert not re.search(r'class="?(rng|seg)\b', html_), "the real-money chart must not reuse the paper chart's class names"
+bad = dict(orders[0], id=77, ticker="KXRAIN-26NOV12-STL", note="</script><b>x</b>", ts=T0 + 400000, result=None, pnl=None, settled_ts=None)
+h_bad = RV.section(orders + [bad], events, [], T0 + 500000, False, stop, tab)
+data = h_bad.split('<script type="application/json" id=rv-data>')[1].split("</script>")[0]
+assert "<" not in data and json.loads(data)["start"] == 25.0
+d_ = RV.chart_data(orders, events, T0 + 300000)
+for t in (T0, T0 + 50001, T0 + 50061, T0 + 140001, T0 + 300000):
+    live.now = lambda w=t: w
+    want = 25.0 + sum(o["pnl"] or 0 for o in orders if o["env"] == "prod" and o.get("settled_ts") is not None and o["settled_ts"] <= t)
+    assert abs(RV.value_at(d_, t) - want) < 1e-9, (t, RV.value_at(d_, t), want)
+assert "RV" not in RV.JS and "querySelectorAll('#rv-rng button')" in RV.JS and ".rng button" not in RV.JS
 empty = RV.section([], [], [], T0, False, stop, tab)
 assert "No real orders yet" in empty
 print("section ok")

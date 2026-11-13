@@ -39,13 +39,18 @@ CSS = """
 .real .rtiles p{margin:4px 0 0;font-size:12px;opacity:.8}
 .real .rbar{display:block;height:6px;border-radius:3px;background:rgba(127,127,127,.18);margin-top:6px;overflow:hidden}
 .real .rbar i{display:block;min-width:2px;height:100%;background:var(--acc,#2a7)}.real .rbar i.warn{background:#d90}.real .rbar i.bad{background:var(--neg,#c33)}
-.real .rchart{width:100%;overflow-x:auto}.real .rchart svg{width:100%;min-width:520px;height:auto;display:block}
-.real .rchart .ln{fill:none;stroke:var(--acc,#2a7);stroke-width:2}
-.real .rchart .base{stroke:rgba(127,127,127,.5);stroke-dasharray:4 4}.real .rchart .floor{stroke:var(--neg,#c33);stroke-dasharray:2 4;opacity:.7}
-.real .rchart .ax{font-size:11px;fill:currentColor;opacity:.7}
-.real .rchart .mk{cursor:pointer;outline:none}.real .rchart .mk:focus circle,.real .rchart .mk:hover circle{stroke:currentColor;stroke-width:2}
-.real .rchart .buy circle{fill:#3b7ddd}.real .rchart .won circle{fill:var(--pos,#2a7)}.real .rchart .lost circle{fill:var(--neg,#c33)}
-.real .rleg{display:flex;flex-wrap:wrap;gap:14px;font-size:12.5px;margin:6px 0}.real .rleg i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+.real .rv-top{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:baseline}
+.real .rv-top h2{margin:0}
+.real .mk{cursor:pointer;outline:none}.real .mk circle{stroke:var(--surface,#fff);stroke-width:2}
+.real .mk:focus circle,.real .mk:hover circle{stroke:var(--ink,#000);stroke-width:2}
+.real .mk.buy circle{fill:#3b7ddd}.real .mk.won circle{fill:var(--good,#0ca30c)}.real .mk.lost circle{fill:var(--bad,#d03b3b)}
+.real .rleg{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12.5px;color:var(--ink2);margin:2px 0 4px}
+.real .rleg i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+.real .rrng{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}.real .rrng[hidden],.real .rv-js[hidden]{display:none}
+.real .rrng button{font:600 13px/1 var(--text,system-ui);border:0;cursor:pointer;background:transparent;border-radius:99px;padding:8px 12px;min-height:32px;min-width:48px;color:var(--tonet,var(--ink2))}
+.real .rrng button[aria-pressed=true]{background:var(--tonet,var(--ink2));color:var(--surface,#fff)}
+.real .rrng button:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.real .rv-static svg{width:100%;height:100%}
 .real .rcal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;margin:8px 0;max-width:560px}
 .real .rcal .h{font-size:11px;opacity:.6;text-align:center}
 .real .rcal .d{border-radius:6px;padding:4px;min-height:44px;font-size:11px;background:rgba(127,127,127,.08);outline:none}
@@ -59,11 +64,11 @@ def e(s):
 
 
 def usd(v):
-    return ("-$%.2f" % -v) if v < -0.004 else "$%.2f" % abs(v)
+    return ("\u2212$%.2f" % -v) if v < -0.004 else "$%.2f" % abs(v)
 
 
 def plus(v):
-    return ("+$%.2f" % v) if v > 0.004 else (("-$%.2f" % -v) if v < -0.004 else "$0.00")
+    return ("+$%.2f" % v) if v > 0.004 else (("\u2212$%.2f" % -v) if v < -0.004 else "$0.00")
 
 
 def when(ts):
@@ -196,8 +201,6 @@ def tiles(orders, events, now):
         return '<span class=rbar><i class="%s" style="width:%.0f%%"></i></span>' % ("bad" if f >= 1 else "warn" if f >= warn else "", 100 * f)
 
     out = [
-        ("Bot's value", usd(v), "Your $25 %s %s from settled bets. Peak %s." % ("minus" if net < -0.004 else "plus", usd(abs(net)), usd(peak)),
-         "pos" if net > 0.004 else "neg" if net < -0.004 else ""),
         ("Open bets", usd(risk), "%d bet%s waiting for Kalshi's result. At most %s at risk at once." % (
             nopen, "" if nopen == 1 else "s", usd(MAX_AT_RISK)) + bar(risk, MAX_AT_RISK), ""),
         ("Settled bets", "%d won, %d lost" % (len(won), len(settled) - len(won)),
@@ -211,56 +214,29 @@ def tiles(orders, events, now):
         '<div><dt>%s</dt><dd class="%s">%s</dd><p>%s</p></div>' % (e(a), c, e(b), p) for a, b, p, c in out)
 
 
-def chart(orders, events, now):
-    """Value over time (steps at each settlement) with a marker at every real order and every settlement."""
-    real = sorted((o for o in orders if o["env"] == "prod" and o["status"] not in NOT_SENT and (o.get("fill_count") or 0) > 0),
-                  key=lambda o: o["ts"])
-    if not real:
-        return '<p class=note>No real orders yet. The first ones appear here after an evening scan copies a paper trade.</p>'
-    u = last_event(events, "prod", ("unlock",))
-    t0 = min([real[0]["ts"]] + ([u["ts"]] if u else [])) - 3600
-    t1 = max(now, max(o.get("settled_ts") or 0 for o in real)) + 1800
-    pts, cum = [(t0, STAKE)], 0.0
-    for o in sorted((o for o in real if o.get("settled_ts") is not None), key=lambda o: (o["settled_ts"], o["id"])):
-        pts.append((o["settled_ts"], STAKE + cum))
-        cum += o.get("pnl") or 0
-        pts.append((o["settled_ts"], STAKE + cum))
-    pts.append((t1, STAKE + cum))
-    _, peak, _ = value_track(orders, events)
-    floor = (1 - DRAWDOWN) * peak
-    lo = min([p[1] for p in pts] + [floor]) - 0.5
-    hi = max([p[1] for p in pts] + [STAKE]) + 0.5
-    W, H, L, R, T, B = 720, 260, 52, 12, 14, 34
-    X = lambda t: L + (W - L - R) * (t - t0) / max(1.0, t1 - t0)
-    Y = lambda v: T + (H - T - B) * (hi - v) / max(0.01, hi - lo)
-    path = "M" + " L".join("%.1f,%.1f" % (X(t), Y(v)) for t, v in pts)
-    g = ['<line class=base x1=%d x2=%d y1=%.1f y2=%.1f />' % (L, W - R, Y(STAKE), Y(STAKE)),
-         '<line class=floor x1=%d x2=%d y1=%.1f y2=%.1f />' % (L, W - R, Y(floor), Y(floor)),
-         '<text class=ax x=4 y=%.1f>%s</text>' % (Y(STAKE) + 4, usd(STAKE)),
-         '<text class=ax x=4 y=%.1f>%s</text>' % (Y(floor) + 4, usd(floor)),
-         '<path class=ln d="%s" />' % path]
-    span = (t1 - t0) / 86400.0
-    step = 1 if span <= 14 else 7 if span <= 120 else 30
-    day = datetime.fromtimestamp(t0, TZ).replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
-    if day.timestamp() >= t1:   # everything inside one day: label its start
-        g.append('<text class=ax x=%d y=%d>%s</text>' % (L, H - 10, datetime.fromtimestamp(t0, TZ).strftime("%b %d").replace(" 0", " ")))
-    k = 0
-    while day.timestamp() < t1:
-        if k % step == 0:
-            g.append('<text class=ax x=%.1f y=%d text-anchor=middle>%s</text>' % (X(day.timestamp()), H - 10, day.strftime("%b %d").replace(" 0", " ")))
-        day += timedelta(days=1)
-        k += 1
-    v_at = lambda t: ([v for tt, v in pts if tt <= t] or [STAKE])[-1]
+def groups(items, key):
+    """Markers closer than 45 minutes to a group's first item are one marker (bets placed in one scan, results
+    recorded in one settle); otherwise they would sit on top of each other and only one could be read."""
+    out = []
+    for it in sorted(items, key=key):
+        if out and key(it) - key(out[-1][0]) <= 2700:
+            out[-1].append(it)
+        else:
+            out.append([it])
+    return out
 
-    def groups(items, key):
-        """Markers closer than 45 minutes are one marker (bets placed in one scan, results recorded in one settle)."""
-        out = []
-        for it in sorted(items, key=key):
-            if out and key(it) - key(out[-1][0]) <= 2700:
-                out[-1].append(it)
-            else:
-                out.append([it])
-        return out
+
+def chart_data(orders, events, now):
+    """What the chart draws: dict(t0, now, start, steps=[[settled_ts, change]], markers=[{t, kind, tip}]), or None
+    without real orders. The value at t is $25 plus the net of orders settled at or before t, as live.py counts it
+    (fees are part of a settled order's P&L, so the line moves only when a bet settles)."""
+    real = [o for o in orders if o["env"] == "prod" and o["status"] not in NOT_SENT and (o.get("fill_count") or 0) > 0]
+    if not real:
+        return None
+    u = last_event(events, "prod", ("unlock",))
+    t0 = min([min(o["ts"] for o in real)] + ([u["ts"]] if u else [])) - 3600
+    steps = [[o["settled_ts"], round(o.get("pnl") or 0, 6)]
+             for o in sorted((o for o in real if o.get("settled_ts") is not None), key=lambda o: (o["settled_ts"], o["id"]))]
 
     def bought(o):
         city, side = bet_words(o)
@@ -269,11 +245,11 @@ def chart(orders, events, now):
             usd(o.get("cost") or 0), usd(o.get("fees") or 0),
             ", waiting for Kalshi's result" if o.get("result") is None else ", settled %s: %s" % (o["result"].upper(), plus(o.get("pnl") or 0)))
 
+    marks = []
     for grp in groups(real, lambda o: o["ts"]):
         t = grp[0]["ts"]
-        tip = "%s: %s placed. %s." % (when(t), "1 bet" if len(grp) == 1 else "%d bets" % len(grp), "; ".join(bought(o) for o in grp))
-        g.append('<g class="mk buy" tabindex=0 data-tip="%s"><circle cx=%.1f cy=%.1f r=%d /></g>' % (
-            e(tip), X(t), Y(v_at(t)), 6 if len(grp) == 1 else 8))
+        marks.append(dict(t=t, kind="buy", tip="%s: %s placed. %s." % (
+            when(t), "1 bet" if len(grp) == 1 else "%d bets" % len(grp), "; ".join(bought(o) for o in grp))))
     for grp in groups([o for o in real if o.get("settled_ts") is not None], lambda o: o["settled_ts"]):
         t = grp[-1]["settled_ts"]
         net = sum(o.get("pnl") or 0 for o in grp)
@@ -281,15 +257,136 @@ def chart(orders, events, now):
         for o in grp:
             city, side = bet_words(o)
             p = o.get("pnl") or 0
-            parts.append("%s %s %s %s (paid %s + fee %s)" % (city, side, "won" if p > 0 else "lost", plus(p),
-                                                             usd(o.get("cost") or 0), usd(o.get("fees") or 0)))
-        tip = "%s: %s settled, net %s. %s." % (when(t), "1 bet" if len(grp) == 1 else "%d bets" % len(grp), plus(net), "; ".join(parts))
-        g.append('<g class="mk %s" tabindex=0 data-tip="%s"><circle cx=%.1f cy=%.1f r=%d /></g>' % (
-            "won" if net > 0 else "lost", e(tip), X(t), Y(v_at(t)), 6 if len(grp) == 1 else 8))
-    return ('<p class=rleg><span><i style="background:#3b7ddd"></i>Order placed</span><span><i style="background:var(--pos,#2a7)"></i>Won</span>'
-            '<span><i style="background:var(--neg,#c33)"></i>Lost</span><span>Dashed lines: your $25, and the 25%% end-rule floor</span></p>'
-            '<div class=rchart><svg viewBox="0 0 %d %d" role=img aria-label="The bot\'s real-money value over time, with a marker at every order">%s</svg></div>'
-            '<p class=note>Hover over a marker, or tap it, to see the bet and how it settled. The line moves only when a bet settles.</p>') % (W, H, "".join(g))
+            parts.append("%s %s %s %s (paid %s + fee %s)" % (city, side, "void, fee kept" if o.get("result") == "void" else
+                                                             "won" if p > 0 else "lost", plus(p), usd(o.get("cost") or 0), usd(o.get("fees") or 0)))
+        marks.append(dict(t=t, kind="won" if net > 0 else "lost", tip="%s: %s settled, net %s. %s." % (
+            when(t), "1 bet" if len(grp) == 1 else "%d bets" % len(grp), plus(net), "; ".join(parts))))
+    return dict(t0=t0, first=min(o["ts"] for o in real), now=now, start=STAKE, steps=steps, markers=sorted(marks, key=lambda m: m["t"]))
+
+
+def value_at(d, t):
+    return d["start"] + sum(c for ts, c in d["steps"] if ts <= t)
+
+
+def static_svg(d):
+    """The chart without JavaScript (all time, markers with their text), replaced by the interactive one."""
+    W, H, PT, PB, PR = 720, 220, 22, 26, 10
+    start, now = d["t0"], d["now"]
+    pts = [[start, value_at(d, start)]] + [[t, value_at(d, t)] for t, _ in d["steps"] if start < t <= now] + [[now, value_at(d, now)]]
+    lo = min(p[1] for p in pts); hi = max(p[1] for p in pts)
+    pad = max((hi - lo) * 0.15, 0.25); lo -= pad; hi += pad
+    X = lambda t: (t - start) / max(1.0, now - start) * (W - PR)
+    Y = lambda v: PT + (hi - v) / (hi - lo) * (H - PT - PB)
+    path = "M%.1f %.1f" % (X(pts[0][0]), Y(pts[0][1])) + "".join(" H%.1f V%.1f" % (X(t), Y(v)) for t, v in pts[1:])
+    ch = pts[-1][1] - pts[0][1]
+    tone = "up" if ch > 0.004 else "down" if ch < -0.004 else "flat"
+    g = ['<line class=bl x1=0 x2=%d y1=%.1f y2=%.1f />' % (W, Y(pts[0][1]), Y(pts[0][1])), '<path class=ln d="%s" />' % path]
+    for m in d["markers"]:
+        if start <= m["t"] <= now:
+            g.append('<g class="mk %s" tabindex=0 data-tip="%s"><title>%s</title><circle cx=%.1f cy=%.1f r=6 /></g>' % (
+                m["kind"], e(m["tip"]), e(m["tip"]), X(m["t"]), Y(value_at(d, m["t"]))))
+    return '<svg viewBox="0 0 %d %d" class=%s role=img aria-label="The bot\'s real-money value since the first order">%s</svg>' % (W, H, tone, "".join(g))
+
+
+JS = r"""
+(function(){var el=document.getElementById('rv-data');if(!el)return;
+var D=JSON.parse(el.textContent),rng='ALL';
+var RANGES={'1D':86400,'1W':7*86400,'1M':30*86400,'ALL':0};
+var PER={'1D':'Past 24 hours','1W':'Past week','1M':'Past month','ALL':'Since the first real order'};
+var TZ='America/La_Paz';
+function $(i){return document.getElementById(i)}
+function money(x){return (x<-0.004?'−$':'$')+Math.abs(x).toFixed(2)}
+function signed(x){return (x>0.004?'+':(x<-0.004?'−':''))+'$'+Math.abs(x).toFixed(2)}
+function dt(ts){var d=new Date(ts*1000);return d.toLocaleDateString(undefined,{month:'short',day:'numeric',timeZone:TZ})+', '+d.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit',timeZone:TZ})}
+function valueAt(t){var v=D.start;D.steps.forEach(function(s){if(s[0]<=t)v+=s[1]});return v}
+var NS='http://www.w3.org/2000/svg';
+function sv(tag,a){var n=document.createElementNS(NS,tag);for(var k in a)n.setAttribute(k,a[k]);return n}
+function tone(ch){return ch>0.004?'up':(ch<-0.004?'down':'flat')}
+function headline(v,base,label){var ch=v-base,d=$('rv-d');
+  $('rv-v').textContent=money(v);
+  d.className='acct-d '+(ch>0.004?'pos':(ch<-0.004?'neg':''));
+  d.querySelector('.arr').textContent=ch>0.004?'▲':(ch<-0.004?'▼':'');
+  $('rv-dv').textContent='$'+Math.abs(ch).toFixed(2)+' ('+(base?Math.abs(ch/base*100):0).toFixed(2)+'%)';
+  $('rv-sg').textContent=ch>0.004?'up ':(ch<-0.004?'down ':'no change ');
+  $('rv-per').textContent=label}
+var view=null;
+function draw(){
+  var now=D.now,span=RANGES[rng],start=span?Math.max(D.t0,now-span):D.t0;
+  var base=valueAt(start),cur=valueAt(now),pts=[[start,base]];
+  D.steps.forEach(function(s){if(s[0]>start&&s[0]<=now)pts.push([s[0],valueAt(s[0])])});
+  pts.push([now,cur]);
+  var box=$('rv-chart'),W=Math.max(280,box.clientWidth),H=box.clientHeight||220,PT=22,PB=26,PR=10;
+  var lo=Math.min.apply(null,pts.map(function(p){return p[1]})),hi=Math.max.apply(null,pts.map(function(p){return p[1]}));
+  var pad=Math.max((hi-lo)*0.15,0.25);lo-=pad;hi+=pad;
+  var X=function(t){return now>start?(t-start)/(now-start)*(W-PR):0},Y=function(v){return PT+(hi-v)/(hi-lo)*(H-PT-PB)};
+  var d='M'+X(pts[0][0]).toFixed(1)+' '+Y(pts[0][1]).toFixed(1);
+  for(var j=1;j<pts.length;j++){d+=' H'+X(pts[j][0]).toFixed(1)+' V'+Y(pts[j][1]).toFixed(1)}
+  var cls=tone(cur-base);
+  var s=sv('svg',{viewBox:'0 0 '+W+' '+H,role:'img',tabindex:'0','class':cls,
+    'aria-label':"The bot's real-money value: "+money(cur)+' now, '+signed(cur-base)+' '+PER[rng].toLowerCase()+'. Drag or use the arrow keys to read past values; the markers are the bets.'});
+  s.appendChild(sv('line',{'class':'bl',x1:0,x2:W,y1:Y(base),y2:Y(base)}));
+  s.appendChild(sv('path',{'class':'ln',d:d}));
+  var xh=sv('line',{'class':'xh',x1:0,x2:0,y1:4,y2:H-PB+6,visibility:'hidden'});s.appendChild(xh);
+  var tl=sv('text',{'class':'tl',x:0,y:H-6,'text-anchor':'middle',visibility:'hidden'});s.appendChild(tl);
+  var dot=sv('circle',{'class':'dot',cx:X(now),cy:Y(cur),r:4.5});s.appendChild(dot);
+  var shown=0;
+  D.markers.forEach(function(m){if(m.t<start||m.t>now)return;shown++;
+    var g=sv('g',{'class':'mk '+m.kind,tabindex:'0','data-tip':m.tip,role:'img','aria-label':m.tip});
+    g.appendChild(sv('circle',{cx:X(m.t),cy:Y(valueAt(m.t)),r:6}));s.appendChild(g)});
+  if(!D.steps.length){var m=sv('text',{'class':'emptyc',x:W/2,y:Math.min(Y(base)+28,H-PB-4),'text-anchor':'middle'});
+    m.textContent=shown?'No bets settled yet: the line moves when Kalshi settles them':'No bets in this period';s.appendChild(m)}
+  box.innerHTML='';box.appendChild(s);box.className='acct-chart '+cls;
+  $('rv-rng').className='rrng '+cls;
+  view={start:start,now:now,X:X,Y:Y,W:W,base:base,cur:cur,xh:xh,tl:tl,dot:dot,svg:s,k:-1,pts:pts,label:PER[rng]+' · from '+money(base)};
+  headline(cur,base,view.label);
+  s.addEventListener('pointermove',scrub);s.addEventListener('pointerdown',scrub);
+  s.addEventListener('pointerleave',reset);s.addEventListener('pointerup',function(ev){if(ev.pointerType!=='mouse')reset()});
+  s.addEventListener('keydown',keys);s.addEventListener('blur',reset)}
+function show(t){var v=valueAt(t),x=view.X(t);
+  view.xh.setAttribute('x1',x);view.xh.setAttribute('x2',x);view.xh.setAttribute('visibility','visible');
+  view.tl.textContent=dt(t);view.tl.setAttribute('x',Math.min(Math.max(x,48),view.W-48));view.tl.setAttribute('visibility','visible');
+  view.dot.setAttribute('cx',x);view.dot.setAttribute('cy',view.Y(v));headline(v,view.base,dt(t))}
+function scrub(ev){if(!view)return;if(ev.target.closest&&ev.target.closest('.mk')){reset();return}
+  var r=view.svg.getBoundingClientRect(),f=Math.min(Math.max((ev.clientX-r.left)/r.width,0),1);show(view.start+f*(view.now-view.start))}
+function keys(ev){if(!view)return;var n=view.pts.length;
+  if(ev.key==='ArrowLeft'||ev.key==='ArrowRight'){ev.preventDefault();view.k=(view.k<0?n-1:view.k)+(ev.key==='ArrowLeft'?-1:1);view.k=Math.min(Math.max(view.k,0),n-1);show(view.pts[view.k][0])}
+  else if(ev.key==='Escape'){reset()}}
+function reset(){if(!view)return;view.k=-1;view.xh.setAttribute('visibility','hidden');view.tl.setAttribute('visibility','hidden');
+  view.dot.setAttribute('cx',view.X(view.now));view.dot.setAttribute('cy',view.Y(view.cur));headline(view.cur,view.base,view.label)}
+$('rv-rng').hidden=false;Array.prototype.forEach.call(document.querySelectorAll('#real .rv-js'),function(n){n.hidden=false});
+Array.prototype.forEach.call(document.querySelectorAll('#rv-rng button'),function(b){b.addEventListener('click',function(){rng=b.getAttribute('data-r');
+  Array.prototype.forEach.call(document.querySelectorAll('#rv-rng button'),function(x){x.setAttribute('aria-pressed',x===b?'true':'false')});draw()})});
+try{draw()}catch(err){}
+var rt;window.addEventListener('resize',function(){clearTimeout(rt);rt=setTimeout(function(){try{draw()}catch(err){}},150)});
+})();
+"""
+
+
+def chart(orders, events, now):
+    """The value panel: headline, chart (interactive with JavaScript, a static drawing without), ranges, legend."""
+    d = chart_data(orders, events, now)
+    if d is None:
+        return '<p class=note>No real orders yet. The first ones appear here after an evening scan copies a paper trade.</p>'
+    v0, v1 = value_at(d, d["t0"]), value_at(d, now)
+    ch = v1 - v0
+    js = json.dumps(d, separators=(",", ":"), allow_nan=False).replace("&", "\\u0026").replace("<", "\\u003c").replace(">", "\\u003e")
+    tone = "up" if ch > 0.004 else "down" if ch < -0.004 else "flat"
+    first = datetime.fromtimestamp(d["first"], TZ).strftime("%b %d").replace(" 0", " ")
+    return ('<p class=acct-v id=rv-v>%s</p>'
+            '<p class="acct-d %s" id=rv-d><span class=arr aria-hidden=true>%s</span><span class=sr id=rv-sg>%s </span>'
+            '<span id=rv-dv>$%.2f (%.2f%%)</span> <span class=per id=rv-per>Since the first real order (%s) \u00b7 from %s</span></p>'
+            '<div class="acct-chart rv-static %s" id=rv-chart>%s</div>'
+            '<div class="rrng %s" id=rv-rng role=group aria-label="Time range for the real-money chart" hidden>%s</div>'
+            '<p class=rleg><span><i style="background:#3b7ddd"></i>Bets placed</span><span><i style="background:var(--good,#0ca30c)"></i>Settled, net won</span>'
+            '<span><i style="background:var(--bad,#d03b3b)"></i>Settled, net lost</span></p>'
+            '<p class=note>The bot&#8217;s value: your $25 plus the net of settled bets, as live.py counts it for its stops. It moves only when '
+            'Kalshi settles a bet.<span class=rv-js hidden> Drag across the chart (or use the arrow keys) to read past values; hover over or tap a marker to see the bets.</span></p>'
+            '<script type="application/json" id=rv-data>%s</script>') % (
+        usd(v1), "pos" if ch > 0.004 else "neg" if ch < -0.004 else "", "\u25b2" if ch > 0.004 else "\u25bc" if ch < -0.004 else "",
+        "up" if ch > 0.004 else "down" if ch < -0.004 else "no change", abs(ch), abs(ch) / v0 * 100 if v0 else 0.0, first, usd(v0),
+        tone, static_svg(d), tone,
+        "".join('<button type=button data-r="%s" aria-pressed=%s>%s</button>' % (r, "true" if r == "ALL" else "false", r)
+                for r in ("1D", "1W", "1M", "ALL")), js)
 
 
 def calendar(orders, now):
@@ -373,11 +470,12 @@ def section(orders, events, paper, now, killed, stop_date, table):
     demo = [o for o in orders if o["env"] == "demo" and o["status"] not in NOT_SENT and (o.get("fill_count") or 0) > 0]
     rows, skipped, unknown = order_rows(orders)
     pv, pt, rt = paper_vs_real(orders, paper)
-    head = ('<section class="panel real" id=real aria-labelledby=real-h><h2 id=real-h>Real money on Kalshi <span class="rstate %s">%s</span></h2>'
-            '<p class=lead>%s Orders come only from live.py, which copies the paper bot&#8217;s rain bets after each evening scan, '
-            'within your limits. This page only reads the bot&#8217;s ledger (live.db); <code>.\\run live status</code> also shows Kalshi&#8217;s own balance.</p>') % (
-        cls, e(lab), e(sent))
-    body = [head, tiles(orders, events, now), '<h3>Value over time</h3>', chart(orders, events, now), calendar(orders, now),
+    head = ('<section class="panel real acct" id=real aria-labelledby=real-h><div class=rv-top><h2 id=real-h>Real money on Kalshi</h2>'
+            '<span class="rstate %s">%s</span></div>') % (cls, e(lab))
+    body = [head, chart(orders, events, now), tiles(orders, events, now),
+            '<p class=note>%s Orders come only from live.py, which copies the paper bot&#8217;s rain bets after each evening scan, '
+            'within your limits. This page only reads the bot&#8217;s ledger (live.db); <code>.\\run live status</code> also shows '
+            'Kalshi&#8217;s own balance.</p>' % e(sent), calendar(orders, now),
             '<h3>Real orders</h3>',
             table(["Market day", "City", "Bet", "Contracts", "Limit price", "Cost incl. fee", "Result", "P&amp;L"], rows,
                   "No real orders yet.", num=(3, 4, 5, 7)),

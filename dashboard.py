@@ -684,7 +684,7 @@ def build_page(D,live=False):
       table(["Market","Ver","Side","Result","Outcome","P&amp;L"],done_rows,"No settled trades yet.",num=(5,)),
       table(["Version and type","Role","Logged","Resolved","Brier forecast","Brier market","Settled trades","P&amp;L"],ver_rows,"Nothing yet.",num=(2,3,4,5,6,7)))
     return ('<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover">'
-          '<title>Tradebot Dashboard</title><style>'+CSS+(AV.ACCT_CSS if AV else "")+(RV.CSS if RV else "")+(CV.CSS if CV else "")+'</style></head><body'+(' data-live=1' if live else '')+'>'+body+'<script>'+JS+(AV.ACCT_JS if AV else "")+'</script></body></html>')
+          '<title>Tradebot Dashboard</title><style>'+CSS+(AV.ACCT_CSS if AV else "")+(RV.CSS if RV else "")+(CV.CSS if CV else "")+'</style></head><body'+(' data-live=1' if live else '')+'>'+body+'<script>'+JS+(AV.ACCT_JS if AV else "")+(RV.JS if RV else "")+'</script></body></html>')
 def main():
     live="--live" in sys.argv
     out=write_page(build_page(read_db(),live),live)
