@@ -1,0 +1,99 @@
+# PLAN10 (research only, research/PLAN10.md): NOAA HRRR rain fields reduced to per-station features, on GitHub's
+# runner (plan section 9). Started by hand only, one stage at a time, in the plan's order (section 8):
+#   check (one field, keys and grid size only) -> train-download -> fit -> holdout-download ; the score runs on the PC (Kalshi's prices and results never come here).
+# The packages (ecCodes with numpy, the library under cfgrib/xarray) and the download from NOAA's Amazon bucket
+# noaa-hrrr-bdp-pds were approved by the user on 2026-11-11 for PLAN10 only (CLAUDE.md section 3); they are installed on
+# this runner, never on the PC. Every request carries User-Agent tradebot-paper-research/1.0 (research/plan10.py's own
+# fetcher). Only the derived per-station features and results under research/results/plan10* are committed: never a
+# raw GRIB, index or netCDF file. This repository is public: nothing from the PC's research/data is ever committed.
+name: PLAN10 HRRR (research)
+on:
+  workflow_dispatch:
+    inputs:
+      stage:
+        description: "check (first), train-download, fit, holdout-download or score (score only says it runs on the PC)"
+        required: true
+        type: choice
+        options: [check, train-download, fit, holdout-download, score]
+concurrency:
+  group: tradebot-plan10   # its own group: never cancels a scan, a settle or a PLAN5 L sample
+  cancel-in-progress: false
+permissions:
+  contents: write
+jobs:
+  plan10:
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    env:
+      TZ: America/La_Paz
+    steps:
+      # Actions pinned to the commits of their release tags (read from github.com with git ls-remote, 2026-11-13).
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09   # v5.1.0
+        with:
+          ref: main
+      - name: Score runs on the PC
+        if: inputs.stage == 'score'
+        run: |
+          echo "PLAN10's score runs once on the PC (research/PLAN10.md section 9): python research/plan10.py score"
+          echo "Kalshi's prices and the holdout outcomes stay in the PC's research/data and are never committed here."
+          exit 0
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1   # v6.3.0
+        if: inputs.stage != 'score'
+        with:
+          python-version: "3.12"
+      # ecCodes pinned (PyPI, checked 2026-11-13): eccodes 2.50.0 (2026-10-15, pure-Python bindings) with its Linux
+      # binary library eccodeslib 2.50.0.33 (2026-10-16; brings eckitlib 2.5.0.33). numpy comes with eccodes. The fit
+      # needs no package (standard library only).
+      - name: Install the approved packages (runner only)
+        if: inputs.stage == 'check' || inputs.stage == 'train-download' || inputs.stage == 'holdout-download'
+        run: |
+          pip install requests==2.32.3 eccodes==2.50.0 eccodeslib==2.50.0.33
+          python -c "import eccodes; print('ecCodes API', eccodes.codes_get_api_version())"
+      - name: Preconditions
+        if: inputs.stage != 'score'
+        run: |
+          # raw GRIB bytes live in TMPDIR for one decode, then are deleted; off-folder copies are the PC's job
+          echo "TMPDIR=$RUNNER_TEMP/plan10_tmp" >> "$GITHUB_ENV"
+          echo "TRADEBOT_OFFSITE_BACKUPS=$RUNNER_TEMP/offsite" >> "$GITHUB_ENV"
+          mkdir -p "$RUNNER_TEMP/plan10_tmp"
+          for f in plan10_identity.json plan10_request.json plan10_train_outcomes.json; do
+            git ls-files --error-unmatch "research/results/$f" >/dev/null 2>&1 || { echo "research/results/$f is not committed (run freeze and request on the PC first)"; exit 1; }
+          done
+          if [ "${{ inputs.stage }}" = "fit" ] && [ -e research/results/plan10_model.json ]; then
+            echo "research/results/plan10_model.json exists: the model is fitted once and never refitted"; exit 1
+          fi
+          if [ "${{ inputs.stage }}" = "holdout-download" ]; then
+            git ls-files --error-unmatch research/results/plan10_model.json >/dev/null 2>&1 || { echo "the frozen model is not committed: the holdout download waits for it"; exit 1; }
+            git diff --quiet HEAD -- research/results/plan10_model.json || { echo "the model differs from the committed one"; exit 1; }
+          fi
+      - name: Check one training field (keys and grid size only; writes nothing)
+        if: inputs.stage == 'check'
+        run: python research/plan10.py check
+      - name: Train download (counts only in the log)
+        if: inputs.stage == 'train-download'
+        run: python research/plan10.py train-download --budget-minutes 320
+      - name: Fit (once)
+        if: inputs.stage == 'fit'
+        run: python research/plan10.py fit
+      - name: Holdout download (counts only in the log; refused unless the model is committed)
+        if: inputs.stage == 'holdout-download'
+        run: python research/plan10.py holdout-download --budget-minutes 320
+      - name: Commit the derived features and results only
+        if: always() && inputs.stage != 'score' && inputs.stage != 'check'
+        run: |
+          rm -rf "$RUNNER_TEMP/plan10_tmp"
+          git config user.name "tradebot-runner"
+          git config user.email "tradebot-runner@users.noreply.github.com"
+          if [ -d research/results/plan10_features ]; then git add -A research/results/plan10_features; fi
+          if [ -e research/results/plan10_model.json ]; then git add research/results/plan10_model.json; fi
+          # never a raw file, and nothing but the features and the model (not the identity record or the request)
+          bad=$(git diff --cached --name-only | grep -Ev '^(research/results/plan10_features/|research/results/plan10_model\.json$)' || true)
+          raw=$(git diff --cached --name-only | grep -Ei '\.(grib2?|idx|nc|nc4|tmp)$' || true)
+          if [ -n "$bad$raw" ]; then echo "refusing to commit: $bad $raw"; git reset -q; exit 1; fi
+          git commit -m "PLAN10 ${{ inputs.stage }} $(date -u +%FT%H:%MZ)" || { echo "nothing new"; exit 0; }
+          for i in 1 2 3 4 5 6; do
+            git push origin HEAD:main && exit 0
+            sleep $((i * 10))
+            git pull --rebase origin main || { git rebase --abort 2>/dev/null || true; }
+          done
+          exit 1

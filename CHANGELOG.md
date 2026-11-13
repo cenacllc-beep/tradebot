@@ -1885,3 +1885,30 @@ unfamiliar codebase ... do not change functionality. only upgrade the code quali
   draft of research/plan10.py (written that morning, reviewed by no one, never deployed or pushed) was lost with it. It
   will be written again; no data had been downloaded. Drafts are now kept in the PC folder as well as the cloud.
 - No rule, limit, lock or threshold changed; v3 and live.py untouched.
+
+## 2026-11-13 10:45 (local) - r86: PLAN10 and PLAN15 code written, code-reviewed, fixed; the user's 7 clarifications applied (not frozen yet)
+- research/plan10.py (HRRR; rewritten after the lost draft), research/plan15.py (15-minute BTC/ETH markets), their
+  workflows (cloud/workflows/plan10.yml, plan15.yml; started by hand only; actions pinned to release commits) and
+  tests (tests/test_plan10.py, tests/test_plan15.py). Nothing downloaded yet.
+- Independent code reviews (agents/code-reviewer.md), all MUST and SHOULD items fixed:
+  - plan10: the holdout download now always needs the committed model; network and decode errors are counted, not
+    fatal; four scoring mutations that slipped past the tests are now caught; ecCodes pinned with a one-field check
+    stage; the commit guard allows only features and the model; the score re-checks the training rows.
+  - plan15: the archive's dollar prices were read as cents (100 times too small); the market listing used a filter
+    Kalshi refuses; numpy (not approved for PLAN15) removed; missing windows counted against 96 a day; fee history
+    fails closed; Coinbase requests overlap by a minute; three scoring mutations now caught; freeze runs on the PC.
+    Raw Coinbase prices are never stored (market-data terms); only the per-window numbers the test needs.
+- The user's "yes" of 2026-11-13 10:30 to seven clarifications, asked in so many words before any data:
+  - PLAN10: (1) the NOAA files are fetched with the project's own byte-range requests instead of Herbie, so every
+    request carries the User-Agent rule's string (same files, same decoding library); (2) "within 40 km" = great-circle
+    distance on the HRRR sphere (6,371.229 km) of 40.0 km or less, "0.01 inch" = 0.254 mm or more, the station's own
+    amount at the nearest grid point within 40 km, and no "confirmed" with fewer than 14 days; (3) the scored days'
+    per-station forecast numbers are committed publicly after the model is frozen (no prices or results); (4) West
+    Palm Beach markets under its old code KPBI count under KDJT (plan10.home_station, tested).
+  - PLAN15: (5) the spot "up or down" for the 97% check = the mean of minute 15's open, high, low and close against
+    S_0 (SPOT_AGREE_MEASURE = "ohlc15"); (6) the ridge on the summed log-likelihood (RIDGE_SCALE = "sum"); (7) a minute
+    with no Kalshi candle uses the last quote of the previous 5 minutes within the window (CARRY_FORWARD_QUOTE = True,
+    CARRY_MAX_MIN = 5). The other choices stay in the code as named constants and in the result record.
+- Still to do before the first download, on the PC: plan15 inspect and freeze; plan10 freeze and request. Their hashes
+  go into this log at the freeze.
+- No rule, limit, lock or threshold changed; v3, live.py and paper.db untouched.

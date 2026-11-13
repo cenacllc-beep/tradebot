@@ -1,0 +1,93 @@
+# PLAN15 (research only, research/PLAN15.md): Kalshi's 15-minute BTC and ETH up-or-down markets. Started by hand only
+# (workflow_dispatch), one stage per run. Public data only: Kalshi's public API (read-only GETs) and Coinbase Exchange's
+# public one-minute candles (approved by the user 2026-11-12; no account, no key). It never places, changes or cancels
+# an order, never touches trial/, paper.db or live.db, and commits only research/results/plan15* (it refuses to commit
+# anything else). Raw Coinbase candles are never written (plan15.py keeps only derived per-window values).
+# inspect and freeze run ON THE PC (the off-folder copy of the identity record must outlive the run) and their files
+# are committed first: every stage here refuses until research/results/plan15_identity.json and
+# research/results/plan15/inspect.json are committed and unchanged. The score runs only when the frozen model is
+# committed and unchanged; plan15.py itself refuses a second score.
+name: PLAN15 15-minute markets (research)
+on:
+  workflow_dispatch:
+    inputs:
+      stage:
+        description: "download-find | download-check | fit | score | status (inspect and freeze run on the PC)"
+        required: true
+        type: choice
+        options: [status, download-find, download-check, fit, score]
+      max_days:
+        description: "download only: at most this many asset-days in this run (empty = no limit)"
+        required: false
+        default: ""
+concurrency:
+  group: tradebot-plan15
+  cancel-in-progress: false
+permissions:
+  contents: write
+jobs:
+  stage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09   # v5.1.0
+        with:
+          ref: main
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1   # v6.3.0
+        with:
+          python-version: "3.12"
+      - name: Refuse every stage unless the identity record (made on the PC) is committed and unchanged
+        run: |
+          for f in research/results/plan15_identity.json research/results/plan15/inspect.json; do
+            git ls-files --error-unmatch "$f" >/dev/null 2>&1 || { echo "$f is not committed: run inspect and freeze on the PC and commit them first"; exit 1; }
+            git diff --quiet HEAD -- "$f" || { echo "$f differs from the commit: stopping"; exit 1; }
+          done
+      - name: Refuse the score unless the frozen model is committed and unchanged
+        if: inputs.stage == 'score'
+        run: |
+          for f in research/results/plan15_model.json research/results/plan15_model.sha256 research/results/plan15_identity.json; do
+            git ls-files --error-unmatch "$f" >/dev/null 2>&1 || { echo "$f is not committed: no score"; exit 1; }
+            git diff --quiet HEAD -- "$f" || { echo "$f differs from the commit: no score"; exit 1; }
+          done
+          want=$(tr -d '[:space:]' < research/results/plan15_model.sha256)
+          got=$(sha256sum research/results/plan15_model.json | cut -d' ' -f1)
+          [ "$want" = "$got" ] || { echo "model hash $got differs from the recorded $want: no score"; exit 1; }
+      - name: Run the stage
+        env:
+          TZ: UTC
+          PYTHONIOENCODING: utf-8
+          STAGE: ${{ inputs.stage }}
+          MAX_DAYS: ${{ inputs.max_days }}
+        run: |
+          extra=""
+          if [ -n "$MAX_DAYS" ]; then
+            case "$MAX_DAYS" in (*[!0-9]*) echo "max_days must be a whole number"; exit 1;; esac
+            extra="--max-days $MAX_DAYS"
+          fi
+          case "$STAGE" in
+            download-find)  python research/plan15.py download find $extra ;;
+            download-check) python research/plan15.py download check $extra ;;
+            fit|score|status) python research/plan15.py "$STAGE" ;;
+            *) echo "unknown stage $STAGE"; exit 1 ;;
+          esac
+      - name: Save research/results/plan15* in the repository (and nothing else)
+        if: always() && inputs.stage != 'status'
+        run: |
+          others=$(git status --porcelain --untracked-files=all | grep -v -E '^.. "?research/results/plan15' || true)
+          if [ -n "$others" ]; then echo "refusing to commit: files outside research/results/plan15* changed:"; echo "$others"; exit 1; fi
+          big=$(find research/results -path 'research/results/plan15*' -type f -size +50M)
+          if [ -n "$big" ]; then echo "refusing to commit files over 50 MB:"; echo "$big"; exit 1; fi
+          find research/results -path 'research/results/plan15*' -name '*.tmp' -type f -delete
+          git config user.name "tradebot-runner"
+          git config user.email "tradebot-runner@users.noreply.github.com"
+          git add -A -- 'research/results/plan15*'
+          git diff --cached --name-only | grep -v -E '^research/results/plan15' && { echo "refusing: staged files outside research/results/plan15*"; exit 1; }
+          git commit -m "PLAN15 $STAGE $(date -u +%FT%H:%MZ)" || { echo "nothing new"; exit 0; }
+          for i in 1 2 3 4 5 6; do
+            git push origin HEAD:main && exit 0
+            sleep $((i * 10))
+            git pull --rebase origin main || { git rebase --abort 2>/dev/null || true; }
+          done
+          exit 1
+        env:
+          STAGE: ${{ inputs.stage }}

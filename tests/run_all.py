@@ -39,6 +39,8 @@ TESTS=[("test_fix.py",[],"daily loss stop, migration, clear margin, single-look 
        ("test_plan7.py",[],"PLAN7: corrected v3 fitted once after the test, forward looks at 60 and 110 days, read-only"),
        ("test_plan8.py",[],"PLAN8: the price with the airport forecast mixed in, fitted once on past data, looks at 60 and 110 days"),
        ("test_plan9.py",[],"PLAN9: v3's hourly chances in 6-hour blocks, vs the price and vs v3, looks at 60 and 110 days"),
+       ("test_plan10.py",[],"PLAN10: HRRR features on synthetic grids, fit once, holdout after the model, scored once"),
+       ("test_plan15.py",[],"PLAN15: 15-minute BTC/ETH markets, random walk and frozen logistic models vs the price, scored once"),
        ("test_manifest.py",[],"code manifest: the same code on the PC, in the repository and in the working copy"),
        ("test_plan4launch.py",[],"PLAN4 chains started from a flag by the hourly job: once, detached, never while running"),
        ("test_moves.py",[],"renamed temperature series; PLAN5 L sampled on GitHub and the PC, merged once before the score"),
