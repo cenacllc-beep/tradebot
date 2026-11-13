@@ -1912,3 +1912,12 @@ unfamiliar codebase ... do not change functionality. only upgrade the code quali
 - Still to do before the first download, on the PC: plan15 inspect and freeze; plan10 freeze and request. Their hashes
   go into this log at the freeze.
 - No rule, limit, lock or threshold changed; v3, live.py and paper.db untouched.
+- 11:20 (local), same release: the PC link was down, so PLAN15's inspect and freeze can now run once on the GitHub
+  runner (workflow stage inspect-freeze; it refuses once an identity record is committed, and freeze() refuses too).
+  The public, timestamped commit of research/results/plan15_identity.json is its off-folder copy; the PC receives a
+  copy at the next deploy. The score stage also refuses if a result file was ever committed (full history checked),
+  so a deleted result cannot allow a second score. Reviewed (agents/code-reviewer.md): no MUST; both SHOULD items
+  applied.
+- Found the same morning: the 9:25 PM report and the 11:41 PM late-night check of Nov 12 fired about four hours late
+  (after 1 AM), so no reminder to wake the laptop arrived in time. Making the late-night check also run at 10:41 PM
+  needs the user's say-so (the change was not allowed from this session).

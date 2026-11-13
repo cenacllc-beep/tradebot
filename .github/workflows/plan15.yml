@@ -3,19 +3,20 @@
 # public one-minute candles (approved by the user 2026-11-12; no account, no key). It never places, changes or cancels
 # an order, never touches trial/, paper.db or live.db, and commits only research/results/plan15* (it refuses to commit
 # anything else). Raw Coinbase candles are never written (plan15.py keeps only derived per-window values).
-# inspect and freeze run ON THE PC (the off-folder copy of the identity record must outlive the run) and their files
-# are committed first: every stage here refuses until research/results/plan15_identity.json and
-# research/results/plan15/inspect.json are committed and unchanged. The score runs only when the frozen model is
+# inspect and freeze run once, in the stage inspect-freeze (2026-11-13: the PC link was down; the public, timestamped
+# commit of the identity record is its off-folder copy, and the PC receives a copy at the next deploy). freeze refuses
+# when an identity record already exists (it is part of the checkout once committed). Every other stage refuses until
+# research/results/plan15_identity.json and research/results/plan15/inspect.json are committed and unchanged. The score runs only when the frozen model is
 # committed and unchanged; plan15.py itself refuses a second score.
 name: PLAN15 15-minute markets (research)
 on:
   workflow_dispatch:
     inputs:
       stage:
-        description: "download-find | download-check | fit | score | status (inspect and freeze run on the PC)"
+        description: "inspect-freeze (once, first) | download-find | download-check | fit | score | status"
         required: true
         type: choice
-        options: [status, download-find, download-check, fit, score]
+        options: [status, inspect-freeze, download-find, download-check, fit, score]
       max_days:
         description: "download only: at most this many asset-days in this run (empty = no limit)"
         required: false
@@ -33,13 +34,21 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09   # v5.1.0
         with:
           ref: main
+          fetch-depth: 0   # full history: the score guard looks for any earlier result commit
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1   # v6.3.0
         with:
           python-version: "3.12"
-      - name: Refuse every stage unless the identity record (made on the PC) is committed and unchanged
+      - name: Refuse inspect-freeze when the code is already frozen
+        if: inputs.stage == 'inspect-freeze'
+        run: |
+          if git ls-files --error-unmatch research/results/plan15_identity.json >/dev/null 2>&1; then
+            echo "already frozen: research/results/plan15_identity.json is committed; it is stored once"; exit 1
+          fi
+      - name: Refuse every other stage unless the identity record is committed and unchanged
+        if: inputs.stage != 'inspect-freeze'
         run: |
           for f in research/results/plan15_identity.json research/results/plan15/inspect.json; do
-            git ls-files --error-unmatch "$f" >/dev/null 2>&1 || { echo "$f is not committed: run inspect and freeze on the PC and commit them first"; exit 1; }
+            git ls-files --error-unmatch "$f" >/dev/null 2>&1 || { echo "$f is not committed: run the inspect-freeze stage first"; exit 1; }
             git diff --quiet HEAD -- "$f" || { echo "$f differs from the commit: stopping"; exit 1; }
           done
       - name: Refuse the score unless the frozen model is committed and unchanged
@@ -48,6 +57,9 @@ jobs:
           for f in research/results/plan15_model.json research/results/plan15_model.sha256 research/results/plan15_identity.json; do
             git ls-files --error-unmatch "$f" >/dev/null 2>&1 || { echo "$f is not committed: no score"; exit 1; }
             git diff --quiet HEAD -- "$f" || { echo "$f differs from the commit: no score"; exit 1; }
+          done
+          for f in research/results/plan15_result.json research/results/plan15_result.md; do
+            if git log --oneline -- "$f" | grep -q .; then echo "$f was committed once: the plan is scored once"; exit 1; fi
           done
           want=$(tr -d '[:space:]' < research/results/plan15_model.sha256)
           got=$(sha256sum research/results/plan15_model.json | cut -d' ' -f1)
@@ -67,6 +79,7 @@ jobs:
           case "$STAGE" in
             download-find)  python research/plan15.py download find $extra ;;
             download-check) python research/plan15.py download check $extra ;;
+            inspect-freeze) python research/plan15.py inspect && python research/plan15.py freeze ;;
             fit|score|status) python research/plan15.py "$STAGE" ;;
             *) echo "unknown stage $STAGE"; exit 1 ;;
           esac
