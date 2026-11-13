@@ -134,4 +134,13 @@ calls.clear(); core.kill_file = lambda: "KILL"; L.DB = os.path.join(OUT, "live15
 L.tick(); assert not [x for x in calls if x != "/markets/KXBTC15M-W1"] and not L.rows(L.db())   # no bet; settling only
 core.kill_file = lambda: (_ for _ in ()).throw(OSError("unreadable"))
 assert L.halted(), "a failed kill-switch check halts (fail closed)"
+# the dashboard panel: a "not started yet" note on the PC before the first run, nothing on the cloud runner
+sys.path.insert(0, WORK)
+import dashboard as D
+os.environ["LIVE15_DB"] = os.path.join(OUT, "none.db")
+os.environ.pop("GITHUB_ACTIONS", None)
+h = D.live15_section(); assert "Not started yet" in h and "tasks\\install_live15.cmd" in h and "\\\\" not in h, h
+os.environ["GITHUB_ACTIONS"] = "true"; assert D.live15_section() == ""
+os.environ.pop("GITHUB_ACTIONS")
+os.environ["LIVE15_DB"] = os.path.join(OUT, "live15.db"); assert "Paper bets" in D.live15_section()
 print("live15: all checks passed")

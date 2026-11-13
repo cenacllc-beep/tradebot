@@ -2004,3 +2004,11 @@ unfamiliar codebase ... do not change functionality. only upgrade the code quali
   rule" (PLAN15 fills at minute k+1's close; live15 at the live ask); each run bets first and settles after, so a slow
   settlement never delays minute 2; the kill switch is checked before each decision and stops betting only (results
   are still recorded); PLAN15F says a run stopped by its 14-minute limit leaves its remaining decisions without a row.
+
+## 2026-11-13 19:45 (La Paz) - r90: the 15-minute panel shows before the first run
+- User: "Has the live 15 minutes betting been updated on the dashboard? Please update". It had not: the job is not
+  installed yet (no live15.db), and the panel stayed hidden until the first run. Now the panel always shows on the PC:
+  before the first run it says "Not started yet" and how to start it (double-click tasks\install_live15.cmd); then
+  the bets. Hidden on the GitHub runner (GITHUB_ACTIONS), which has no PC job. The error line carries the panel's id.
+  Presentation only. tests/test_live15.py covers the three cases.
+- Review (agents/code-reviewer.md): no MUST; applied both SHOULDs (cloud runner, test).

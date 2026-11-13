@@ -292,9 +292,15 @@ def real_section(D,tr,now):
         return '<section class=panel><h2>Real money on Kalshi</h2><p class=neg>The real-money ledger could not be read (%s). <code>.\\run live status</code> shows the account.</p></section>'%e(str(ex))
 def live15_section(now=None):
     """PLAN15F's live paper bets on the 15-minute BTC/ETH markets (research/live15.py's own ledger, read-only;
-    descriptive). "" when the job has not run yet; an unreadable ledger shows a line."""
+    descriptive). Before the job's first run, a short "not started yet" note; an unreadable ledger shows a line."""
     p=os.environ.get("LIVE15_DB") or os.path.join(os.path.dirname(os.path.abspath(__file__)),"research","data","live15.db")
-    if not os.path.exists(p): return ""
+    if not os.path.exists(p) and os.environ.get("GITHUB_ACTIONS"): return ""   # the cloud copy has no PC job
+    if not os.path.exists(p):   # not started yet: say how to start it (installing a Windows task is the user's step)
+        return ('<section class=panel id=live15><h2>15-minute paper bets (live) <span>research only, PLAN15F</span></h2>'
+          '<p class=note><b>Not started yet.</b> No paper bet has been made: the job that makes them is not installed or has not run. '
+          'To start it, double-click <code>tasks\\install_live15.cmd</code> in the tradebot folder once (it should print a line starting with OK). '
+          'From then on the PC makes paper bets on Kalshi&#8217;s 15-minute Bitcoin and Ethereum markets every 15 minutes while you are signed in, '
+          'and this panel shows them at the next hourly dashboard refresh. No real orders are ever placed.</p></section>')
     try:
         rp=os.path.join(os.path.dirname(os.path.abspath(__file__)),"research")
         if rp not in sys.path: sys.path.insert(0,rp)
@@ -329,7 +335,7 @@ def live15_section(now=None):
           table(["Time","Asset","Minute","Side","Price","Model up","Result","P&amp;L $"],recent) if recent else "<p>No paper bet yet.</p>")
     except Exception as ex:
         print("15-minute paper view failed:",ex)
-        return '<section class=panel><h2>15-minute paper bets (live)</h2><p class=neg>Its ledger could not be read (%s). <code>python research\\live15.py report</code> prints it.</p></section>'%e(str(ex))
+        return '<section class=panel id=live15><h2>15-minute paper bets (live)</h2><p class=neg>Its ledger could not be read (%s). <code>python research\\live15.py report</code> prints it.</p></section>'%e(str(ex))
 def live_tile():
     """Kalshi account tile (live.py's ledger, live.db), read-only. Added 2026-10-14 with live.py."""
     p=live_db_path()
