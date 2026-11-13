@@ -45,6 +45,7 @@ TESTS=[("test_fix.py",[],"daily loss stop, migration, clear margin, single-look 
        ("test_plan4launch.py",[],"PLAN4 chains started from a flag by the hourly job: once, detached, never while running"),
        ("test_moves.py",[],"renamed temperature series; PLAN5 L sampled on GitHub and the PC, merged once before the score"),
        ("test_learn.py",[],"learning report: pattern screen, read-only"),
+       ("test_real_view.py",[],"dashboard real-money section: same numbers as live.py, markers, read-only"),
        ("test_markets.py",[],"Kalshi vs Polymarket research: retries, fees, prices"),
        ("test_ui.py",[],"every dashboard button and tab (needs Playwright)")]
 def main():

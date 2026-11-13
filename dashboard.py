@@ -32,6 +32,8 @@ try: from dashboard_assets import CSS, JS   # static page assets (text only)
 except Exception as ex: CSS=JS=""; print("page styles unavailable (dashboard_assets.py: %s); the page is written unstyled"%ex)
 try: import account_view as AV   # paper account chart, activity, statements, gains report (presentation only)
 except Exception as ex: AV=None; print("account view unavailable:",ex)
+try: import real_view as RV   # real-money (Kalshi) section: presentation only, from live.db rows (added 2026-11-13)
+except Exception as ex: RV=None; print("real-money view unavailable:",ex)
 try: import freshness as FR   # data freshness checks (read-only; added 2026-10-23)
 except Exception as ex: FR=None; print("freshness checks unavailable:",ex)
 # Times on the page are in the bot's zone, La Paz (UTC-4 all year), whatever zone this PC uses (2026-10-23).
@@ -265,9 +267,32 @@ def backtest_panel(v4p=()):
             '(research/PLAN.md). It tests the next-version candidate, not the bot&#8217;s current model. Cities share weather, so the real sample is the %d days, '
             'not the market count. Lead = how much lower the forecast&#8217;s Brier score is than the market&#8217;s, per market; clear = at least twice the day-to-day noise.</p>%s</section>')%(
             say,tiles+table(["Forecast","Brier","Lead","Clear?"],rows,num=(1,2)),fwd,h["days"],plan2_block())
+def live_db_path():
+    return os.getenv("LIVE_DB") or os.path.join(os.path.dirname(os.path.abspath(DB)),"live.db")   # next to paper.db; an empty LIVE_DB counts as unset, as in live.py
+def read_live():
+    """live.db's orders and events as dicts, read-only (for real_view). ([], []) when there is no ledger."""
+    p=live_db_path()
+    if not os.path.exists(p): return [],[]
+    c=sqlite3.connect(Path(p).resolve().as_uri()+"?mode=ro",uri=True)
+    try:
+        c.row_factory=sqlite3.Row
+        return [dict(r) for r in c.execute("select * from orders")],[dict(r) for r in c.execute("select id,ts,env,kind,detail from events")]
+    finally: c.close()
+def real_section(D,tr,now):
+    """The real-money panel (real_view.py) from read_db()'s live.db rows, or "" when there is no prod activity; an
+    unreadable ledger shows a line."""
+    if not RV: return ""
+    try:
+        if D.get("live_error"): raise RuntimeError(D["live_error"])
+        orders,events=D.get("live_orders") or [],D.get("live_events") or []
+        if not any(o.get("env")=="prod" for o in orders) and not any(v.get("env")=="prod" and v.get("kind")!="setup" for v in events): return ""
+        return RV.section(orders,events,tr,now,killed(),STOP,table)
+    except Exception as ex:
+        print("real-money view failed:",ex)
+        return '<section class=panel><h2>Real money on Kalshi</h2><p class=neg>The real-money ledger could not be read (%s). <code>.\\run live status</code> shows the account.</p></section>'%e(str(ex))
 def live_tile():
     """Kalshi account tile (live.py's ledger, live.db), read-only. Added 2026-10-14 with live.py."""
-    p=os.getenv("LIVE_DB",os.path.join(os.path.dirname(os.path.abspath(DB)),"live.db"))   # next to paper.db, as live.py finds it when run from this folder
+    p=live_db_path()
     lock=("Real money locked until %s, then your call (<code>.\\run live unlock</code>)."%dstr(STOP)) if date.today()<STOP else "Real money stays locked until you run <code>.\\run live unlock</code>."
     if not os.path.exists(p):
         return '<div><dt>Kalshi account</dt><dd>Not connected</dd><p>Paper only so far. Demo account first (fake money): <code>.\\run live setup</code>. %s</p></div>'%lock
@@ -487,6 +512,8 @@ def read_db(db=None):
         AU["decisions_total"]=c.execute("select count(*) from decisions").fetchone()[0] if AU["scans"] else 0; c.close()
     except Exception as ex: sys.exit("Cannot open %s read-only: %s"%(db,ex))
     D["audit"]=AU
+    try: D["live_orders"],D["live_events"]=read_live(); D["live_error"]=None   # live.db, read-only (the real-money section)
+    except Exception as ex: D["live_orders"],D["live_events"],D["live_error"]=[],[],str(ex)
     return D
 def read_research():
     """(last market-structure run, research summaries, PLAN5 L sample count): text read for display, never acted on."""
@@ -631,9 +658,10 @@ def build_page(D,live=False):
             ctl=CV.section(dict(AU,trades=tr,shadow_orders=so,obs=obs,v4_paper=v4p,v4_obs=v4,marks=marks,structure_runs=sr,research_notes=notes,lip_samples=lip_n,freshness=fresh),table,now.timestamp())
         except Exception as ex: print("control center failed:",ex)
     chips=status_chips(kill,live,stopped,AU,obs,ra,fresh)
+    real=real_section(D,tr,now.timestamp())
     body=('<div class=wrap>'
-      '<header class=top><div><h1>Tradebot</h1><p>Kalshi weather test on paper. Orders on a Kalshi account come only from live.py: demo (fake money) now, real money locked until Nov 11.</p></div>'
-      '<div class=meta>%s<span>Updated %s</span></div></header>%s'
+      '<header class=top><div><h1>Tradebot</h1><p>Kalshi weather test: paper bets, and real-money copies of them placed only by live.py, within your limits.</p></div>'
+      '<div class=meta>%s<span>Updated %s</span></div></header>%s%s'
       '<section class=hero><p class=q>Does the NWS forecast beat Kalshi&#8217;s prices on rain markets?</p><p class=answer>%s</p>'
       '<div class=gatehead><span>Go-live gate, %s rain markets only</span><b>%d of 4 checks pass</b></div>%s%s</section>'
       '<div class=two><section class="panel"><h2>What to do next</h2><ol class=todo>%s</ol><p class=foot>%s Run commands from the tradebot folder.</p></section>'
@@ -647,7 +675,7 @@ def build_page(D,live=False):
       '<details><summary>Data by estimator version</summary>%s</details></section>'
       '<p class=fine><b>Read with caution.</b> Early samples are noise. Cities share weather systems, so the effective sample is far smaller than the market count. Paper results ignore slippage and use approximate fees. The shadow tests are research only and never count toward the gate. Not financial advice. Data before Oct 13, 2026 was lost when the project folder was deleted; the test restarted that day.</p>'
       '</div><div id=tip role=tooltip></div>')%(
-      chips,when(datetime.now(BOT_TZ))+" (UTC-4)",acct,verdict(rg,bf,bm,rain,passed,mg,look),e(GV),npass,gate,calendar(rain,nd,tr),
+      chips,when(datetime.now(BOT_TZ))+" (UTC-4)",real,acct,verdict(rg,bf,bm,rain,passed,mg,look),e(GV),npass,gate,calendar(rain,nd,tr),
       todo_html,lastline,money,backtest_panel(v4p),results(st),
       dsub,dumbbell(lrows),why,chart_table,
       e(GV),brier_view(bf,bm,len(rg),mg),shadow_view(so,sm,tr,v4,obs),ctl,
@@ -656,7 +684,7 @@ def build_page(D,live=False):
       table(["Market","Ver","Side","Result","Outcome","P&amp;L"],done_rows,"No settled trades yet.",num=(5,)),
       table(["Version and type","Role","Logged","Resolved","Brier forecast","Brier market","Settled trades","P&amp;L"],ver_rows,"Nothing yet.",num=(2,3,4,5,6,7)))
     return ('<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover">'
-          '<title>Tradebot Dashboard</title><style>'+CSS+(AV.ACCT_CSS if AV else "")+(CV.CSS if CV else "")+'</style></head><body'+(' data-live=1' if live else '')+'>'+body+'<script>'+JS+(AV.ACCT_JS if AV else "")+'</script></body></html>')
+          '<title>Tradebot Dashboard</title><style>'+CSS+(AV.ACCT_CSS if AV else "")+(RV.CSS if RV else "")+(CV.CSS if CV else "")+'</style></head><body'+(' data-live=1' if live else '')+'>'+body+'<script>'+JS+(AV.ACCT_JS if AV else "")+'</script></body></html>')
 def main():
     live="--live" in sys.argv
     out=write_page(build_page(read_db(),live),live)

@@ -1,0 +1,10 @@
+{
+ "amendments": [
+  {
+   "name": "file:research/plan10.py",
+   "sha256": "b3b713a71ae79bb060a3abc604cb14da0aec7a90396d88617db2574164c41964",
+   "reason": "Approved by the user 2026-11-13 13:03 La Paz ('Approved HRRR amendment'), before any bulk download. The cloud one-field check (run 43467250285) showed ecCodes returns typeOfFirstFixedSurface as the text 'sfc' unless read as a number, so decode_grib rejected every APCP field. The fix reads the six identity keys as integers (codes_get(gid, k, int)); nothing else in plan10.py changed, and no rule, threshold, feature or statistic of PLAN10 changed. No feature value had been computed with the old code.",
+   "recorded": "2026-11-13T13:10:00-04:00"
+  }
+ ]
+}

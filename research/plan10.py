@@ -656,14 +656,16 @@ def _decode(eccodes, path, run_day, cycle, fh):
             eccodes.codes_release(gid)
             raise Missing("more than one GRIB message in the downloaded range")
     try:
-        def get(k):
+        def get(k, ktype=None):
             try:
-                return eccodes.codes_get(gid, k)
+                return eccodes.codes_get(gid, k, ktype) if ktype else eccodes.codes_get(gid, k)
             except Exception:
                 return None
         want = dict(discipline=0, parameterCategory=1, parameterNumber=8, typeOfFirstFixedSurface=1,
                     dataDate=int(run_day.strftime("%Y%m%d")), dataTime=cycle * 100)
-        got = {k: get(k) for k in want}
+        # read as numbers: ecCodes gives some coded keys as text by default (typeOfFirstFixedSurface "sfc" for 1),
+        # found by the one-field check of 2026-11-13 before any bulk download
+        got = {k: get(k, int) for k in want}
         if got != want or str(get("stepRange")) != "0-%d" % fh:
             raise Missing("not the APCP 0-%d message: %s stepRange=%s" % (fh, got, get("stepRange")))
         sig = {k: get(k) for k in SIG_KEYS}

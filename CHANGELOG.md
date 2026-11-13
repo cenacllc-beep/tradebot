@@ -1922,14 +1922,34 @@ unfamiliar codebase ... do not change functionality. only upgrade the code quali
   (after 1 AM), so no reminder to wake the laptop arrived in time. Making the late-night check also run at 10:41 PM
   needs the user's say-so (the change was not allowed from this session).
 
-## 2026-11-13 12:55 (local) - PLAN15 and PLAN10 frozen
-- PLAN15 inspect and freeze ran on the GitHub runner at 10:50 (stage inspect-freeze). Kalshi's records confirmed the
-  plan's assumptions: each window starts at the market's open_time, the reference price is set on open markets, and
-  the fee is quadratic with multiplier 1 with no listed fee change. Identity: research/plan15.py 1999ad103a90,
-  research/PLAN15.md f185768108ae, research/results/plan15/inspect.json e6a63c552218. First download-find runs started.
-- PLAN10 frozen on the PC at 12:52 (identity: research/PLAN10.md 69208ee29042, research/plan10.py cfe5d6d4143b,
-  research/backtest.py 9aa956fc03ff, PLAN7's pinned functions as in plan8). Request: 33 stations, 1,692 holdout markets
-  (1,711 passed the quote rule; Houston Intercontinental KIAH, 19 markets, left out: not in v3's rain table, 1.1%, under
-  the 10% line); 12,041 training station-days. research/results/plan10_identity.json, plan10_request.json (stations,
-  coordinates, day-start hours, holdout days; no prices or results) and plan10_train_outcomes.json (the training
-  year's NWS climate-report outcomes only) committed to the repository for the runner.
+## 2026-11-13 13:40 (local) - r87: a real-money section on the dashboard (presentation only)
+- The user (12:39): "Does not appear the dashboard has been updated to show real money orders". Real orders were
+  working (Nov 12: three filled, one skipped by the no-rain filter), but the page showed them only as one line in the
+  Kalshi tile, and its header still said "real money locked until Nov 11".
+- New real_view.py (presentation only; dashboard.py's read_db() reads live.db read-only and passes the rows): a "Real
+  money on Kalshi" section above the paper account. It shows:
+  - the lock state, and whether new orders are held (daily stop, 25% drawdown, position mismatch, unknown order);
+  - tiles for the bot's value, open bets, wins and losses, the daily stop used, and the room left to the 25% end rule;
+  - a value chart with hover/tap markers for every order and settlement (bets of one scan or one settle share a marker);
+  - a calendar by market day, the order list, orders with an unknown outcome, paper bets not copied and why, and
+    paper vs real on the same markets.
+  The header now describes real money as it is.
+- The numbers are live.py's: value, peak, pause, daily loss, at-risk and fees match live.py on the same ledger. A test
+  checks this, and the reviewer checked 300 random ledgers. The page never writes live.db and never reads the Kalshi
+  settings file, so an unlock is described as what live.db records, with `.\run live status` as the full answer.
+- Independent code review (agents/code-reviewer.md): 1 MUST (the badge could say "Unlocked" while live.py held orders),
+  5 SHOULD, 5 COULD. All applied except the shared keyboard-focus tooltip timing, which predates this release.
+  Applied: the stops the page can see, and honest wording; core.fee itself (the copy rounded a cent low on 25
+  price/count pairs); unknown-outcome orders listed on their own; city names for the codes the tickers really use;
+  thinner date labels; live.db read in read_db(); group markers against a group's first order; clearer tile and table
+  wording; paper-vs-real totals only where both have settled; an empty LIVE_DB counts as unset.
+- tests/test_real_view.py (registered in run_all). No rule, limit, lock or threshold changed; live.py, v3 and
+  paper.db untouched.
+- Held back from this release: research/plan10.py's one-line decode fix (found by the cloud one-field check: ecCodes
+  returns typeOfFirstFixedSurface as "sfc" unless read as a number, so every field would have been rejected). The
+  code is frozen, so the fix needs the user's approval of an amendment before it ships.
+- 13:10, same release: the user approved the PLAN10 amendment ("Approved HRRR amendment", 13:03). research/plan10.py
+  reads the decoder's six identity keys as numbers (the one-line fix above); research/results/plan10_amendments.json
+  accepts its new hash b3b713a71ae7 with the reason. tests/test_plan10.py's fake decoder now answers like the real one
+  ("sfc" unless read as a number), so the old code fails the test. No rule, threshold or statistic of PLAN10 changed;
+  no feature had been computed with the old code.

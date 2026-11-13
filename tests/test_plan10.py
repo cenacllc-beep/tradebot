@@ -214,9 +214,11 @@ class FakeEc(object):
             return 1 + self.n
         return None
 
-    def codes_get(self, gid, k):
+    def codes_get(self, gid, k, ktype=None):
         if k not in self.keys:
             raise CodesInternalError("no key " + k)
+        if k == "typeOfFirstFixedSurface" and ktype is not int:
+            return "sfc"   # as real ecCodes does: coded keys come back as text unless read as numbers (2026-11-13)
         return self.keys[k]
 
     def codes_get_values(self, gid):
@@ -248,7 +250,7 @@ for ec, want in ((FakeEc(good), "ok"), (FakeEc(dict(good, stepRange="16-17")), P
         assert got["sig"]["centre"] == 7 and got["sig"]["subCentre"] is None and got["missing_value"] is None
         assert got["latlon"]() == ([40.0, 40.1], [40.0, 40.1]) and ec.released
     except (P.Missing, P.Transient) as ex:
-        assert want is not "ok" and isinstance(ex, want), (want, ex)
+        assert want != "ok" and isinstance(ex, want), (want, ex)
 del sys.modules["eccodes"]
 s4 = Sess([Resp(404)])
 try:
