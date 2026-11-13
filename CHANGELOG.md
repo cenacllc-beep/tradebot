@@ -1860,3 +1860,28 @@ unfamiliar codebase ... do not change functionality. only upgrade the code quali
   stay marked after scrolling by hand), fixed with a lower bound and the release on hand scrolling, plus a test that
   fails without the fix. tests/ui_checks.py waits for smooth scrolls by polling instead of fixed pauses.
   66 checks pass at 390 dark touch and 1100 light; full suite passes.
+
+## 2026-11-13 01:50 (local) - PLAN14 and PLAN15 written before their data, reviewed and frozen; new sources approved
+- The user's request of 2026-11-12 11:41 (skill vs luck on sports and crypto: trade patterns, reaction speed, one
+  league's rating model, placebos and many-tries control, costs and capacity, plain reporting, penny-stock hype as a
+  risk only) became research/PLAN14.md; the request of 18:57 (an AI system for Kalshi's 15-minute up-or-down markets)
+  became research/PLAN15.md. Both written before any price, trade, result or report for them was read.
+- Independent statistics review (agents/statistician.md). PLAN14: 6 MUST (in-play trades after the reference price;
+  timing buckets that used the actual close; power recomputed from the code's own standard error, about 20c a
+  copy-day at Holm's first step; the "reachable" rule read noise as reachable, now signed and baseline-corrected with a
+  pre-event window; placebo matched on timing bucket and price band; the injury version's multiplicity and Elo
+  details), 6 SHOULD, 3 COULD. PLAN15: 5 MUST (signal at k against the ask at k, fill at k + 1, candle labels; the
+  reference window and price from the market's own fields; a side-flip placebo matched on prices and fees; power
+  about 5c a contract, not 1.5-2c; ETH in the same 12-test family, one model per asset and minute), 3 SHOULD, 3 COULD.
+  All applied.
+- The user's answers of 2026-11-12 (asked in so many words): Coinbase's public market-data feed approved (PLAN14
+  Part 2, PLAN15); the NBA's official results, schedule and injury reports approved (PLAN14 Parts 2 and 3); no paid
+  sportsbook odds (Kalshi's close is the benchmark); penny stocks as a written summary only. Recorded in CLAUDE.md
+  section 3.
+- Frozen. SHA-256: research/PLAN14.md 87dfae21c419d9bb7a2d6dbee308810c00f65ff5f0d65ae6fa754e001354f144;
+  research/PLAN15.md f185768108ae6bc324bad673f81b637374f5952b9984038bfbcf320090eae30d. Their code (plan14.py,
+  plan15.py) is written, code-reviewed and frozen before the first download.
+- Lost work, logistics only: the cloud workspace was reset on 2026-11-12 between 08:45 and 18:57 La Paz, and the first
+  draft of research/plan10.py (written that morning, reviewed by no one, never deployed or pushed) was lost with it. It
+  will be written again; no data had been downloaded. Drafts are now kept in the PC folder as well as the cloud.
+- No rule, limit, lock or threshold changed; v3 and live.py untouched.
