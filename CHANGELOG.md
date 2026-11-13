@@ -1921,3 +1921,15 @@ unfamiliar codebase ... do not change functionality. only upgrade the code quali
 - Found the same morning: the 9:25 PM report and the 11:41 PM late-night check of Nov 12 fired about four hours late
   (after 1 AM), so no reminder to wake the laptop arrived in time. Making the late-night check also run at 10:41 PM
   needs the user's say-so (the change was not allowed from this session).
+
+## 2026-11-13 12:55 (local) - PLAN15 and PLAN10 frozen
+- PLAN15 inspect and freeze ran on the GitHub runner at 10:50 (stage inspect-freeze). Kalshi's records confirmed the
+  plan's assumptions: each window starts at the market's open_time, the reference price is set on open markets, and
+  the fee is quadratic with multiplier 1 with no listed fee change. Identity: research/plan15.py 1999ad103a90,
+  research/PLAN15.md f185768108ae, research/results/plan15/inspect.json e6a63c552218. First download-find runs started.
+- PLAN10 frozen on the PC at 12:52 (identity: research/PLAN10.md 69208ee29042, research/plan10.py cfe5d6d4143b,
+  research/backtest.py 9aa956fc03ff, PLAN7's pinned functions as in plan8). Request: 33 stations, 1,692 holdout markets
+  (1,711 passed the quote rule; Houston Intercontinental KIAH, 19 markets, left out: not in v3's rain table, 1.1%, under
+  the 10% line); 12,041 training station-days. research/results/plan10_identity.json, plan10_request.json (stations,
+  coordinates, day-start hours, holdout days; no prices or results) and plan10_train_outcomes.json (the training
+  year's NWS climate-report outcomes only) committed to the repository for the runner.
