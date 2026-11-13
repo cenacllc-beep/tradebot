@@ -290,6 +290,46 @@ def real_section(D,tr,now):
     except Exception as ex:
         print("real-money view failed:",ex)
         return '<section class=panel><h2>Real money on Kalshi</h2><p class=neg>The real-money ledger could not be read (%s). <code>.\\run live status</code> shows the account.</p></section>'%e(str(ex))
+def live15_section(now=None):
+    """PLAN15F's live paper bets on the 15-minute BTC/ETH markets (research/live15.py's own ledger, read-only;
+    descriptive). "" when the job has not run yet; an unreadable ledger shows a line."""
+    p=os.environ.get("LIVE15_DB") or os.path.join(os.path.dirname(os.path.abspath(__file__)),"research","data","live15.db")
+    if not os.path.exists(p): return ""
+    try:
+        rp=os.path.join(os.path.dirname(os.path.abspath(__file__)),"research")
+        if rp not in sys.path: sys.path.insert(0,rp)
+        import live15 as L15
+        c=sqlite3.connect(Path(p).resolve().as_uri()+"?mode=ro",uri=True)
+        try: bets=L15.rows(c)
+        finally: c.close()
+        s=L15.stats(bets)
+        last=max((b["ts"] for b in bets),default=None)
+        def grp(f):
+            out=[]
+            for key in sorted({f(b) for b in bets}):
+                g=L15.stats([b for b in bets if f(b)==key])
+                out.append([e(str(key)),str(g["filled"]),str(g["settled"]),str(g["won"]),"%+.2f"%g["net"]])
+            return out
+        se=(" (&#177; %.1fc over %d UTC days)"%(100*s["day_se"],s["days"])) if s["day_se"] is not None else ""
+        per=("%+.1fc a bet%s"%(100*s["per_bet"],se)) if s["per_bet"] is not None else "none settled yet"
+        rec=[b for b in bets if b["status"] in ("open","settled")][-10:][::-1]
+        recent=[[when(datetime.fromtimestamp(b["ts"],BOT_TZ)),e(b["asset"]),"min %d"%b["k"],e(b["side"] or ""),"%.0fc"%(100*b["price"]),
+                 "%.0f%%"%(100*b["p_up"]) if b["p_up"] is not None else "",e(b["result"] or "open"),("%+.2f"%b["pnl"]) if b["pnl"] is not None else ""] for b in rec]
+        return ('<section class=panel id=live15><h2>15-minute paper bets (live) <span>research only, PLAN15F</span></h2>'
+          '<p class=note>Paper bets on Kalshi&#8217;s 15-minute Bitcoin and Ethereum up-or-down markets, made by the PC every 15 minutes with PLAN15&#8217;s frozen model: one contract at the live ask when the model is 4+ points above it, at minutes 2, 5 and 10. No real orders are ever placed. Last decision: %s.</p>'
+          '<dl class=rtiles><div><dt>Paper bets</dt><dd>%d</dd><p>%d open, %d settled, %d won</p></div>'
+          '<div><dt>Net after fees</dt><dd>%+.2f</dd><p>%s; fees on settled bets %.2f</p></div>'
+          '<div><dt>Decisions</dt><dd>%d</dd><p>%d no signal, %d no fill, %d missed</p></div></dl>'
+          '<h3>By asset</h3>%s<h3>By decision minute</h3>%s<h3>Latest paper bets</h3>%s'
+          '<p class=fine>Descriptive only: a few days of 15-minute bets are noise, and the fee needs about 52%% wins at 50c just to break even. These bets cannot change PLAN15&#8217;s single score (after Dec 31); if that shows no edge, they stop.</p></section>')%(
+          when(datetime.fromtimestamp(last,BOT_TZ)) if last else "none yet",s["filled"],s["open"],s["settled"],s["won"],s["net"],per,s["fees"],
+          s["decisions"],s["no_signal"],s["no_fill"],s["missed"],
+          table(["Asset","Bets","Settled","Won","Net $"],grp(lambda b:b["asset"])) if bets else "",
+          table(["Minute","Bets","Settled","Won","Net $"],grp(lambda b:b["k"])) if bets else "",
+          table(["Time","Asset","Minute","Side","Price","Model up","Result","P&amp;L $"],recent) if recent else "<p>No paper bet yet.</p>")
+    except Exception as ex:
+        print("15-minute paper view failed:",ex)
+        return '<section class=panel><h2>15-minute paper bets (live)</h2><p class=neg>Its ledger could not be read (%s). <code>python research\\live15.py report</code> prints it.</p></section>'%e(str(ex))
 def live_tile():
     """Kalshi account tile (live.py's ledger, live.db), read-only. Added 2026-10-14 with live.py."""
     p=live_db_path()
@@ -675,7 +715,7 @@ def build_page(D,live=False):
       '<details><summary>Data by estimator version</summary>%s</details></section>'
       '<p class=fine><b>Read with caution.</b> Early samples are noise. Cities share weather systems, so the effective sample is far smaller than the market count. Paper results ignore slippage and use approximate fees. The shadow tests are research only and never count toward the gate. Not financial advice. Data before Oct 13, 2026 was lost when the project folder was deleted; the test restarted that day.</p>'
       '</div><div id=tip role=tooltip></div>')%(
-      chips,when(datetime.now(BOT_TZ))+" (UTC-4)",real,acct,verdict(rg,bf,bm,rain,passed,mg,look),e(GV),npass,gate,calendar(rain,nd,tr),
+      chips,when(datetime.now(BOT_TZ))+" (UTC-4)",real,acct+live15_section(),verdict(rg,bf,bm,rain,passed,mg,look),e(GV),npass,gate,calendar(rain,nd,tr),
       todo_html,lastline,money,backtest_panel(v4p),results(st),
       dsub,dumbbell(lrows),why,chart_table,
       e(GV),brier_view(bf,bm,len(rg),mg),shadow_view(so,sm,tr,v4,obs),ctl,

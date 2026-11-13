@@ -1972,3 +1972,35 @@ unfamiliar codebase ... do not change functionality. only upgrade the code quali
   titles; the crosshair clears when the pointer reaches a marker; arrow keys and Escape work from a focused marker;
   one minus sign style in the static and live headlines. tests/test_real_view.py guards the class names, the embedded
   data and the value at each time against live.py's rule.
+
+## 2026-11-13 19:10 (La Paz) - r89: PLAN15F, live PAPER bets on the 15-minute BTC/ETH markets
+- User (18:55, with a screenshot of Kalshi's 15-minute Live page): "Still no automated live bets/ research, for live
+  bets using the paper account." Confirmed: nothing placed live paper bets on those markets (PLAN15 is a past-data test
+  scored once after Dec 31). The user chose to start live paper bets now, before PLAN15's score.
+- research/PLAN15F.md (written before any live bet): PLAN15's own random-walk model and fee, imported from the frozen
+  research/plan15.py (unchanged); at minutes 2, 5 and 10 of each KXBTC15M/KXETH15M window, one paper contract at the
+  live ask when the model is 4+ points above it, only if the book shows a contract there. Descriptive only; it cannot
+  change PLAN15; it stops at PLAN15's score if that shows no edge. Never real orders.
+- research/live15.py (tick | settle | report): its own ledger research/data/live15.db (unique per window and minute, so
+  a rerun never doubles a bet) and logs\live15.log; a decision it cannot make within 60 s of its minute is logged as
+  missed, never made up. No /portfolio call, no live.py import, no paper.db or live.db access. Requests: Kalshi's public
+  API and Coinbase's public candles (PLAN15 approval of 2026-11-12), User-Agent tradebot-paper-research/1.0.
+- tasks\live15.cmd, tasks\install_live15.cmd/.ps1, tasks\remove_live15.cmd: one Windows task, "Tradebot\15-minute
+  paper bets", every 15 minutes (:01/:16/:31/:46), on battery too, one copy at a time, 14-minute limit, never wakes the
+  PC, no make-up runs. The user installs it himself (it adds a scheduled task).
+- dashboard.py: "15-minute paper bets (live)" panel below the paper account (read-only on live15.db; hidden until the
+  job has run; a damaged ledger shows a line). tests/test_live15.py (fake Kalshi, Coinbase and clock) added to the suite.
+- Review (agents/code-reviewer.md, before deploy). Safety check passed (no order endpoint, no live.py, no paper.db or
+  live.db). Fixed: only windows asking "above the reference" are bet on (other strike types skipped, fail closed); the
+  order book's read time is stored and a book later than 60 s after the minute is a miss, not a bet on an old model
+  price; PLAN15F's report section now promises only what the code reports; the test closes its database before
+  switching (Windows); the task runs pythonw.exe with no window and reads back its 15-minute repeat (a one-day repeat is
+  extended); the kill switch (core.kill_file) stops these paper bets too, failing closed; a window that cannot be set up
+  records its three decisions as missed; scalar and void results follow strategy.payout/settled_pnl; a database error
+  while recording a miss is logged, not raised; Coinbase is asked from 2 s after the minute; a 1c level in the older
+  book shape is read; fees are summed over settled bets; tracebacks go to logs\live15.log. Left: it runs only while
+  the user is signed in (S4U would need administrator permission); live15.db is not in backup.py's copy (research only).
+- Second review (fresh agent, the fixes above): no MUST. Applied: live15.py's header no longer says "exactly PLAN15's
+  rule" (PLAN15 fills at minute k+1's close; live15 at the live ask); each run bets first and settles after, so a slow
+  settlement never delays minute 2; the kill switch is checked before each decision and stops betting only (results
+  are still recorded); PLAN15F says a run stopped by its 14-minute limit leaves its remaining decisions without a row.
