@@ -20,9 +20,12 @@ nothing here writes paper.db or live.db. Not financial advice.
   market's own reference price (floor_strike). Only windows that ask "above the reference" (strike_type greater or
   greater_or_equal) are bet on; any other kind is skipped and logged (fail closed).
 - **Decision minutes:** 2, 5 and 10. At each, as soon as Coinbase's candle for that minute is out (asked from 2 seconds
-  after the minute ends, for up to 45 seconds), the live Kalshi order book is read once. If the price or the book is
-  not in hand within 60 seconds of the minute's end, the decision is recorded as missed. BTC is handled before ETH in
-  each minute, so a slow BTC step can make ETH's decision late.
+  after the minute ends, for up to 58 seconds; both assets are asked in turn and each is decided as soon as its own
+  candle is out), the live Kalshi order book is read once. If the price or the book is not in hand within 60 seconds
+  of the minute's end, the decision is recorded as missed. (Amended 2026-11-13 21:10 after the first live run: Coinbase
+  published its candles about 46 s after the minute, so the first version's 45 s wait, BTC first, missed every BTC
+  decision. The model and the rule are unchanged.) Because the candle comes out about 46 s late, the price the model
+  uses is about 46-50 s old when the book is read; the log shows its age.
 - **Signal:** model chance minus the ask on one side at least 4 points (PLAN15's EDGE). YES ask = $1 - the best NO
   bid; NO ask = $1 - the best YES bid.
 - **Paper fill:** one contract at that ask, immediately, only if the book shows at least one contract there.

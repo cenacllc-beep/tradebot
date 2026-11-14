@@ -2012,3 +2012,18 @@ unfamiliar codebase ... do not change functionality. only upgrade the code quali
   the bets. Hidden on the GitHub runner (GITHUB_ACTIONS), which has no PC job. The error line carries the panel's id.
   Presentation only. tests/test_live15.py covers the three cases.
 - Review (agents/code-reviewer.md): no MUST; applied both SHOULDs (cloud runner, test).
+
+## 2026-11-13 21:10 (La Paz) - r91: PLAN15F waits for Coinbase's candle on both coins at once
+- First live run (8:46 PM): 6 decisions, 1 paper bet (ETH minute 5, NO at 15c), 1 no signal, 4 missed. Every BTC
+  decision and ETH minute 2 were missed with "no Coinbase price": Coinbase published each one-minute candle about 46 s
+  after the minute ended, the code waited 45 s per coin, and BTC went first, so ETH only got its price after BTC gave up.
+- Fix (research/live15.py; PLAN15F.md section 1 amended, model and rule unchanged): from 2 s after the minute both coins
+  are asked in turn every 3 s, each decided as soon as its own candle is out, up to 58 s (the 60 s limit on the book
+  read is unchanged). The log shows the price's age at the book read. A failed Coinbase read is logged once per
+  decision; a damaged candle is handled inside its decision. tests/test_live15.py: a 46 s candle delay, both coins
+  decided at all three minutes.
+- Noted for the user: because the candle comes out about 46 s late, the model's price is about 46-50 s old when the
+  live book is read, and the market has moved on by then (the first bet's 24-point gap is likely that).
+- Review (agents/code-reviewer.md): no MUST; applied: the candle is read inside the decision's error handling, and a
+  failing Coinbase read is logged once. Left: one hung request can still delay a run (the 60 s limit then records the
+  decision as missed).

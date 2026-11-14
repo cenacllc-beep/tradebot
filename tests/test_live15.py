@@ -30,6 +30,7 @@ clock = [T0 + 60]
 L.now = lambda: clock[0]
 L.time.sleep = lambda s: clock.__setitem__(0, clock[0] + s)
 spot = {}
+DELAY = [0]
 for i in range(-70, 16):   # a steady climb: BTC ends minute k well above the reference
     spot[int(T0 + 60 * i)] = 68000.0 * math.exp(0.0004 * i + (0.0003 if i % 2 else -0.0003))
 calls = []
@@ -58,7 +59,7 @@ def coinbase(path, params):
     out = []
     for end, v in spot.items():
         start = end - 60
-        if s <= start <= e and end <= clock[0]:   # a candle exists only once its minute has ended
+        if s <= start <= e and end + DELAY[0] <= clock[0]:   # a candle appears DELAY seconds after its minute ends
             out.append([start, v * 0.999, v * 1.001, v, v, 1.0])
     return sorted(out, reverse=True)
 P.http_kalshi = kalshi; P.http_coinbase = coinbase
@@ -134,6 +135,21 @@ calls.clear(); core.kill_file = lambda: "KILL"; L.DB = os.path.join(OUT, "live15
 L.tick(); assert not [x for x in calls if x != "/markets/KXBTC15M-W1"] and not L.rows(L.db())   # no bet; settling only
 core.kill_file = lambda: (_ for _ in ()).throw(OSError("unreadable"))
 assert L.halted(), "a failed kill-switch check halts (fail closed)"
+# Coinbase's candles come out about 46 s after the minute (seen on the first live run): both assets are still decided
+def kalshi_both(path, params=None):
+    if path == "/markets":
+        s = params["series_ticker"]
+        return {"markets": [dict(ticker=s + "-W9", open_time=datetime_iso(T0), close_time=datetime_iso(T0 + 900),
+                                 floor_strike=68000.0, strike_type="greater_or_equal")]}
+    return kalshi(path, params)
+core.kill_file = lambda: None
+P.http_kalshi = kalshi_both; DELAY[0] = 46; L.DB = os.path.join(OUT, "live15g.db"); clock[0] = T0 + 60
+L.tick(); r = L.rows(L.db())
+assert sorted((b["asset"], b["k"]) for b in r) == [("BTC", 2), ("BTC", 5), ("BTC", 10), ("ETH", 2), ("ETH", 5), ("ETH", 10)], r
+assert not [b for b in r if b["status"] == "missed"], [(b["asset"], b["k"], b["note"]) for b in r]
+assert all(46 <= b["book_ts"] - (T0 + 60 * b["k"]) <= L.LATE for b in r)
+DELAY[0] = 0
+
 # the dashboard panel: a "not started yet" note on the PC before the first run, nothing on the cloud runner
 sys.path.insert(0, WORK)
 import dashboard as D

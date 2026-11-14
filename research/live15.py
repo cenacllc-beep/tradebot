@@ -30,7 +30,7 @@ DB = os.environ.get("LIVE15_DB") or os.path.join(HERE, "data", "live15.db")
 LOG = os.environ.get("LIVE15_LOG") or os.path.join(ROOT, "logs", "live15.log")
 KS = P.KS                    # decision minutes 2, 5, 10
 EDGE = P.EDGE                # 4 points
-WAIT_SPOT = 45               # seconds after a minute ends that Coinbase's candle may take to appear
+WAIT_SPOT = 58               # seconds after a minute ends that Coinbase's candle may take to appear (about 46 s seen)
 LATE = 60                    # a decision is skipped when it cannot be made within this many seconds of its minute's end
 RUN_LIMIT = 14 * 60          # a run never lasts longer than this (the next one starts 15 minutes after it)
 SETTLE_AFTER = 120           # a window is asked for its result this long after it closes
@@ -142,19 +142,6 @@ def decide(p_up, ya, ysz, na, nsz):
     return side, price, "filled"
 
 
-def spot_close(asset, end_ts):
-    """Coinbase's one-minute close for the minute ending at end_ts, waiting up to WAIT_SPOT seconds for it."""
-    deadline = end_ts + WAIT_SPOT
-    sleep_until(end_ts + 2)   # Coinbase serves the minute in progress; ask once it has ended
-    while True:
-        got = P.fetch_spot(asset, end_ts, end_ts).get(int(end_ts))
-        if got:
-            return got[3]
-        if now() >= deadline:
-            return None
-        time.sleep(3)
-
-
 def sigma(asset, open_ts):
     sp = P.fetch_spot(asset, open_ts - 60 * P.SIGMA_MIN, open_ts)
     return P.sigma_from([(sp.get(int(open_ts) + 60 * i) or [None] * 4)[3] for i in range(-P.SIGMA_MIN, 1)])
@@ -212,6 +199,7 @@ def follow(c, start):
             if w:
                 skip(c, w, a, "set-up error: %s" % str(ex)[:150])
     for k in KS:
+        todo = []
         for a, w, mult, sig in plan:
             end = w["open"] + 60 * k
             if c.execute("select 1 from bets where window=? and k=?", (w["ticker"], k)).fetchone():
@@ -222,34 +210,58 @@ def follow(c, start):
             if now() > end + LATE or now() > start + RUN_LIMIT:
                 safe_record(c, w, a, k, status="missed", note="the run reached minute %d too late" % k)
                 continue
-            sleep_until(end)
-            try:
-                s_k = spot_close(a, end)
-                if s_k is None:
-                    record(c, w, a, k, sigma=sig, status="missed", note="no Coinbase price for minute %d" % k)
-                    continue
-                p_up = P.rw_prob(s_k, w["strike"], sig, k)
-                if now() > end + LATE:
-                    record(c, w, a, k, s_k=s_k, sigma=sig, p_up=p_up, status="missed", note="the price came too late")
-                    continue
-                ya, ysz, na, nsz = asks(P.http_kalshi("/markets/%s/orderbook" % w["ticker"]) or {})
-                book_ts = now()
-                if book_ts > end + LATE:   # a slow read would bet minutes later on the minute-k model
-                    record(c, w, a, k, s_k=s_k, sigma=sig, p_up=p_up, book_ts=book_ts, status="missed",
-                           note="the order book came too late (%.0f s after minute %d)" % (book_ts - end, k))
-                    continue
-                side, price, note = decide(p_up, ya, ysz, na, nsz)
-                f = P.fee(price, mult) if note == "filled" else None
-                record(c, w, a, k, s_k=s_k, sigma=sig, p_up=p_up, yes_ask=ya, no_ask=na, yes_size=ysz, no_size=nsz,
-                       side=side, price=price if note == "filled" else None, fee=f,
-                       status="open" if note == "filled" else ("no signal" if note == "no signal" else "no fill"), note=note,
-                       book_ts=book_ts)
-                log("%s %s minute %d: model %.1f%% up; YES ask %s, NO ask %s; %s%s" % (
-                    a, w["ticker"], k, 100 * p_up, "-" if ya is None else "%.0fc" % (100 * ya), "-" if na is None else "%.0fc" % (100 * na),
-                    note, (": paper %s at %.0fc + fee %.2f" % (side.upper(), 100 * price, f)) if note == "filled" else ""))
-            except Exception as ex:
-                safe_record(c, w, a, k, status="missed", note="error: %s" % str(ex)[:200])
-                log("%s %s minute %d: error (%s)" % (a, w["ticker"], k, ex))
+            todo.append((a, w, mult, sig, end))
+        if not todo:
+            continue
+        # Coinbase publishes a minute's candle about 46 s after the minute ends. Both assets are asked in turn every
+        # few seconds, and each is decided as soon as its own candle is out, so one never waits behind the other.
+        sleep_until(max(t[4] for t in todo) + 2)   # Coinbase serves the minute in progress; ask once it has ended
+        while todo:
+            for item in list(todo):
+                a, w, mult, sig, end = item[:5]
+                try:
+                    got = P.fetch_spot(a, end, end).get(int(end))
+                except Exception as ex:
+                    got = None
+                    if not item[5:]:   # logged once per decision, not every 3 s
+                        todo[todo.index(item)] = item = item + (True,)
+                        log("%s minute %d: Coinbase read failed (%s); asking again until %d s" % (a, k, ex, WAIT_SPOT))
+                if got:
+                    todo.remove(item)
+                    decide_one(c, a, w, mult, sig, k, end, got)
+                elif now() >= end + WAIT_SPOT:
+                    todo.remove(item)
+                    safe_record(c, w, a, k, sigma=sig, status="missed", note="no Coinbase price for minute %d within %d s" % (k, WAIT_SPOT))
+            if todo:
+                time.sleep(3)
+
+
+def decide_one(c, a, w, mult, sig, k, end, candle):
+    """One decision once the minute-k candle is in hand: the model, then one read of the live book, then the rule."""
+    try:
+        s_k = candle[3]   # the close
+        p_up = P.rw_prob(s_k, w["strike"], sig, k)
+        if now() > end + LATE:
+            record(c, w, a, k, s_k=s_k, sigma=sig, p_up=p_up, status="missed", note="the price came too late")
+            return
+        ya, ysz, na, nsz = asks(P.http_kalshi("/markets/%s/orderbook" % w["ticker"]) or {})
+        book_ts = now()
+        if book_ts > end + LATE:   # a slow read would bet minutes later on the minute-k model
+            record(c, w, a, k, s_k=s_k, sigma=sig, p_up=p_up, book_ts=book_ts, status="missed",
+                   note="the order book came too late (%.0f s after minute %d)" % (book_ts - end, k))
+            return
+        side, price, note = decide(p_up, ya, ysz, na, nsz)
+        f = P.fee(price, mult) if note == "filled" else None
+        record(c, w, a, k, s_k=s_k, sigma=sig, p_up=p_up, yes_ask=ya, no_ask=na, yes_size=ysz, no_size=nsz,
+               side=side, price=price if note == "filled" else None, fee=f,
+               status="open" if note == "filled" else ("no signal" if note == "no signal" else "no fill"), note=note,
+               book_ts=book_ts)
+        log("%s %s minute %d: model %.1f%% up (price %.0f s old); YES ask %s, NO ask %s; %s%s" % (
+            a, w["ticker"], k, 100 * p_up, book_ts - end, "-" if ya is None else "%.0fc" % (100 * ya), "-" if na is None else "%.0fc" % (100 * na),
+            note, (": paper %s at %.0fc + fee %.2f" % (side.upper(), 100 * price, f)) if note == "filled" else ""))
+    except Exception as ex:
+        safe_record(c, w, a, k, status="missed", note="error: %s" % str(ex)[:200])
+        log("%s %s minute %d: error (%s)" % (a, w["ticker"], k, ex))
 
 
 def settle(c):
