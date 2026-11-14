@@ -142,6 +142,27 @@ def decide(p_up, ya, ysz, na, nsz):
     return side, price, "filled"
 
 
+def _iso(t):
+    return datetime.fromtimestamp(t, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def spot_candle(asset, end_ts, attempt):
+    """Coinbase's one-minute candle [open, high, low, close] for the minute ending at end_ts, or None while it is not out.
+    Each attempt asks a slightly different range (one minute more of history each time): an identical request asked
+    again a few seconds later was answered from a cache without the new candle (first live runs, Nov 13), so polling
+    with one fixed request never saw it. The candle itself is read exactly as PLAN15 reads it (plan15.coinbase_ohlc)."""
+    rows = P.http_coinbase("/products/%s/candles" % P.SPOT[asset], dict(
+        granularity=60, start=_iso(end_ts - 120 - 60 * (attempt % 50)), end=_iso(end_ts)))
+    if not isinstance(rows, list):
+        raise RuntimeError("Coinbase answered without a candle list")
+    for row in rows:
+        if isinstance(row, list) and len(row) >= 5:
+            t, v = P.coinbase_ohlc(row)
+            if t == int(end_ts):
+                return v
+    return None
+
+
 def sigma(asset, open_ts):
     sp = P.fetch_spot(asset, open_ts - 60 * P.SIGMA_MIN, open_ts)
     return P.sigma_from([(sp.get(int(open_ts) + 60 * i) or [None] * 4)[3] for i in range(-P.SIGMA_MIN, 1)])
@@ -216,11 +237,13 @@ def follow(c, start):
         # Coinbase publishes a minute's candle about 46 s after the minute ends. Both assets are asked in turn every
         # few seconds, and each is decided as soon as its own candle is out, so one never waits behind the other.
         sleep_until(max(t[4] for t in todo) + 2)   # Coinbase serves the minute in progress; ask once it has ended
+        attempt = 0
         while todo:
+            attempt += 1
             for item in list(todo):
                 a, w, mult, sig, end = item[:5]
                 try:
-                    got = P.fetch_spot(a, end, end).get(int(end))
+                    got = spot_candle(a, end, attempt)
                 except Exception as ex:
                     got = None
                     if not item[5:]:   # logged once per decision, not every 3 s

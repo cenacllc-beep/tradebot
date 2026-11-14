@@ -53,7 +53,13 @@ def kalshi(path, params=None):
 from datetime import datetime, timezone
 def datetime_iso(t):
     return datetime.fromtimestamp(t, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-def coinbase(path, params):
+CB_CACHE = {}
+def coinbase(path, params):   # like the real feed: the same request asked again is answered from a cache
+    key = (path, params["start"], params["end"])
+    if key not in CB_CACHE:
+        CB_CACHE[key] = coinbase_fresh(path, params)
+    return CB_CACHE[key]
+def coinbase_fresh(path, params):
     s = int(datetime.strptime(params["start"], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc).timestamp())
     e = int(datetime.strptime(params["end"], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc).timestamp())
     out = []
@@ -89,7 +95,7 @@ assert n == len(op) and s["settled"] == len(op) and abs(s["net"] - sum(1 - 0.6 -
 print("settle ok:", L.summary(L.db()))
 
 # a run that starts too late records misses, places nothing
-c.close(); L.DB = os.path.join(OUT, "live15b.db")
+c.close(); CB_CACHE.clear(); L.DB = os.path.join(OUT, "live15b.db")
 clock[0] = T0 + 60 * 12
 L.tick(); late = L.rows(L.db())
 assert late and all(b["status"] == "missed" for b in late), [(b["k"], b["status"]) for b in late]
@@ -102,7 +108,7 @@ def kalshi2(path, params=None):
         return {"markets": [dict(ticker=params["series_ticker"] + "-W3", open_time=datetime_iso(T0), close_time=datetime_iso(T0 + 900),
                                  floor_strike=68000.0, strike_type="less")]}
     return kalshi(path, params)
-P.http_kalshi = kalshi2; L.DB = os.path.join(OUT, "live15c.db"); clock[0] = T0 + 60
+P.http_kalshi = kalshi2; CB_CACHE.clear(); L.DB = os.path.join(OUT, "live15c.db"); clock[0] = T0 + 60
 L.tick(); r = L.rows(L.db())
 assert len(r) == 6 and all(b["status"] == "missed" and "strike type" in b["note"] for b in r), r
 
@@ -111,13 +117,13 @@ def kalshi3(path, params=None):
     if path.endswith("/orderbook"):
         clock[0] += 90
     return kalshi(path, params)
-P.http_kalshi = kalshi3; L.DB = os.path.join(OUT, "live15d.db"); clock[0] = T0 + 60
+P.http_kalshi = kalshi3; CB_CACHE.clear(); L.DB = os.path.join(OUT, "live15d.db"); clock[0] = T0 + 60
 L.tick(); r = [b for b in L.rows(L.db()) if b["asset"] == "BTC"]
 assert r and r[0]["k"] == 2 and r[0]["status"] == "missed" and "too late" in r[0]["note"] and r[0]["book_ts"], r[0]
 assert not any(b["status"] == "open" for b in r)
 
 # void and scalar results follow the project's rule (strategy.payout): void = minus the fee; scalar pays its value
-P.http_kalshi = kalshi; L.DB = os.path.join(OUT, "live15e.db"); clock[0] = T0 + 60
+P.http_kalshi = kalshi; CB_CACHE.clear(); L.DB = os.path.join(OUT, "live15e.db"); clock[0] = T0 + 60
 L.tick(); c = L.db(); op = [b for b in L.rows(c) if b["status"] == "open"]
 assert op
 def kalshi_void(path, params=None):
@@ -131,7 +137,7 @@ c.close()
 
 # the kill switch stops the run before anything is read or written
 import core
-calls.clear(); core.kill_file = lambda: "KILL"; L.DB = os.path.join(OUT, "live15f.db")
+calls.clear(); core.kill_file = lambda: "KILL"; CB_CACHE.clear(); L.DB = os.path.join(OUT, "live15f.db")
 L.tick(); assert not [x for x in calls if x != "/markets/KXBTC15M-W1"] and not L.rows(L.db())   # no bet; settling only
 core.kill_file = lambda: (_ for _ in ()).throw(OSError("unreadable"))
 assert L.halted(), "a failed kill-switch check halts (fail closed)"
@@ -143,7 +149,7 @@ def kalshi_both(path, params=None):
                                  floor_strike=68000.0, strike_type="greater_or_equal")]}
     return kalshi(path, params)
 core.kill_file = lambda: None
-P.http_kalshi = kalshi_both; DELAY[0] = 46; L.DB = os.path.join(OUT, "live15g.db"); clock[0] = T0 + 60
+CB_CACHE.clear(); P.http_kalshi = kalshi_both; DELAY[0] = 46; L.DB = os.path.join(OUT, "live15g.db"); clock[0] = T0 + 60
 L.tick(); r = L.rows(L.db())
 assert sorted((b["asset"], b["k"]) for b in r) == [("BTC", 2), ("BTC", 5), ("BTC", 10), ("ETH", 2), ("ETH", 5), ("ETH", 10)], r
 assert not [b for b in r if b["status"] == "missed"], [(b["asset"], b["k"], b["note"]) for b in r]

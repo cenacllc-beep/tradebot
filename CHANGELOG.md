@@ -2027,3 +2027,15 @@ unfamiliar codebase ... do not change functionality. only upgrade the code quali
 - Review (agents/code-reviewer.md): no MUST; applied: the candle is read inside the decision's error handling, and a
   failing Coinbase read is logged once. Left: one hung request can still delay a run (the 60 s limit then records the
   decision as missed).
+
+## 2026-11-13 21:25 (La Paz) - r92: PLAN15F gets past Coinbase's response cache
+- The 9:16 PM run (r91) still missed both coins at minute 2 "within 58 s". Pattern across both runs: a request repeated
+  every few seconds never returned the just-finished minute, while the first fresh request about 46 s after the minute
+  did. Consistent with Coinbase answering an identical request from a cache (so the "46 s delay" was the cache, not
+  Coinbase's publishing time). Fix: spot_candle() asks a slightly different range each attempt (one more minute of
+  history each time; at most 52 candles), and reads the row with PLAN15's own coinbase_ohlc. Model and rule unchanged.
+- tests/test_live15.py: the fake feed now answers an identical request from a cache; the old fixed request fails this
+  test (all six decisions missed), the new one passes.
+- Review (agents/code-reviewer.md): no MUST; wanted candle always in range, the in-progress next minute is never used,
+  rate within plan15's limit. Applied: the fake cache is cleared before each scenario. Noted: proven only once a live
+  run decides soon after the minute.
