@@ -1,0 +1,94 @@
+# PLAN16 (research only, research/PLAN16.md): four fixed rules for Kalshi's 15-minute BTC and ETH markets, scored
+# once on PLAN15's find period (windows closing Sep 1 to Oct 31, 2026). Started by hand only (workflow_dispatch), one
+# stage per run. Public data only: Kalshi's public API (read-only GETs) and Coinbase Exchange's public one-minute
+# candles (approved by the user 2026-11-12 and 2026-11-13). It never places, changes or cancels an order, never touches
+# trial/, paper.db or live.db, never reads PLAN15's check period, and commits only research/results/plan16* (it refuses
+# to commit anything else). Raw Coinbase candles and raw trades are never written (only derived values per window).
+# freeze runs once (it refuses when an identity record is committed); every other stage refuses until
+# research/results/plan16_identity.json is committed and unchanged; the score refuses if a result was ever committed.
+name: PLAN16 15-minute rules (research)
+on:
+  workflow_dispatch:
+    inputs:
+      stage:
+        description: "freeze (once, first) | download | score | status"
+        required: true
+        type: choice
+        options: [status, freeze, download, score]
+      max_days:
+        description: "download only: at most this many asset-days in this run (empty = no limit)"
+        required: false
+        default: ""
+concurrency:
+  group: tradebot-plan16
+  cancel-in-progress: false
+permissions:
+  contents: write
+jobs:
+  stage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09   # v5.1.0
+        with:
+          ref: main
+          fetch-depth: 0   # full history: the score guard looks for any earlier result commit
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1   # v6.3.0
+        with:
+          python-version: "3.12"
+      - name: Refuse freeze when the code is already frozen
+        if: inputs.stage == 'freeze'
+        run: |
+          if git ls-files --error-unmatch research/results/plan16_identity.json >/dev/null 2>&1; then
+            echo "already frozen: research/results/plan16_identity.json is committed; it is stored once"; exit 1
+          fi
+      - name: Refuse every other stage unless the identity record is committed and unchanged
+        if: inputs.stage != 'freeze'
+        run: |
+          f=research/results/plan16_identity.json
+          git ls-files --error-unmatch "$f" >/dev/null 2>&1 || { echo "$f is not committed: run the freeze stage first"; exit 1; }
+          git diff --quiet HEAD -- "$f" || { echo "$f differs from the commit: stopping"; exit 1; }
+      - name: Refuse a second score
+        if: inputs.stage == 'score'
+        run: |
+          for f in research/results/plan16_result.json research/results/plan16_result.md; do
+            if git log --oneline -- "$f" | grep -q .; then echo "$f was committed once: the plan is scored once"; exit 1; fi
+          done
+      - name: Run the stage
+        env:
+          TZ: UTC
+          PYTHONIOENCODING: utf-8
+          STAGE: ${{ inputs.stage }}
+          MAX_DAYS: ${{ inputs.max_days }}
+        run: |
+          extra=""
+          if [ -n "$MAX_DAYS" ]; then
+            case "$MAX_DAYS" in (*[!0-9]*) echo "max_days must be a whole number"; exit 1;; esac
+            extra="--max-days $MAX_DAYS"
+          fi
+          case "$STAGE" in
+            download) python research/plan16.py download --budget-minutes 300 $extra ;;
+            freeze|score|status) python research/plan16.py "$STAGE" ;;
+            *) echo "unknown stage $STAGE"; exit 1 ;;
+          esac
+      - name: Save research/results/plan16* in the repository (and nothing else)
+        if: always() && inputs.stage != 'status'
+        run: |
+          others=$(git status --porcelain --untracked-files=all | grep -v -E '^.. "?research/results/plan16' || true)
+          if [ -n "$others" ]; then echo "refusing to commit: files outside research/results/plan16* changed:"; echo "$others"; exit 1; fi
+          big=$(find research/results -path 'research/results/plan16*' -type f -size +50M)
+          if [ -n "$big" ]; then echo "refusing to commit files over 50 MB:"; echo "$big"; exit 1; fi
+          find research/results -path 'research/results/plan16*' -name '*.tmp' -type f -delete
+          git config user.name "tradebot-runner"
+          git config user.email "tradebot-runner@users.noreply.github.com"
+          git add -A -- 'research/results/plan16*'
+          git diff --cached --name-only | grep -v -E '^research/results/plan16' && { echo "refusing: staged files outside research/results/plan16*"; exit 1; }
+          git commit -m "PLAN16 $STAGE $(date -u +%FT%H:%MZ)" || { echo "nothing new"; exit 0; }
+          for i in 1 2 3 4 5 6; do
+            git push origin HEAD:main && exit 0
+            sleep $((i * 10))
+            git pull --rebase origin main || { git rebase --abort 2>/dev/null || true; }
+          done
+          exit 1
+        env:
+          STAGE: ${{ inputs.stage }}

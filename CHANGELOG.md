@@ -2057,3 +2057,16 @@ unfamiliar codebase ... do not change functionality. only upgrade the code quali
 - Frozen: research/PLAN16.md SHA-256 5e82af19f0dda166aa53f48654b5f8d7fe2f6f50519f5c4d4f8a7238b16f3e1d.
 - The live Coinbase ticker is not built for now: since r92 the live bot reads each minute's price 3-10 s after the
   minute, so a ticker would gain only those seconds; the approval stays for when a rule needs it.
+
+## 2026-11-13 22:45 (La Paz) - PLAN16 code written, reviewed twice, ready to freeze
+- research/plan16.py (freeze | download | score | status), tests/test_plan16.py (synthetic data: inputs at minute k,
+  the four rules, the statistics, an edge planted in one rule passes and the others do not, guards, score once, a
+  network fault never saves a day), cloud/workflows/plan16.yml (+ .github copy; by hand only; commits only
+  research/results/plan16*; freeze once; score refused if a result was ever committed).
+- Code review (agents/code-reviewer.md): MUST 1 (result JSON saved before the markdown) and MUST 2 (a window counted
+  twice in the 10% guard) fixed; identity now also covers PLAN15's inspect.json and PLAN7's pinned functions; wider
+  error catching in the download; REF computed exactly as plan15.signal; Coinbase read from 75 minutes before the first
+  window and trades with PLAN15's own fetch_trades (both as plan section 3 says); notes in the result's settings; guard
+  tests. Second review: no MUST; applied: the result is checked as JSON before anything is written, and freeze refuses
+  unless PLAN15 is frozen. Left: B does not require PLAN15's full-spot completeness (the plan asks only for minute k and
+  the 60-minute sigma), so B and the reference can differ on a few windows.
