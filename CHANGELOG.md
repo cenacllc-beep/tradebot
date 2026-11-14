@@ -2039,3 +2039,21 @@ unfamiliar codebase ... do not change functionality. only upgrade the code quali
 - Review (agents/code-reviewer.md): no MUST; wanted candle always in range, the in-progress next minute is never used,
   rate within plan15's limit. Applied: the fake cache is cleared before each scenario. Noted: proven only once a live
   run decides soon after the minute.
+
+## 2026-11-13 22:00 (La Paz) - PLAN16 written, statistics-reviewed and frozen
+- User (21:28-21:31): "How can we intelligently make those bets?", "What would you do to be as accurate as possible/
+  to increase your winning rate?", then "Go. Make no mistakes" to the plan offered in so many words (live Coinbase
+  price for the 15-minute research; a pre-registered past-data test of the ideas). Approval recorded in CLAUDE.md
+  section 3.
+- Settlement confirmed from Kalshi's own market rules text (stored by PLAN15): Yes if the simple average of the sixty
+  seconds of CF Benchmarks' BRTI before the close is at least the same average before the open; PLAN15's model already
+  allows for the closing average (time left T - k - 0.5).
+- research/PLAN16.md: four fixed rules (A recent volatility, B 10-point edge, C three-candle trend from the user's
+  video, D Kalshi order-flow imbalance), scored once on windows closing Sep 1 to Oct 31 (PLAN15's find period; its
+  Nov-Dec check period untouched), 8 tests, Holm 2.5% one-sided, t + 2-day block bootstrap + side-flip placebo.
+- Statistics review (agents/statistician.md, fresh agent): five MUST items applied before the freeze (one p per test
+  for Holm, the placebo statistic, the bootstrap unit, missing-data rules per rule, disclosure of what had been seen:
+  the live bot's first 5 decisions and one window of one PLAN15 day file); SHOULD and NIT items applied.
+- Frozen: research/PLAN16.md SHA-256 5e82af19f0dda166aa53f48654b5f8d7fe2f6f50519f5c4d4f8a7238b16f3e1d.
+- The live Coinbase ticker is not built for now: since r92 the live bot reads each minute's price 3-10 s after the
+  minute, so a ticker would gain only those seconds; the approval stays for when a rule needs it.
