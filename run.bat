@@ -25,7 +25,7 @@ rem   run test       run the automated tests (fake data in a temporary folder; n
 rem   run learn      learning report: wins and losses by pattern (read-only; add --past for the past rain data)
 rem   run kill       kill switch ON: scans stop trading (no paper trades, no shadow orders, no Kalshi orders)
 rem   run unkill     kill switch off (typed by you); "run kill status" shows it
-rem   run live ...   Kalshi account: setup, test, status, demo-order, use demo, use prod, unlock, lock, resume, sync
+rem   run live ...   Kalshi account: setup, test, status, demo-order, use demo, use prod, unlock, lock, resume, sync, snapshot
 rem                  (live.py; real money stays locked until Nov 11 and then needs "run live unlock" typed by you)
 rem The shadow tests (shadow.py) are research only and never count toward the gate. If they or the
 rem Kalshi copy step fail, the backups and the dashboard still run.
@@ -94,6 +94,7 @@ if errorlevel 1 (
   exit /b 1
 )
 if not defined NOLIVE "%PY%" live.py mirror
+if not defined NOLIVE "%PY%" live.py snapshot
 "%PY%" shadow.py scan
 "%PY%" backup.py postscan
 "%PY%" export.py
@@ -109,6 +110,7 @@ if errorlevel 1 (
   exit /b 1
 )
 "%PY%" live.py sync
+"%PY%" live.py snapshot
 "%PY%" shadow.py settle
 "%PY%" learn.py
 "%PY%" research\plan7.py auto
@@ -148,6 +150,8 @@ rem the repository's before the single score, so an hour either one takes counts
 "%PY%" research\ohlc_audit.py run --every 86400
 "%PY%" marks.py
 "%PY%" freshness.py --clock
+rem Kalshi's own account figures for the dashboard (read-only: places nothing, writes no ledger).
+"%PY%" live.py snapshot
 "%PY%" dashboard.py --no-open
 exit /b 0
 

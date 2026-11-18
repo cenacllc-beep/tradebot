@@ -463,7 +463,84 @@ def paper_vs_real(orders, paper):
     return rows, pt, rt
 
 
-def section(orders, events, paper, now, killed, stop_date, table):
+STALE_SECONDS = 2 * 3600   # the snapshot is taken hourly: older than two hours means a run was missed
+
+
+def _iso_when(t):
+    """Kalshi's ISO time ("2026-11-18T01:02:03.456Z") as a local label; the text itself when it cannot be read."""
+    try:
+        d = datetime.strptime(str(t)[:19], "%Y-%m-%dT%H:%M:%S").replace(tzinfo=timezone.utc)
+        return when(d.timestamp())
+    except (TypeError, ValueError):
+        return str(t or "")
+
+
+def _num(v, fmt):
+    return "" if v is None else fmt % v
+
+
+def _by(x):
+    w = x.get("who") or ("bot" if x.get("bot") else "you")
+    return {"bot": "the bot", "mixed": "<b>the bot and you</b>"}.get(w, "<b>you (not the bot)</b>")
+
+
+def account_block(acct, now, table):
+    """Kalshi's own view of the account (live.py snapshot, logs/account.json): cash, open positions, fills and settlements
+    of the last two weeks, each marked as the bot's or not. "" when there is no snapshot yet."""
+    try:
+        return _account_block(acct, now, table)
+    except Exception as ex:   # a damaged snapshot never hides the rest of the real-money panel
+        return '<h3>Kalshi account right now</h3><p class=neg>The account snapshot could not be shown (%s).</p>' % e(ex)
+
+
+def _account_block(acct, now, table):
+    if isinstance(acct, dict) and acct.get("env") not in (None, "prod"):
+        return ('<h3>Kalshi account right now</h3><p class=note>The last snapshot is of the %s exchange (fake money), so it is '
+                'not shown here.</p>' % e(acct.get("env")))
+    if not isinstance(acct, dict) or "cash" not in acct:
+        if isinstance(acct, dict) and acct.get("error"):
+            return ('<h3>Kalshi account right now</h3><p class=neg>No account snapshot yet: %s</p>' % e(acct["error"]))
+        return ('<h3>Kalshi account right now</h3><p class=note>No account snapshot yet. It is taken every hour by the scheduled '
+                'job (<code>.\\run live snapshot</code> takes one now).</p>')
+    age = now - float(acct.get("ts") or 0)
+    stale = (not acct.get("ok")) or age > STALE_SECONDS
+    fills, sets, pos = acct.get("fills") or [], acct.get("settlements") or [], acct.get("positions") or []
+    mine = [x for x in fills if not x.get("bot")]
+    other = mine or [x for x in pos + sets if not x.get("bot")]
+    out = ['<h3>Kalshi account right now <span class=note>real exchange, Kalshi&#8217;s own figures, read %s</span></h3>' % e(when(float(acct.get("ts") or 0)))]
+    if stale:
+        out.append('<p class=neg>%s</p>' % e(
+            "The last read failed (%s); these figures are from %s." % (acct.get("error") or "no reason given", when(float(acct.get("ts") or 0)))
+            if not acct.get("ok") else "This snapshot is over two hours old: the hourly job may not have run."))
+    pv = acct.get("portfolio_value")
+    t = [("Cash", usd(acct["cash"]), "Available to trade now (Kalshi&#8217;s balance)."),
+         ("Positions", "" if pv is None else usd(pv), "Value of open positions as Kalshi marks them."),
+         ("Open markets", str(len(pos)), "%d held only by the bot&#8217;s orders, %d with trades not by the bot." % (sum(1 for x in pos if x.get("bot")), sum(1 for x in pos if not x.get("bot")))),
+         ("Trades not by the bot", str(len(mine)), "Fills in the last %d days made in the app or elsewhere." % int(acct.get("days") or 14))]
+    out.append('<dl class=rtiles>%s</dl>' % "".join('<div><dt>%s</dt><dd>%s</dd><p>%s</p></div>' % (e(a), e(b), c) for a, b, c in t))
+    if other:
+        out.append('<p class=neg>Kalshi shows trades the bot did not make. The bot&#8217;s loss stops and its value count only its own '
+                   'bets, so these are outside every limit it keeps; they also use the cash it copies paper bets with.</p>')
+    if pos:
+        out.append(table(["Market", "Side", "Contracts", "At risk", "Made by"],
+                         [[e(x.get("ticker") or ""), e((x.get("side") or "").upper()), _num(x.get("count"), "%g"),
+                           _num(x.get("exposure"), "$%.2f"), _by(x)] for x in pos], "", num=(2, 3)))
+    if fills:
+        out.append('<details><summary>Fills in the last %d days (%d)</summary>%s</details>' % (int(acct.get("days") or 14), len(fills), table(
+            ["Time", "Market", "Bet", "Contracts", "Price", "Fee", "Made by"],
+            [[e(_iso_when(x.get("time"))), e(x.get("ticker") or ""), e(("%s %s" % (x.get("action") or "", (x.get("side") or "").upper())).strip()),
+              _num(x.get("count"), "%g"), _num(x.get("price"), "$%.2f"), _num(x.get("fee"), "$%.2f"), _by(x)] for x in fills],
+            "", num=(3, 4, 5))))
+    if sets:
+        out.append('<details><summary>Settlements in the last %d days (%d)</summary>%s</details>' % (int(acct.get("days") or 14), len(sets), table(
+            ["Settled", "Market", "Result", "Cost", "Paid out", "Fees", "Made by"],
+            [[e(_iso_when(x.get("time"))), e(x.get("ticker") or ""), e(x.get("result") or ""), _num(x.get("cost"), "$%.2f"),
+              _num(x.get("revenue"), "$%.2f"), _num(x.get("fee"), "$%.2f"), _by(x)] for x in sets],
+            "", num=(3, 4, 5))))
+    return "".join(out)
+
+
+def section(orders, events, paper, now, killed, stop_date, table, account=None):
     """The whole real-money panel. table(headers, rows, empty, num=...) is dashboard.table."""
     today = datetime.fromtimestamp(now, TZ).date()
     lab, cls, sent = state(events, killed, today, stop_date, orders, now)
@@ -474,8 +551,8 @@ def section(orders, events, paper, now, killed, stop_date, table):
             '<span class="rstate %s">%s</span></div>') % (cls, e(lab))
     body = [head, chart(orders, events, now), tiles(orders, events, now),
             '<p class=note>%s Orders come only from live.py, which copies the paper bot&#8217;s rain bets after each evening scan, '
-            'within your limits. This page only reads the bot&#8217;s ledger (live.db); <code>.\\run live status</code> also shows '
-            'Kalshi&#8217;s own balance.</p>' % e(sent), calendar(orders, now),
+            'within your limits. The chart and tiles above count the bot&#8217;s own bets (live.db); the account below is '
+            'Kalshi&#8217;s own figures, read every hour.</p>' % e(sent), account_block(account, now, table), calendar(orders, now),
             '<h3>Real orders</h3>',
             table(["Market day", "City", "Bet", "Contracts", "Limit price", "Cost incl. fee", "Result", "P&amp;L"], rows,
                   "No real orders yet.", num=(3, 4, 5, 7)),

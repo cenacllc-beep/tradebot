@@ -278,6 +278,12 @@ def read_live():
         c.row_factory=sqlite3.Row
         return [dict(r) for r in c.execute("select * from orders")],[dict(r) for r in c.execute("select id,ts,env,kind,detail from events")]
     finally: c.close()
+def read_account():
+    """live.py's account snapshot (logs/account.json: Kalshi's own balance, positions, fills, settlements), or None."""
+    p=os.path.join(os.path.dirname(os.path.abspath(__file__)),"logs","account.json")
+    try:
+        with open(p,encoding="utf-8") as f: return json.load(f)
+    except (OSError,ValueError): return None
 def real_section(D,tr,now):
     """The real-money panel (real_view.py) from read_db()'s live.db rows, or "" when there is no prod activity; an
     unreadable ledger shows a line."""
@@ -286,7 +292,7 @@ def real_section(D,tr,now):
         if D.get("live_error"): raise RuntimeError(D["live_error"])
         orders,events=D.get("live_orders") or [],D.get("live_events") or []
         if not any(o.get("env")=="prod" for o in orders) and not any(v.get("env")=="prod" and v.get("kind")!="setup" for v in events): return ""
-        return RV.section(orders,events,tr,now,killed(),STOP,table)
+        return RV.section(orders,events,tr,now,killed(),STOP,table,read_account())
     except Exception as ex:
         print("real-money view failed:",ex)
         return '<section class=panel><h2>Real money on Kalshi</h2><p class=neg>The real-money ledger could not be read (%s). <code>.\\run live status</code> shows the account.</p></section>'%e(str(ex))

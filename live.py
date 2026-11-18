@@ -8,6 +8,8 @@ rain trades on your Kalshi account, at the paper price or better, never more con
   .\\run live demo-order [no] [TICKER]   demo exchange only: buy 1 YES (or NO) contract at the ask (fake money)
   .\\run live mirror       place this scan's paper rain trades (run.bat scan runs this after main.py scan)
   .\\run live sync         record fills and settlements (run.bat settle runs this)
+  .\\run live snapshot     read-only: Kalshi's own balance, positions, fills and settlements -> logs\\account.json for the
+                          dashboard (run hourly, after each sync and after each mirror; places nothing, writes no ledger)
   .\\run live use demo     (or: use prod) switch exchange
   .\\run live unlock       real money, Nov 11 or later only: shows the gate verdict, then you type the phrase
   .\\run live lock         stop real-money orders again (always allowed)
@@ -592,7 +594,10 @@ def mirror():
         try: o=place(cl,c,env,pid,t,side,k_,cents,"copy of paper trade %d"%pid+("" if k_==n else " (cut from %d by the $%.0f cap or cash)"%(n,MAX_AT_RISK)))
         except ExchangeError as e: skip(str(e)); continue
         if o is None:
-            if c.execute("select status from orders where env=? and paper_id=?",(env,pid)).fetchone()[0]=="unknown": return
+            st_,note_=c.execute("select status,note from orders where env=? and paper_id=?",(env,pid)).fetchone()
+            if st_=="unknown": return
+            if st_=="rejected" and "insufficient_balance" in (note_ or ""):   # Kalshi says the cash is not there: stop this run
+                return print("  stopping: Kalshi reports insufficient balance (cash read as $%.2f); no more orders this run"%cash)
             continue
         x=o["_spent"]; risk+=x; cash-=x
 def reconcile(cl,c,env,tickers):
@@ -664,6 +669,96 @@ def status():
     v,p,_=value_track(c,env)
     if v>=2*STAKE: print("REMINDER: the bot's value has doubled ($%.2f). The rules say: withdraw your original $%.0f now."%(v,STAKE))
     print("Paper gate (v3 rain):"); [print("  "+l) for l in gate_lines()]
+ACCOUNT_JSON=_abs(os.getenv("TRADEBOT_ACCOUNT_JSON") or os.path.join(HERE,"logs","account.json"))   # tests point it elsewhere
+SNAPSHOT_DAYS=14          # fills and settlements kept in the snapshot: the last two weeks
+def _pages(cl,ep,key,params,most=20):
+    """All rows of one paged GET (read-only), at most `most` pages."""
+    out,cur=[],None
+    for _ in range(most):
+        p=dict(params)
+        if cur: p["cursor"]=cur
+        j=cl.get(ep,p)
+        if not isinstance(j,dict) or not isinstance(j.get(key),list): raise ExchangeError("Kalshi's %s answer has no %s list"%(ep,key))
+        out+=j[key]; cur=j.get("cursor")
+        if not cur: return out
+    raise ExchangeError("too many pages of %s"%key)
+def _f(o,k):
+    """A dollar or count field as a number from its fixed-point string (*_dollars / *_fp) or the older plain field; None if absent."""
+    for kk in (k+"_dollars",k+"_fp",k):
+        v=o.get(kk)
+        if v not in (None,""):
+            try: return float(v)
+            except (TypeError,ValueError): return None
+    return None
+def account_snapshot(cl,c,env,t=None):
+    """Kalshi's own view of the account, read-only: cash, portfolio value, every open position, and the last two weeks of
+    fills and settlements, each fill marked as the bot's (its order id is in live.db) or not (a trade made in the app or
+    elsewhere). Nothing here places, changes or cancels an order, and nothing is written to live.db."""
+    t=now() if t is None else t
+    b=cl.get("/portfolio/balance")
+    cash=_need(b,"balance","balance")
+    pv=b.get("portfolio_value"); pv=None if pv in (None,"") else float(pv)/100   # cents (GetBalanceResponse)
+    bot=set(r[0] for r in c.execute("select order_id from orders where env=? and order_id is not null",(env,)))
+    pos=[]
+    for m in _pages(cl,"/portfolio/positions","market_positions",{"limit":1000,"settlement_status":"unsettled"}):
+        q=_f(m,"position")
+        if not q: continue
+        led=c.execute("select coalesce(sum(case when side='yes' then fill_count else -fill_count end),0) from orders where env=? and ticker=? and fill_count>0 and result is null",(env,m.get("ticker"))).fetchone()[0]
+        who="bot" if led and abs(led-q)<0.005 else ("mixed" if led else "you")   # by count, so a manual trade on a bot market shows
+        pos.append(dict(ticker=m.get("ticker"),side="yes" if q>0 else "no",count=abs(q),exposure=_f(m,"market_exposure"),
+                        realized_pnl=_f(m,"realized_pnl"),fees_paid=_f(m,"fees_paid"),bot=who=="bot",who=who))
+    since=int(t-SNAPSHOT_DAYS*86400)
+    fills=[]
+    for x in _pages(cl,"/portfolio/fills","fills",{"limit":1000,"min_ts":since}):
+        side=x.get("outcome_side") or x.get("side")
+        price=_f(x,"yes_price") if side=="yes" else _f(x,"no_price")
+        fills.append(dict(time=x.get("created_time"),ticker=x.get("ticker") or x.get("market_ticker"),side=side,
+                          action=x.get("action"),count=_f(x,"count"),price=price,fee=_f(x,"fee_cost"),
+                          taker=x.get("is_taker"),bot=x.get("order_id") in bot))
+    sets=[]
+    for x in _pages(cl,"/portfolio/settlements","settlements",{"limit":1000,"min_ts":since}):
+        rev=x.get("revenue"); rev=None if rev in (None,"") else float(rev)/100   # cents (Settlement.revenue)
+        cost=(_f(x,"yes_total_cost") or 0.0)+(_f(x,"no_total_cost") or 0.0)
+        led=c.execute("select coalesce(sum(fill_count),0) from orders where env=? and ticker=? and fill_count>0",(env,x.get("ticker"))).fetchone()[0]
+        held=(_f(x,"yes_count") or 0.0)+(_f(x,"no_count") or 0.0)
+        who="bot" if led and abs(led-held)<0.005 else ("mixed" if led else "you")
+        sets.append(dict(time=x.get("settled_time"),ticker=x.get("ticker"),result=x.get("market_result"),
+                         yes=_f(x,"yes_count"),no=_f(x,"no_count"),cost=cost,revenue=rev,fee=_f(x,"fee_cost"),bot=who=="bot",who=who))
+    fills.sort(key=lambda r: r["time"] or "",reverse=True); sets.sort(key=lambda r: r["time"] or "",reverse=True)
+    return dict(env=env,ts=t,ok=True,error=None,cash=cash,portfolio_value=pv,positions=pos,fills=fills,settlements=sets,
+                days=SNAPSHOT_DAYS)
+def _write_json(path,obj):
+    os.makedirs(os.path.dirname(path),exist_ok=True)
+    tmp=path+".tmp"
+    with open(tmp,"w",encoding="utf-8") as f: json.dump(obj,f)
+    os.replace(tmp,path)
+def snapshot(path=None):
+    """Write logs\\account.json (read-only on Kalshi and on live.db). A failed read keeps the last good snapshot and adds
+    the error and its time, so the dashboard shows both the last known account and that it is stale."""
+    path=path or ACCOUNT_JSON
+    s,env,k=load_settings()
+    if not ready(k): return print("live: no Kalshi account set up (no snapshot)")
+    try:
+        cl,_=client()
+        if os.path.exists(LIVE_DB): c=sqlite3.connect(Path(LIVE_DB).resolve().as_uri()+"?mode=ro",uri=True)
+        else:   # no ledger yet: nothing is the bot's; never create live.db from here
+            c=sqlite3.connect(":memory:"); c.execute("create table orders(env text,ticker text,order_id text,fill_count integer)")
+        try: snap=account_snapshot(cl,c,env)
+        finally: c.close()
+    except Exception as e:   # never stops the job that runs it; the last good snapshot stays, marked with the failure
+        try:
+            with open(path,encoding="utf-8") as f: old=json.load(f)
+            if not isinstance(old,dict) or old.get("env")!=env: old={}   # never relabel another exchange's figures
+        except (OSError,ValueError): old={}
+        old.update(env=env,ok=False,error=safe("%s: %s"%(type(e).__name__,e))[:300],error_ts=now())
+        try: _write_json(path,old)
+        except OSError: pass
+        return print("live (%s): account snapshot failed (%s); the dashboard keeps the last one"%(env,safe(e)))
+    _write_json(path,snap)
+    man=sum(1 for x in snap["fills"] if not x["bot"])
+    print("live (%s): account snapshot: cash $%.2f, %d open position%s, %d fill%s in %d days (%d not by the bot)"%(
+        env,snap["cash"],len(snap["positions"]),"" if len(snap["positions"])==1 else "s",len(snap["fills"]),
+        "" if len(snap["fills"])==1 else "s",SNAPSHOT_DAYS,man))
 def test_connection():
     cl,env=client()
     if cl is None: sys.exit("No key set up for %s yet: run .\\run live setup"%env)
@@ -817,6 +912,7 @@ def main(a):
     cmd=a[0] if a else "status"
     if cmd=="mirror": mirror()
     elif cmd=="sync": sync()
+    elif cmd=="snapshot": snapshot()
     elif cmd=="status": status()
     elif cmd=="test": test_connection()
     elif cmd=="setup": setup()

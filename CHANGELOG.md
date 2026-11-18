@@ -2070,3 +2070,21 @@ unfamiliar codebase ... do not change functionality. only upgrade the code quali
   tests. Second review: no MUST; applied: the result is checked as JSON before anything is written, and freeze refuses
   unless PLAN15 is frozen. Left: B does not require PLAN15's full-spot completeness (the plan asks only for minute k and
   the 60-minute sigma), so B and the reference can differ on a few windows.
+
+## 2026-11-18 19:15 (La Paz) - r93: Kalshi's own account figures on the dashboard, hourly
+- User: "our bot is also not fully wired to our kalshi account for real-time updates. investigate and resolve".
+- Found (logs\tasks.log, live.db): the dashboard's real-money panel showed only the bot's ledger, and Kalshi's balance
+  was read only during the evening copy. Kalshi's cash went $25.00 (Nov 11) -> $24.74 (Nov 13) -> $0.42 (Nov 14) ->
+  $1.42 (Nov 15) -> $8.84 (Nov 16) -> $8.15 (Nov 17) while the bot's own bets cost under $2 and netted +$0.35 on 5
+  settled. So money moved through trades (or transfers) outside the bot, which the ledger, the loss stops and the 25%
+  end rule never see. Six paper copies (Nov 14-15) were refused by Kalshi with insufficient_balance; one more, sent
+  after a refusal, also failed. Gate look stored today: not passed.
+- live.py `snapshot` (read-only GETs: balance, positions, fills, settlements; live.db opened read-only, never created)
+  writes logs\account.json; a failed read keeps the last figures marked as failed (never another exchange's). run.bat
+  runs it hourly and after mirror and sync. real_view.py shows "Kalshi account right now" in the real-money panel: cash,
+  positions value, open markets, trades not by the bot (fills by order id; positions and settlements by count against
+  the ledger: bot, bot and you, or you), stale or failed snapshots flagged, demo snapshots not shown, a damaged file
+  never hides the panel. mirror() stops the run after an insufficient_balance refusal (only removes orders).
+- Tests: tests/test_live.py snapshot section (GETs only, ledger unchanged, fields and units, failure kept, panel text).
+- Review (agents/code-reviewer.md): no MUST; applied: env shown and demo hidden, never relabel another exchange's
+  figures, the panel survives a damaged file, positions/settlements judged by count, not ticker alone.

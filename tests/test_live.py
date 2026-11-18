@@ -7,6 +7,7 @@ from urllib.parse import urlparse
 WORK,OUT=sys.argv[1],sys.argv[2]; os.makedirs(OUT,exist_ok=True); os.chdir(OUT)
 os.environ.setdefault("PAPER_DB",os.path.join(OUT,"paper.db")); os.environ.setdefault("TRADEBOT_OFFSITE_BACKUPS",os.path.join(OUT,"offsite"))
 os.environ["TRADEBOT_KALSHI_DIR"]=os.path.join(OUT,"kalshi"); os.environ.pop("LIVE_DB",None)
+os.environ["TRADEBOT_ACCOUNT_JSON"]=os.path.join(OUT,"logs","account.json")
 for v in ("KALSHI_ENV","KALSHI_KEY_ID","KALSHI_KEY_FILE"): os.environ.pop(v,None)
 assert os.path.isabs(os.environ["PAPER_DB"]) and not os.environ["PAPER_DB"].startswith(WORK), "tests must never use the real paper.db"
 sys.path.insert(0,WORK)
@@ -646,6 +647,64 @@ assert r.returncode==3 and any("badlive" in f and f.startswith("paper_") for f i
 r=subprocess.run([sys.executable,os.path.join(WORK,"dashboard.py"),"--no-open"],capture_output=True,text=True,env=env,encoding="utf-8",errors="replace"); assert r.returncode==0, r.stderr
 html=open("dashboard.html",encoding="utf-8").read(); assert "Kalshi account" in html and "Demo:" in html and "Real:" in html, "account tile"
 assert "At most $%.0f at risk at once."%live.MAX_AT_RISK in html, "the tile names live.py's cap"
+
+# ---------- account snapshot (2026-11-18): read-only, Kalshi's own figures for the dashboard ----------
+settings("prod")
+ACC=os.path.join(OUT,"logs","account.json")
+lc=live.ldb(); boid=lc.execute("select order_id from orders where env='prod' and order_id is not null and fill_count>0").fetchone()
+bot_oid=boid[0] if boid else "no-bot-order"; bot_t=lc.execute("select ticker from orders where order_id=?",(bot_oid,)).fetchone()
+bot_t=bot_t[0] if bot_t else "KXRAIN-X"; lc.close()
+orig=F.request; seen=[]
+def snap_request(method,url,headers=None,params=None,json=None,timeout=None):
+    ep=urlparse(url).path.split("/trade-api/v2",1)[1]
+    seen.append((method,ep,dict(params or {})))
+    assert method=="GET", "the snapshot only reads"
+    if ep=="/portfolio/balance": return Resp(200,{"balance":815,"balance_dollars":"8.1500","portfolio_value":32,"updated_ts":1})
+    if ep=="/portfolio/positions":
+        return Resp(200,{"market_positions":[{"ticker":bot_t,"position_fp":"2.00","market_exposure_dollars":"0.3200"},
+                                             {"ticker":"KXBTC15M-26NOV18-X","position_fp":"-5.00","market_exposure_dollars":"2.5000"},
+                                             {"ticker":"KXOLD","position_fp":"0.00","market_exposure_dollars":"0.0000"}],"cursor":""})
+    if ep=="/portfolio/fills":
+        assert params.get("min_ts") and params["min_ts"]<time.time()-13*86400
+        return Resp(200,{"fills":[{"order_id":bot_oid,"ticker":bot_t,"outcome_side":"yes","action":"buy","count_fp":"2.00","yes_price_dollars":"0.1600","no_price_dollars":"0.8400","fee_cost":"0.0188","is_taker":True,"created_time":"2026-11-18T00:56:17Z"},
+                                  {"order_id":"app-1","ticker":"KXBTC15M-26NOV18-X","outcome_side":"no","action":"buy","count_fp":"5.00","yes_price_dollars":"0.5000","no_price_dollars":"0.5000","fee_cost":"0.0875","is_taker":True,"created_time":"2026-11-18T01:00:00Z"}],"cursor":""})
+    if ep=="/portfolio/settlements":
+        return Resp(200,{"settlements":[{"ticker":"KXETH15M-26NOV14-Y","market_result":"no","yes_count_fp":"10.00","yes_total_cost_dollars":"5.0000","no_count_fp":"0.00","no_total_cost_dollars":"0.0000","revenue":0,"settled_time":"2026-11-14T20:00:00Z","fee_cost":"0.1750"}],"cursor":""})
+    return orig(method,url,headers,params,json,timeout)
+F.request=snap_request
+posts_before=len(F.posts()); h0=ph()
+db_before=open(live.LIVE_DB,"rb").read()
+out,code=run(live.main,["snapshot"])
+assert code in (0,None), out
+assert len(F.posts())==posts_before and open(live.LIVE_DB,"rb").read()==db_before, "the snapshot places nothing and writes no ledger"
+assert all(m=="GET" for m,_,_ in seen)
+A=json.load(open(ACC))
+assert A["ok"] and A["env"]=="prod" and abs(A["cash"]-8.15)<1e-9 and abs(A["portfolio_value"]-0.32)<1e-9, A
+assert [p_["ticker"] for p_ in A["positions"]]==[bot_t,"KXBTC15M-26NOV18-X"], "flat positions are left out"
+assert A["positions"][1]["side"]=="no" and A["positions"][1]["count"]==5.0 and not A["positions"][1]["bot"]
+f_={x["ticker"]:x for x in A["fills"]}
+assert f_["KXBTC15M-26NOV18-X"]["bot"] is False and abs(f_["KXBTC15M-26NOV18-X"]["price"]-0.50)<1e-9
+if boid: assert f_[bot_t]["bot"] is True and abs(f_[bot_t]["price"]-0.16)<1e-9
+assert A["settlements"][0]["result"]=="no" and A["settlements"][0]["revenue"]==0.0 and abs(A["settlements"][0]["cost"]-5.0)<1e-9
+assert "1 not by the bot" in out.replace("(","").replace(")","") or "not by the bot" in out, out
+# a failed read keeps the last good figures and says so
+def broken(method,url,headers=None,params=None,json=None,timeout=None): raise requests.exceptions.ConnectionError("x")
+F.request=broken
+out,code=run(live.main,["snapshot"]); A2=json.load(open(ACC))
+assert code in (0,None) and A2["ok"] is False and A2["error"] and abs(A2["cash"]-8.15)<1e-9 and "failed" in out, (out,A2)
+F.request=orig
+# the dashboard's account block: Kalshi's figures, trades not by the bot flagged, stale snapshots flagged
+import real_view as RV
+tbl=lambda h,rows,empty,num=(): "<table>%s</table>"%"".join("<tr>%s</tr>"%"".join("<td>%s</td>"%c for c in r) for r in rows)
+html=RV.account_block(A,A["ts"]+60,tbl)
+assert "$8.15" in html and "Trades not by the bot" in html and "you (not the bot)" in html and "class=neg" in html
+assert "over two hours old" in RV.account_block(A,A["ts"]+3*3600,tbl)
+assert "The last read failed" in RV.account_block(A2,A2["ts"]+60,tbl)
+assert "No account snapshot yet" in RV.account_block(None,time.time(),tbl)
+assert "demo exchange" in RV.account_block(dict(A,env="demo"),A["ts"],tbl)
+assert "could not be shown" in RV.account_block(dict(A,ts="bad"),time.time(),tbl)   # a damaged file never hides the panel
+assert A["positions"][1]["who"]=="you" and A["positions"][0]["who"] in ("bot","mixed","you")
+print("account snapshot ok")
 
 # run() checked after every command that paper.db did not change; the fake checked every request's headers and signature
 assert all(r[12] in ("demo","prod") for r in rows())
