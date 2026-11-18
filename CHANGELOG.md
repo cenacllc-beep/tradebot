@@ -2088,3 +2088,30 @@ unfamiliar codebase ... do not change functionality. only upgrade the code quali
 - Tests: tests/test_live.py snapshot section (GETs only, ledger unchanged, fields and units, failure kept, panel text).
 - Review (agents/code-reviewer.md): no MUST; applied: env shown and demo hidden, never relabel another exchange's
   figures, the panel survives a damaged file, positions/settlements judged by count, not ticker alone.
+
+## 2026-11-18 20:30 (La Paz) - PLAN17 written, statistics-reviewed and frozen (research only)
+- User (19:13): cheap contracts that reverse late can turn $1 into $900+; (19:40) "think about it intelligently and
+  implement the most intelligent system". research/PLAN17.md: a pre-registered past-data test of whether a small
+  frozen logistic model (cheap side's price, Coinbase's distance to the strike in 15-minute volatility units, 3-minute
+  momentum, Kalshi's 3-minute price move, minutes left) picks 1-5c sides at minutes 10-13 that win more often than
+  their price says. Fit on September windows, scored once on October, per asset at 1.25% (t, 2-day block bootstrap,
+  a price-and-minute-matched random-pick placebo, and an exact Poisson-binomial bound). Expected: no edge shown.
+- Statistics review (agents/statistician.md): MUST 1 exact bound for few wins, MUST 2 placebo matched by day x minute x
+  ask cent, MUST 3 disclosure of what was known about Sep-Oct (PLAN15 not fitted, PLAN16 not scored), MUST 4 ridge
+  pinned (standardised inputs, penalty 0.5 x 1.0 x sum of squared slopes); SHOULD bet-weighted figure, power in wins,
+  fee source pinned (whole-cent result also reported), fresh Coinbase minutes -16..13, quotes via plan15.quote, fit rows
+  defined; NITs applied. Nothing left.
+- Frozen: research/PLAN17.md sha256 ceee706fb07aac21fa170db5484d5593f8aa82fa12769919b077847c662c1f3c.
+
+## 2026-11-18 21:15 (La Paz) - PLAN17 code written, reviewed twice, ready to freeze (research only)
+- research/plan17.py (freeze | download | fit | score ASSET | status), tests/test_plan17.py (synthetic data: inputs and
+  their signs for NO, cheap side, k-3 quote, fees, exact bound, placebo fallbacks, a planted edge passes, no edge
+  fails, too few bets not testable, guards, fit once, score once, October not downloaded before the fit),
+  cloud/workflows/plan17.yml (+ .github copy; by hand only; commits only research/results/plan17*; fit once and each
+  asset scored once, refused if ever committed).
+- Code review (agents/code-reviewer.md): MUST 1 (cheap NO sides on a candle with yes ask $1.00 were excluded) fixed;
+  SHOULD: October waits for the fit, S_0 = floor_strike only, day-level SEs by minute and fee, baseline = first cheap
+  minute, a day with no usable Coinbase minutes is retried, more tests; NITs applied. Second review: no MUST; applied:
+  fit and score refuse unless PLAN15's inspect confirmed floor_strike; the md notes the 97% check is PLAN15's own.
+- Placebo detail not in the plan's text: when a stratum and both fallbacks are empty, the rule's own bet stands in
+  (makes a pass harder); reported.
