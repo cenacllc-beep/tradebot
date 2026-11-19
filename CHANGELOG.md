@@ -2161,3 +2161,21 @@ unfamiliar codebase ... do not change functionality. only upgrade the code quali
 - 2026-11-18 21:26 (La Paz): the first freeze run refused ("packages differ from the
   pins"): ruptures reports its version as "v1.1.10". The pin check now drops a leading "v" (no other change; tests
   rerun). The runner installed numpy 2.5.5, scipy 1.18.1, pandas 3.1.1 with the pins; the model records them.
+
+## 2026-11-19 07:45 (La Paz) - PLAN16 and PLAN17 scored once; statistics review (research only)
+- PLAN16 (scored 11:18 UTC on GitHub): NO EDGE SHOWN for all 8 tests (Holm stops at the first step; no p near any
+  level). Per contract: BTC A -1.6c, B -0.4c, C -1.9c, D -5.9c; ETH A -1.8c, B -1.2c, C -2.6c, D -2.4c. Win rates
+  match prices; the losses are about the fee. Reference (not a test, not to be used to change PLAN15/PLAN15F): PLAN15's
+  own rule lost about 1.7-1.8c a contract over about 12,000 past signals. BTC D's -8c day mean is not a finding;
+  betting against it would need its own plan.
+- PLAN17 (model fitted 07:03 UTC on 6,206 September rows; scored 11:18/11:19 UTC): NOT TESTABLE for both assets
+  (the 100-bet floor: BTC 65 bets on 28 days, 2 wins, day mean +0.5c +/- 1.9c; ETH 71 bets on 29 days, 2 wins,
+  -1.1c +/- 1.1c). Not testable is not evidence either way, and the plan forbids rescuing it (no lower threshold, no
+  November data). Descriptive: buying every cheap side lost -0.16c +/- 0.34c (BTC) and -0.52c +/- 0.38c (ETH) with
+  the fine fee, about -1.0c and -1.4c with the whole-cent fee; cheap sides won about as often as their prices.
+- Statistics review (agents/statistician.md): both verdicts follow the frozen plans; no MUST. Caveats recorded here
+  (the result files are written once and stay as they are): the "median contracts traded" capacity figure is all
+  contracts traded in that market and minute (both sides, every price), not what was on offer at 1-5c; PLAN16's .md
+  omits capacity (it is in the JSON); the PLAN17 verdict string names both floors but the bet floor applied; the
+  "97%%" typo and "1 bets" in plan17.py's report text; price bands "1c" and "5c" are ranges (1.0-1.49c, 4.5-5.0c);
+  calibration rows are up to 4 per window and correlated.
