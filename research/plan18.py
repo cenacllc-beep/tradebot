@@ -97,7 +97,8 @@ def pin_problems():
     for name, want in PINS.items():
         try:
             mod = __import__(name)
-            got = getattr(mod, "__version__", None)
+            got = str(getattr(mod, "__version__", None) or "")
+            got = got[1:] if got.startswith("v") else got   # ruptures reports "v1.1.10"
         except ImportError:
             got = None
         if got != want:

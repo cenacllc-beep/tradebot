@@ -2158,3 +2158,6 @@ unfamiliar codebase ... do not change functionality. only upgrade the code quali
 - Second review: no MUST. Applied: Kraken's cursor read from the raw response and required to grow; a core exchange
   that stays short after 3 runs is saved as it is (the plan text needs only 3 exchanges per minute; dispersion is
   missing where one of the three is), recorded in research/results/plan18/shortfall.json and shown by status.
+- 2026-11-18 21:30 (La Paz) [sic: 2026-11-19 01:26 UTC]: the first freeze run refused ("packages differ from the
+  pins"): ruptures reports its version as "v1.1.10". The pin check now drops a leading "v" (no other change; tests
+  rerun). The runner installed numpy 2.5.5, scipy 1.18.1, pandas 3.1.1 with the pins; the model records them.
