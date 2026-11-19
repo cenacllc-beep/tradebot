@@ -94,6 +94,18 @@ def nearly(name, a, b):
 try:
     Q.build_comp("BTC", d0, nearly)
     raise AssertionError("a required exchange missing 20 minutes must not save the day")
+except Q.Short as sh:
+    assert sh.name == "coinbase" and sh.n == 1420
+assert Q.build_comp("BTC", d0, nearly, accept_short=True)["CB"][0] is None   # after SHORT_TRIES runs: saved as it is
+class Back(FakeEx):
+    def fetch_trades(self, sym, since=None, limit=None, params=None):
+        out = FakeEx.fetch_trades(self, sym, since, limit, params)
+        if out:
+            out[-1]["info"][-1] = "7"   # a cursor that does not grow
+        return out
+try:
+    Q.trade_closes(Back(trades=trades, step=50), "X", t0, t0 + 3000)
+    raise AssertionError("a cursor that does not grow must stop the day")
 except RuntimeError:
     pass
 assert set(comp2["absent"]) == {"bullish", "kraken"} and comp2["N"][0] == 3 and comp2["S"][0] == 100.0

@@ -2139,3 +2139,22 @@ unfamiliar codebase ... do not change functionality. only upgrade the code quali
   side-flip placebo, exact ruptures recipe, Coinbase comparison refits, Kalshi coverage check before the fit, fee
   multiplier at the fill; NITs applied. Nothing left.
 - Frozen: research/PLAN18.md sha256 717909c8aaa78c8d217747d1cd3f75d27a9da5067d4d206e83b4d1b872969cff.
+
+## 2026-11-18 23:30 (La Paz) - PLAN18 code written, reviewed twice, ready to freeze (research only)
+- research/plan18.py (freeze | download | fit | score | status), tests/test_plan18.py (synthetic: minute labels,
+  OHLCV paging with gaps, Kraken cursor paging and bursts, composite and dispersion, required/transient/short exchange
+  handling, GARCH horizon, shift detector, a planted edge passes G and M for both assets, fair prices show nothing,
+  guard, placebo, Holm, fit once, score once, August not downloaded before the fit), cloud/workflows/plan18.yml
+  (+ .github copy; installs ccxt 4.5.85, arch 8.0.0, ruptures 1.1.10 on the runner; commits only
+  research/results/plan18*).
+- Code review (agents/code-reviewer.md): MUST network faults and rate limits retried instead of saving a day without
+  the exchange; core exchanges need 1,430 of 1,440 minutes; Kraken paged with its own cursor (bursts of 1,000+ trades
+  in a second no longer stall). SHOULD: empty pages skip ahead; GARCH convergence and stability checked; library
+  versions recorded; fit-period Q1; fee multiplier checked for August; Kalshi coverage pooled over June-July; the 10%
+  guard counts raw candles (decisions use plan15.quote, which carries a candle forward up to 5 minutes, as the plan
+  text says); exchange instances cached; more tests. NITs applied or noted (filter starts at arch's backcast value;
+  logit(mid) clipped like G's p; August market records are read into memory by PLAN15's archive listing but nothing
+  August is saved or computed before the fit).
+- Second review: no MUST. Applied: Kraken's cursor read from the raw response and required to grow; a core exchange
+  that stays short after 3 runs is saved as it is (the plan text needs only 3 exchanges per minute; dispersion is
+  missing where one of the three is), recorded in research/results/plan18/shortfall.json and shown by status.

@@ -139,6 +139,15 @@ def freeze(root=ROOT, path=None, now=None):
 # ---------- composite (plan section 1) ----------
 PAGE_MINUTES = dict(bitstamp=1000, coinbase=300, cryptocom=300, bullish=100)   # ccxt's largest one-minute page
 REQUIRED_MIN = 1430                                       # a required exchange must give this many of 1440 minutes
+SHORT_TRIES = 3                                           # after this many short runs the day is saved as it is
+
+
+class Short(RuntimeError):
+    """A required exchange answered but gave fewer than REQUIRED_MIN minutes."""
+
+    def __init__(self, name, n):
+        RuntimeError.__init__(self, "%s returned only %d of 1440 minutes" % (name, n))
+        self.name, self.n = name, n
 _EX = {}
 
 
@@ -216,7 +225,10 @@ def trade_closes(ex, sym, t0, t1, tries=3):
                 time.sleep(5 * (i + 1))
         rows = [r for r in rows or [] if r.get("timestamp") is not None]
         nxt = None
-        if rows and isinstance(rows[-1].get("info"), list) and rows[-1]["info"]:
+        raw = getattr(ex, "last_json_response", None)
+        if isinstance(raw, dict) and isinstance(raw.get("result"), dict) and raw["result"].get("last") is not None:
+            nxt = str(raw["result"]["last"])             # Kraken's own cursor, independent of row order
+        elif rows and isinstance(rows[-1].get("info"), list) and rows[-1]["info"]:
             nxt = str(rows[-1]["info"][-1])
         rows.sort(key=lambda r: (r["timestamp"],) + _idkey(r))
         for r in rows:
@@ -233,12 +245,13 @@ def trade_closes(ex, sym, t0, t1, tries=3):
         top = max((r["timestamp"] for r in rows), default=None)
         if top is not None and top / 1000.0 > t1:
             return {e: v[1] for e, v in last.items()}
-        if not nxt or nxt == cursor:
+        cur_ns = int(cursor) * 10 ** 9 if len(cursor) <= 11 else int(cursor)   # the start is in seconds
+        if not nxt or not nxt.isdigit() or int(nxt) <= cur_ns:
             raise RuntimeError("Kraken's trades stopped before the end of the day (day not fully covered)")
         cursor = nxt
 
 
-def build_comp(asset, d, fetch=None):
+def build_comp(asset, d, fetch=None, accept_short=False):
     """One asset-day's derived series: minute ends day_start + 60 .. day_start + 86400. fetch(name, t0, t1) ->
     {end: close} (tests replace it). A failure of a required exchange raises (the day is not saved); Bullish or
     Kraken failing leaves them absent (recorded)."""
@@ -259,8 +272,8 @@ def build_comp(asset, d, fetch=None):
                 raise RuntimeError("%s: %s: %s" % (name, type(ex).__name__, str(ex)[:200]))
             closes[name], absent[name] = {}, "%s: %s" % (type(ex).__name__, str(ex)[:120])   # it answered: absent
             continue
-        if name in REQUIRED and len(closes[name]) < REQUIRED_MIN:
-            raise RuntimeError("%s returned only %d of 1440 minutes" % (name, len(closes[name])))
+        if name in REQUIRED and len(closes[name]) < REQUIRED_MIN and not accept_short:
+            raise Short(name, len(closes[name]))
     S, CB, DISP, N = [], [], [], []
     for i in range(1, 1441):
         e = t0 + 60 * i
@@ -308,6 +321,9 @@ def download(max_days=None, budget_minutes=None, log=print, now=None, markets=No
     last = TEST[1] if fitted else FIT[1]
     done = waiting = 0
     cache = {}
+    short_path = os.path.join(DATA, "shortfall.json")
+    shorts, _ = P._read_json(short_path)
+    shorts = shorts if isinstance(shorts, dict) else {}
     for a in ASSETS:
         for d in days(FIRST_COMP_DAY, TEST[1]):
             if d > last:
@@ -325,7 +341,17 @@ def download(max_days=None, budget_minutes=None, log=print, now=None, markets=No
                     continue
                 try:
                     if kind == "comp":
-                        obj = build_comp(a, d)
+                        key = "%s %s" % (a, d)
+                        try:
+                            obj = build_comp(a, d, accept_short=shorts.get(key, {}).get("tries", 0) >= SHORT_TRIES)
+                        except Short as sh:
+                            e = shorts.setdefault(key, dict(tries=0))
+                            e.update(tries=e["tries"] + 1, exchange=sh.name, minutes=sh.n)
+                            jsonio.save(short_path, shorts)
+                            raise
+                        if key in shorts:
+                            shorts[key]["saved_short"] = True
+                            jsonio.save(short_path, shorts)
                     else:
                         if a not in cache:
                             cache[a] = P.market_list(a, FIT[0], last, time.time() - P.SETTLE_LAG)
@@ -1055,9 +1081,10 @@ def status():
     rec, _ = P._read_json(IDENTITY)
     n = {a: dict(comp=sum(1 for d in days(FIRST_COMP_DAY, TEST[1]) if os.path.exists(comp_path(a, d))),
                  kalshi=sum(1 for d in days(FIT[0], TEST[1]) if os.path.exists(kal_path(a, d)))) for a in ASSETS}
-    return "PLAN18: frozen %s; files %s (of %d composite and %d Kalshi days); fitted %s; scored %s" % (
+    sh, _ = P._read_json(os.path.join(DATA, "shortfall.json"))
+    return "PLAN18: frozen %s; files %s (of %d composite and %d Kalshi days); fitted %s; scored %s; short days %s" % (
         bool(rec), n, len(days(FIRST_COMP_DAY, TEST[1])), len(days(FIT[0], TEST[1])), os.path.exists(MODEL),
-        os.path.exists(RESULT))
+        os.path.exists(RESULT), sh or {})
 
 
 def main(argv=None):
