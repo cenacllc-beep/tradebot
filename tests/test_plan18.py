@@ -249,7 +249,7 @@ Q.identity_problems = lambda root=None, path=None, pins=True: []
 Q.DATA = os.path.join(OUT, "dl")
 Q.MODEL = os.path.join(OUT, "dl_model.json")
 seen = []
-Q.build_comp = lambda a, d: seen.append(d) or dict(S=[1.0] * 1440, complete=True)
+Q.build_comp = lambda a, d, accept_short=False: seen.append(d) or dict(S=[1.0] * 1440, complete=True)
 P.market_list = lambda a, f, l, n: {}
 P.build_day = lambda a, d, ms, u: dict(windows=[], complete=True)
 ok, msg = Q.download(log=lambda m: None)
