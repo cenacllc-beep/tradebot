@@ -137,20 +137,39 @@ def freeze(root=ROOT, path=None, now=None):
 
 
 # ---------- composite (plan section 1) ----------
+PAGE_MINUTES = dict(bitstamp=1000, coinbase=300, cryptocom=300, bullish=100)   # ccxt's largest one-minute page
+REQUIRED_MIN = 1430                                       # a required exchange must give this many of 1440 minutes
+_EX = {}
+
+
 def _exchange(name):
-    import ccxt
-    return getattr(ccxt, name)({"enableRateLimit": True, "userAgent": UA, "headers": {"User-Agent": UA}})
+    """One ccxt instance per exchange for the run (shares its rate limiter), markets loaded once."""
+    if name not in _EX:
+        import ccxt
+        ex = getattr(ccxt, name)({"enableRateLimit": True, "userAgent": UA, "headers": {"User-Agent": UA}})
+        ex.load_markets()
+        _EX[name] = ex
+    return _EX[name]
 
 
-def ohlcv_closes(ex, sym, t0, t1, tries=3):
+def _transient(ex):
+    """True for network faults, timeouts and rate limits (the day is retried, never saved without the exchange)."""
+    try:
+        import ccxt
+        return isinstance(ex, (ccxt.NetworkError, ccxt.ExchangeNotAvailable))
+    except ImportError:
+        return False
+
+
+def ohlcv_closes(ex, sym, t0, t1, tries=3, page=1000):
     """{end of minute: close} for minutes ending in (t0, t1], from fetch_ohlcv paged by since (ccxt's timestamp is the
-    minute's start, so the end is start + 60)."""
+    minute's start, so the end is start + 60). An empty page (a gap) moves on by one page span, never ends the day."""
     out, since = {}, (t0) * 1000
     while since < t1 * 1000:
         rows = None
         for i in range(tries):
             try:
-                rows = ex.fetch_ohlcv(sym, "1m", since=since, limit=1000)
+                rows = ex.fetch_ohlcv(sym, "1m", since=since, limit=page)
                 break
             except Exception:   # noqa: BLE001  (retried, then raised)
                 if i == tries - 1:
@@ -158,7 +177,8 @@ def ohlcv_closes(ex, sym, t0, t1, tries=3):
                 time.sleep(5 * (i + 1))
         rows = [r for r in rows or [] if r and r[0] is not None and r[0] >= since]
         if not rows:
-            break   # no more data in the range (gaps stay missing)
+            since += page * 60000   # a gap: try the next page span (gaps stay missing)
+            continue
         for r in rows:
             end = int(r[0]) // 1000 + 60
             if t0 < end <= t1 and r[4] is not None:
@@ -170,35 +190,52 @@ def ohlcv_closes(ex, sym, t0, t1, tries=3):
     return out
 
 
+def _idkey(r):
+    i = r.get("id")
+    try:
+        return (0, int(i), "")
+    except (TypeError, ValueError):
+        return (1, 0, str(i))
+
+
 def trade_closes(ex, sym, t0, t1, tries=3):
-    """{end of minute: last trade price} for minutes ending in (t0, t1], from fetch_trades paged by the last trade's
-    time; a trade at time t belongs to the minute ending at ceil(t / 60) x 60. Raises unless the pages reach past t1
-    (a day not fully covered has no closes)."""
-    last, seen, since = {}, set(), t0 * 1000 + 1
+    """{end of minute: last trade price} for minutes ending in (t0, t1], from Kraken's public trades paged with its own
+    `last` cursor (nanoseconds; ccxt appends it to the last row's info), starting at t0 in seconds; a trade at time t
+    belongs to the minute ending at ceil(t / 60) x 60. Raises unless the pages reach past t1 (a day not fully covered
+    has no closes); network faults are raised as they are."""
+    last, seen, cursor = {}, set(), str(int(t0))
     while True:
         rows = None
         for i in range(tries):
             try:
-                rows = ex.fetch_trades(sym, since=since, limit=1000)
+                rows = ex.fetch_trades(sym, None, 1000, {"since": cursor})
                 break
             except Exception:   # noqa: BLE001
                 if i == tries - 1:
                     raise
                 time.sleep(5 * (i + 1))
-        rows = sorted((r for r in rows or [] if r.get("timestamp") is not None), key=lambda r: (r["timestamp"], str(r.get("id"))))
-        new = [r for r in rows if (r.get("id"), r["timestamp"], r.get("price")) not in seen]
-        if not new:
-            raise RuntimeError("trades stopped before the end of the day")
-        for r in new:
-            seen.add((r.get("id"), r["timestamp"], r.get("price")))
+        rows = [r for r in rows or [] if r.get("timestamp") is not None]
+        nxt = None
+        if rows and isinstance(rows[-1].get("info"), list) and rows[-1]["info"]:
+            nxt = str(rows[-1]["info"][-1])
+        rows.sort(key=lambda r: (r["timestamp"],) + _idkey(r))
+        for r in rows:
+            k = (r.get("id"), r["timestamp"], r.get("price"))
+            if k in seen:
+                continue
+            seen.add(k)
             t = r["timestamp"] / 1000.0
             end = int(math.ceil(t / 60.0)) * 60
             if t0 < end <= t1:
-                last[end] = (r["timestamp"], float(r["price"]))   # rows in time order: the last one stands
-        top = new[-1]["timestamp"]
-        if top / 1000.0 > t1:
+                prev = last.get(end)
+                if prev is None or (r["timestamp"],) + _idkey(r) >= prev[0]:
+                    last[end] = ((r["timestamp"],) + _idkey(r), float(r["price"]))
+        top = max((r["timestamp"] for r in rows), default=None)
+        if top is not None and top / 1000.0 > t1:
             return {e: v[1] for e, v in last.items()}
-        since = top if top > since else since + 1
+        if not nxt or nxt == cursor:
+            raise RuntimeError("Kraken's trades stopped before the end of the day (day not fully covered)")
+        cursor = nxt
 
 
 def build_comp(asset, d, fetch=None):
@@ -210,20 +247,19 @@ def build_comp(asset, d, fetch=None):
     if fetch is None:
         def fetch(name, a, b):
             ex = _exchange(name)
-            ex.load_markets()
             if name in TRADES_EXCHANGES:
                 return trade_closes(ex, SYMBOL[asset], a, b)
-            return ohlcv_closes(ex, SYMBOL[asset], a, b)
+            return ohlcv_closes(ex, SYMBOL[asset], a, b, page=PAGE_MINUTES[name])
     closes, absent = {}, {}
     for name in OHLCV_EXCHANGES + TRADES_EXCHANGES:
         try:
             closes[name] = fetch(name, t0, t1)
         except Exception as ex:   # noqa: BLE001
-            if name in REQUIRED:
-                raise RuntimeError("%s: %s" % (name, str(ex)[:200]))
-            closes[name], absent[name] = {}, "%s: %s" % (type(ex).__name__, str(ex)[:120])
+            if name in REQUIRED or _transient(ex):   # retried on a later run; never saved without the exchange
+                raise RuntimeError("%s: %s: %s" % (name, type(ex).__name__, str(ex)[:200]))
+            closes[name], absent[name] = {}, "%s: %s" % (type(ex).__name__, str(ex)[:120])   # it answered: absent
             continue
-        if name in REQUIRED and len(closes[name]) < 720:
+        if name in REQUIRED and len(closes[name]) < REQUIRED_MIN:
             raise RuntimeError("%s returned only %d of 1440 minutes" % (name, len(closes[name])))
     S, CB, DISP, N = [], [], [], []
     for i in range(1, 1441):
@@ -361,8 +397,23 @@ def fit_garch(returns):
     am = arch_model(r, mean="Zero", vol="GARCH", p=1, q=1, dist="normal", rescale=False)
     res = am.fit(disp="off")
     p = res.params
-    return dict(omega=float(p["omega"]), alpha=float(p["alpha[1]"]), beta=float(p["beta[1]"]),
-                backcast=float(am.volatility.backcast(r)), n=len(returns), loglik=float(res.loglikelihood))
+    g = dict(omega=float(p["omega"]), alpha=float(p["alpha[1]"]), beta=float(p["beta[1]"]),
+             backcast=float(am.volatility.backcast(r)), n=len(returns), loglik=float(res.loglikelihood),
+             convergence_flag=int(res.convergence_flag))
+    if g["convergence_flag"] != 0 or not all(math.isfinite(g[k]) for k in ("omega", "alpha", "beta", "backcast")) \
+            or g["omega"] <= 0 or g["alpha"] < 0 or g["beta"] < 0 or g["alpha"] + g["beta"] >= 1:
+        raise RuntimeError("GARCH fit not usable: %s" % g)
+    return g
+
+
+def lib_versions():
+    out = {}
+    for name in ("numpy", "scipy", "pandas", "arch", "ruptures", "ccxt"):
+        try:
+            out[name] = getattr(__import__(name), "__version__", None)
+        except ImportError:
+            out[name] = None
+    return out
 
 
 def horizon_var(g, s2next, k):
@@ -534,6 +585,12 @@ def fit(path=None, data=None, now=None):
                  period=[FIT[0].isoformat(), FIT[1].isoformat()],
                  inputs_m=["logit_g", "logit_mid", "coinbase_gap", "dispersion", "r_stat", "minutes_left"],
                  inputs_m_coinbase=["logit_g", "logit_mid", "r_stat", "minutes_left"],
+                 libs=lib_versions(),
+                 notes=["the GARCH filter starts at arch's backcast value (arch's own recursion starts at omega + "
+                        "(alpha + beta) x backcast; the plan allows either)",
+                        "logit(mid) is clipped at 0.5%-99.5% like G's p",
+                        "quotes use plan15.quote as the plan says (it carries a candle forward up to 5 minutes); the "
+                        "10% guard counts raw candles"],
                  fitted=datetime.fromtimestamp(time.time() if now is None else now, timezone.utc).isoformat())
     for a in ASSETS:
         if data is None:
@@ -546,21 +603,27 @@ def fit(path=None, data=None, now=None):
         else:
             comps, kal = data[a]
         cov = coverage(kal)
-        ent = dict(coverage=cov)
-        if any(v["share"] < COVERAGE_MIN for v in cov.values()):
+        pooled = sum(v["windows"] for v in cov.values()) / float(sum(v["expected"] for v in cov.values()) or 1)
+        ent = dict(coverage=cov, coverage_pooled=pooled)
+        if pooled < COVERAGE_MIN:
             ent["not_testable"] = "Kalshi candles cover under 90% of June-July windows"
             model["assets"][a] = ent
             continue
+        sers = {}
         for key, tag in (("S", ""), ("CB", "_coinbase")):
-            ser = Series(comps, key)
+            ser = sers[key] = Series(comps, key)
             lo, rs = ser.fit_returns()
-            g = fit_garch(rs)
+            try:
+                g = fit_garch(rs)
+            except RuntimeError as ex:
+                return None, "%s %s: %s; nothing saved" % (a, key, ex)
             ser.run_filter(g)
             ent["garch" + tag] = g
             m = fit_m(ser, g, kal, coinbase=(key == "CB"))
             if m is None:
                 return None, "model M%s for %s did not fit; nothing saved" % (tag, a)
             ent["m" + tag] = m
+        ent["q1_fit_period"] = q1(sers["S"], sers["CB"], kal)
         model["assets"][a] = ent
     jsonio.save(path, model)
     return model, "fitted; saved %s" % path
@@ -817,7 +880,7 @@ def guard(ser, kal):
         for w in ws:
             o = int(w["open"])
             comp_ok = all((ser.idx(o + 60 * i) is not None and ser.S[ser.idx(o + 60 * i)]) for i in range(GUARD_FROM, T + 1))
-            kal_ok = all(P.quote(w, k) is not None for k in K_G)
+            kal_ok = all(str(k) in (w.get("c") or {}) for k in K_G)   # raw candles (no carry-forward)
             miss += int(not (comp_ok and kal_ok))
     share = miss / float(exp) if exp else 1.0
     return (None if share <= MAX_MISSING else "%.1f%% of August windows miss the composite or Kalshi candles" % (100 * share)), share
@@ -837,9 +900,8 @@ def score(out_path=None, data=None, insp=None, model=None, root=ROOT):
     """data (tests): {asset: (comps May31-Aug31, kalshi Aug)}."""
     out_path = out_path or RESULT
     md_path = out_path[:-5] + ".md"
-    for f in (out_path, md_path):
-        if os.path.exists(f):
-            return None, "already scored (%s exists); scored once" % f
+    if os.path.exists(out_path):   # the JSON is written last: a stale .md alone is overwritten
+        return None, "already scored (%s exists); scored once" % out_path
     if data is None:
         bad = identity_problems(root)
         if bad:
@@ -882,9 +944,9 @@ def score(out_path=None, data=None, insp=None, model=None, root=ROOT):
                 return None, why
         else:
             comps, kal = data[a]
-        fp = P.fee_problem(insp, a)
-        if fp:
-            return None, "fee multiplier unknown (%s)" % fp
+        unknown = [d for d in days(TEST[0], TEST[1]) if P.multiplier_at(insp, a, P.day_start(d) + 43200) is None]
+        if unknown:
+            return None, "fee multiplier unknown for %s on %d August days; no score" % (a, len(unknown))
         ser = Series(comps, "S")
         ser.run_filter(ent["garch"])
         cbs = Series(comps, "CB")

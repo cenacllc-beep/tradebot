@@ -8,6 +8,8 @@
 # series are never written (only the derived composite, Coinbase's close and dispersion per minute). freeze runs once;
 # every other stage refuses until research/results/plan18_identity.json is committed and unchanged; fit refuses if a
 # model was ever committed; score refuses if a result was ever committed.
+# Runtime: Kraken's trade pages dominate (roughly 100+ pages per BTC day), so the download needs several 300-minute
+# runs; each run saves whole days only and the next run continues.
 name: PLAN18 index exchanges (research)
 on:
   workflow_dispatch:

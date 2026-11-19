@@ -30,15 +30,32 @@ class FakeEx(object):
     def fetch_ohlcv(self, sym, tf, since=None, limit=None):
         self.calls += 1
         return [r for r in self.rows if r[0] >= since][:min(limit, self.step)]
-    def fetch_trades(self, sym, since=None, limit=None):
+    def fetch_trades(self, sym, since=None, limit=None, params=None):
+        """Kraken-like: params since = seconds or a nanosecond cursor; whole-second resolution for seconds; the last
+        row's info ends with the next cursor (the last trade's time in ns)."""
         self.calls += 1
-        return [t for t in self.trades if t["timestamp"] >= since][:min(limit, self.step)]
+        cur = int(params["since"])
+        ms = cur // 10 ** 6 if cur > 10 ** 12 else cur * 1000
+        strict = cur > 10 ** 12
+        out = [dict(t) for t in self.trades if (t["timestamp"] > ms if strict else t["timestamp"] >= ms)][:min(limit, self.step)]
+        if out:
+            out[-1]["info"] = ["p", "a", out[-1]["timestamp"] / 1000.0, str(out[-1]["timestamp"] * 10 ** 6)]
+        return out
 t0 = 1_780_000_000 // 60 * 60
 rows = [[(t0 + 60 * i) * 1000, 0, 0, 0, 100.0 + i, 1] for i in range(0, 200)]   # ccxt: start of minute
-c = Q.ohlcv_closes(FakeEx(rows, step=37), "X", t0, t0 + 60 * 150)
+c = Q.ohlcv_closes(FakeEx(rows, step=37), "X", t0, t0 + 60 * 150, page=37)
 assert c[t0 + 60] == 100.0 and c[t0 + 60 * 150] == 249.0 and len(c) == 150 and t0 not in c     # end = start + 60
 trades = [dict(id=i, timestamp=(t0 + 10 * i) * 1000 + (0 if i % 6 else 0), price=float(i)) for i in range(1, 400)]
 k = Q.trade_closes(FakeEx(trades=trades, step=50), "X", t0, t0 + 3000)
+# a burst: 120 trades in one second, pages of 50 (seconds-based paging would stall; the cursor does not)
+burst = [dict(id=1000 + j, timestamp=(t0 + 100) * 1000 + j, price=float(j)) for j in range(120)] + \
+        [dict(id=2000 + j, timestamp=(t0 + 200 + 30 * j) * 1000, price=500.0 + j) for j in range(120)]
+kb = Q.trade_closes(FakeEx(trades=burst, step=50), "X", t0, t0 + 3000)
+assert kb[t0 + 120] == 119.0                                            # the burst's last trade closes its minute
+# an empty middle page in the candles moves on instead of ending the day
+gap = [r for r in rows if not (40 <= (r[0] // 1000 - t0) // 60 < 60)]
+cg = Q.ohlcv_closes(FakeEx(gap, step=20), "X", t0, t0 + 60 * 150, page=20)
+assert t0 + 60 * 41 not in cg and cg[t0 + 60 * 150] == 249.0 and len(cg) == 130
 assert k[t0 + 60] == 6.0 and k[t0 + 120] == 12.0 and k[t0 + 3000] == 300.0   # trade at 60 s belongs to the minute ending then
 try:
     Q.trade_closes(FakeEx(trades=trades[:100], step=50), "X", t0, t0 + 3000)
@@ -58,6 +75,27 @@ comp = Q.build_comp("BTC", d0, fake_fetch())
 assert comp["S"][0] == round(100.025, 2) and comp["N"][0] == 4 and comp["N"][1] == 5 and comp["S"][1] == 100.05
 assert comp["CB"][0] == 100.2 and abs(comp["DISP"][0] - (math.sqrt(sum((v - 100.0333333) ** 2 for v in (100.0, 100.2, 99.9)) / 2) / comp["S"][0])) < 1e-9
 comp2 = Q.build_comp("BTC", d0, fake_fetch(("bullish", "kraken")))
+import ccxt
+def net(name, a, b):
+    if name == "kraken":
+        raise ccxt.RequestTimeout("slow")
+    return fake_fetch()(name, a, b)
+try:
+    Q.build_comp("BTC", d0, net)
+    raise AssertionError("a transient Kraken fault must not save the day without Kraken")
+except RuntimeError:
+    pass
+def nearly(name, a, b):
+    out = fake_fetch()(name, a, b)
+    if name == "coinbase":
+        for e in list(out)[:20]:
+            del out[e]
+    return out
+try:
+    Q.build_comp("BTC", d0, nearly)
+    raise AssertionError("a required exchange missing 20 minutes must not save the day")
+except RuntimeError:
+    pass
 assert set(comp2["absent"]) == {"bullish", "kraken"} and comp2["N"][0] == 3 and comp2["S"][0] == 100.0
 for f in ("coinbase",):
     try:
@@ -177,6 +215,18 @@ rr = Q.r_reading(ser, w, 10)
 assert rr[0] and rr[1] > 2.0, rr
 ser.r[ik - 10] = None
 assert Q.r_reading(ser, w, 10) is None
+
+# placebo: an unpayable flip keeps its own side; Holm keeps a not-testable test in the family, ranked last
+fs = [dict(day=date(2026, 8, 1), ticker="A", profit=0.5, flip=None), dict(day=date(2026, 8, 1), ticker="B", profit=0.5, flip=-0.5)]
+assert Q.placebo_p(fs, 0.5, draws=200) > 0.3
+tests = [dict(name="X G", stats=dict(not_testable="few", signals=0)), dict(name="X R", stats=dict(p_t=0.0, t=9.0, df=30, mean=0.1), dm={date(2026, 8, 1): 0.1}, fs=[dict(day=date(2026, 8, 1), ticker="A", profit=0.1, flip=-0.1)])]
+order = Q.holm(tests, [date(2026, 8, 1)])
+assert order[-1]["name"] == "X G" and order[-1]["verdict"] == Q.NOT_TESTABLE and order[0]["holm_level"] == 0.025 / 2
+# guard: raw Kalshi candles missing in more than 10% of windows
+ser_g = Q.Series({d: v for d, v in comps.items() if d <= date(2026, 6, 4)}, "S")
+kg = {date(2026, 6, 3): dict(windows=[dict(w, c={}) if i < 20 else w for i, w in enumerate(kal[date(2026, 6, 3)]["windows"])])}
+why, share = Q.guard(ser_g, kg)
+assert why and abs(share - 20 / 96.0) < 1e-9, (why, share)
 
 # a model fitted under another plan is refused
 bad = dict(model, plan_sha256="x")
