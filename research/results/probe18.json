@@ -1,0 +1,1072 @@
+{
+ "ccxt": "4.5.85",
+ "exchanges": [
+  {
+   "BTC": {
+    "days": {
+     "2026-06-15": {
+      "ohlcv": {
+       "first_min": 0,
+       "last_min": 59,
+       "minutes": 60,
+       "missing": 0,
+       "rows": 60
+      },
+      "trades": {
+       "first_min": null,
+       "last_min": null,
+       "minutes": 0,
+       "missing": 60,
+       "rows": 0
+      }
+     },
+     "2026-07-15": {
+      "ohlcv": {
+       "first_min": 0,
+       "last_min": 59,
+       "minutes": 60,
+       "missing": 0,
+       "rows": 60
+      },
+      "trades": {
+       "first_min": null,
+       "last_min": null,
+       "minutes": 0,
+       "missing": 60,
+       "rows": 0
+      }
+     },
+     "2026-08-15": {
+      "ohlcv": {
+       "first_min": 0,
+       "last_min": 59,
+       "minutes": 60,
+       "missing": 0,
+       "rows": 60
+      },
+      "trades": {
+       "first_min": null,
+       "last_min": null,
+       "minutes": 0,
+       "missing": 60,
+       "rows": 0
+      }
+     },
+     "2026-09-15": {
+      "ohlcv": {
+       "first_min": 0,
+       "last_min": 59,
+       "minutes": 60,
+       "missing": 0,
+       "rows": 60
+      },
+      "trades": {
+       "first_min": null,
+       "last_min": null,
+       "minutes": 0,
+       "missing": 60,
+       "rows": 0
+      }
+     },
+     "2026-10-15": {
+      "ohlcv": {
+       "first_min": 0,
+       "last_min": 59,
+       "minutes": 60,
+       "missing": 0,
+       "rows": 60
+      },
+      "trades": {
+       "first_min": null,
+       "last_min": null,
+       "minutes": 0,
+       "missing": 60,
+       "rows": 0
+      }
+     }
+    },
+    "symbol": "BTC/USD"
+   },
+   "ETH": {
+    "days": {
+     "2026-06-15": {
+      "ohlcv": {
+       "first_min": 0,
+       "last_min": 59,
+       "minutes": 60,
+       "missing": 0,
+       "rows": 60
+      },
+      "trades": {
+       "first_min": null,
+       "last_min": null,
+       "minutes": 0,
+       "missing": 60,
+       "rows": 0
+      }
+     },
+     "2026-07-15": {
+      "ohlcv": {
+       "first_min": 0,
+       "last_min": 59,
+       "minutes": 60,
+       "missing": 0,
+       "rows": 60
+      },
+      "trades": {
+       "first_min": null,
+       "last_min": null,
+       "minutes": 0,
+       "missing": 60,
+       "rows": 0
+      }
+     },
+     "2026-08-15": {
+      "ohlcv": {
+       "first_min": 0,
+       "last_min": 59,
+       "minutes": 60,
+       "missing": 0,
+       "rows": 60
+      },
+      "trades": {
+       "first_min": null,
+       "last_min": null,
+       "minutes": 0,
+       "missing": 60,
+       "rows": 0
+      }
+     },
+     "2026-09-15": {
+      "ohlcv": {
+       "first_min": 0,
+       "last_min": 59,
+       "minutes": 60,
+       "missing": 0,
+       "rows": 60
+      },
+      "trades": {
+       "first_min": null,
+       "last_min": null,
+       "minutes": 0,
+       "missing": 60,
+       "rows": 0
+      }
+     },
+     "2026-10-15": {
+      "ohlcv": {
+       "first_min": 0,
+       "last_min": 59,
+       "minutes": 60,
+       "missing": 0,
+       "rows": 60
+      },
+      "trades": {
+       "first_min": null,
+       "last_min": null,
+       "minutes": 0,
+       "missing": 60,
+       "rows": 0
+      }
+     }
+    },
+    "symbol": "ETH/USD"
+   },
+   "exchange": "bitstamp",
+   "has_ohlcv": true,
+   "has_trades": true
+  },
+  {
+   "BTC": {
+    "days": {
+     "2026-06-15": {
+      "ohlcv": {
+       "first_min": 0,
+       "last_min": 59,
+       "minutes": 60,
+       "missing": 0,
+       "rows": 60
+      },
+      "trades": {
+       "error": "ArgumentsRequired: coinbase fetchTrades() requires a `until` parameter when you use `since` argument"
+      }
+     },
+     "2026-07-15": {
+      "ohlcv": {
+       "first_min": 0,
+       "last_min": 59,
+       "minutes": 60,
+       "missing": 0,
+       "rows": 60
+      },
+      "trades": {
+       "error": "ArgumentsRequired: coinbase fetchTrades() requires a `until` parameter when you use `since` argument"
+      }
+     },
+     "2026-08-15": {
+      "ohlcv": {
+       "first_min": 0,
+       "last_min": 59,
+       "minutes": 60,
+       "missing": 0,
+       "rows": 60
+      },
+      "trades": {
+       "error": "ArgumentsRequired: coinbase fetchTrades() requires a `until` parameter when you use `since` argument"
+      }
+     },
+     "2026-09-15": {
+      "ohlcv": {
+       "first_min": 0,
+       "last_min": 59,
+       "minutes": 60,
+       "missing": 0,
+       "rows": 60
+      },
+      "trades": {
+       "error": "ArgumentsRequired: coinbase fetchTrades() requires a `until` parameter when you use `since` argument"
+      }
+     },
+     "2026-10-15": {
+      "ohlcv": {
+       "first_min": 0,
+       "last_min": 59,
+       "minutes": 60,
+       "missing": 0,
+       "rows": 60
+      },
+      "trades": {
+       "error": "ArgumentsRequired: coinbase fetchTrades() requires a `until` parameter when you use `since` argument"
+      }
+     }
+    },
+    "symbol": "BTC/USD"
+   },
+   "ETH": {
+    "days": {
+     "2026-06-15": {
+      "ohlcv": {
+       "first_min": 0,
+       "last_min": 59,
+       "minutes": 60,
+       "missing": 0,
+       "rows": 60
+      },
+      "trades": {
+       "error": "ArgumentsRequired: coinbase fetchTrades() requires a `until` parameter when you use `since` argument"
+      }
+     },
+     "2026-07-15": {
+      "ohlcv": {
+       "first_min": 0,
+       "last_min": 59,
+       "minutes": 60,
+       "missing": 0,
+       "rows": 60
+      },
+      "trades": {
+       "error": "ArgumentsRequired: coinbase fetchTrades() requires a `until` parameter when you use `since` argument"
+      }
+     },
+     "2026-08-15": {
+      "ohlcv": {
+       "first_min": 0,
+       "last_min": 59,
+       "minutes": 60,
+       "missing": 0,
+       "rows": 60
+      },
+      "trades": {
+       "error": "ArgumentsRequired: coinbase fetchTrades() requires a `until` parameter when you use `since` argument"
+      }
+     },
+     "2026-09-15": {
+      "ohlcv": {
+       "first_min": 0,
+       "last_min": 59,
+       "minutes": 60,
+       "missing": 0,
+       "rows": 60
+      },
+      "trades": {
+       "error": "ArgumentsRequired: coinbase fetchTrades() requires a `until` parameter when you use `since` argument"
+      }
+     },
+     "2026-10-15": {
+      "ohlcv": {
+       "first_min": 0,
+       "last_min": 59,
+       "minutes": 60,
+       "missing": 0,
+       "rows": 60
+      },
+      "trades": {
+       "error": "ArgumentsRequired: coinbase fetchTrades() requires a `until` parameter when you use `since` argument"
+      }
+     }
+    },
+    "symbol": "ETH/USD"
+   },
+   "exchange": "coinbase",
+   "has_ohlcv": true,
+   "has_trades": true
+  },
+  {
+   "BTC": {
+    "days": {
+     "2026-06-15": {
+      "ohlcv": {
+       "first_min": null,
+       "last_min": null,
+       "minutes": 0,
+       "missing": 60,
+       "rows": 0
+      },
+      "trades": {
+       "first_min": 0,
+       "last_min": 11,
+       "minutes": 12,
+       "missing": 48,
+       "rows": 1000
+      }
+     },
+     "2026-07-15": {
+      "ohlcv": {
+       "first_min": null,
+       "last_min": null,
+       "minutes": 0,
+       "missing": 60,
+       "rows": 0
+      },
+      "trades": {
+       "first_min": 0,
+       "last_min": 15,
+       "minutes": 16,
+       "missing": 44,
+       "rows": 1000
+      }
+     },
+     "2026-08-15": {
+      "ohlcv": {
+       "first_min": null,
+       "last_min": null,
+       "minutes": 0,
+       "missing": 60,
+       "rows": 0
+      },
+      "trades": {
+       "first_min": 0,
+       "last_min": 45,
+       "minutes": 46,
+       "missing": 14,
+       "rows": 1000
+      }
+     },
+     "2026-09-15": {
+      "ohlcv": {
+       "first_min": null,
+       "last_min": null,
+       "minutes": 0,
+       "missing": 60,
+       "rows": 0
+      },
+      "trades": {
+       "first_min": 0,
+       "last_min": 5,
+       "minutes": 6,
+       "missing": 54,
+       "rows": 1000
+      }
+     },
+     "2026-10-15": {
+      "ohlcv": {
+       "first_min": null,
+       "last_min": null,
+       "minutes": 0,
+       "missing": 60,
+       "rows": 0
+      },
+      "trades": {
+       "first_min": 0,
+       "last_min": 3,
+       "minutes": 4,
+       "missing": 56,
+       "rows": 1000
+      }
+     }
+    },
+    "symbol": "BTC/USD"
+   },
+   "ETH": {
+    "days": {
+     "2026-06-15": {
+      "ohlcv": {
+       "first_min": null,
+       "last_min": null,
+       "minutes": 0,
+       "missing": 60,
+       "rows": 0
+      },
+      "trades": {
+       "first_min": 0,
+       "last_min": 33,
+       "minutes": 34,
+       "missing": 26,
+       "rows": 1000
+      }
+     },
+     "2026-07-15": {
+      "ohlcv": {
+       "first_min": null,
+       "last_min": null,
+       "minutes": 0,
+       "missing": 60,
+       "rows": 0
+      },
+      "trades": {
+       "first_min": 0,
+       "last_min": 30,
+       "minutes": 31,
+       "missing": 29,
+       "rows": 1000
+      }
+     },
+     "2026-08-15": {
+      "ohlcv": {
+       "first_min": null,
+       "last_min": null,
+       "minutes": 0,
+       "missing": 60,
+       "rows": 0
+      },
+      "trades": {
+       "first_min": 0,
+       "last_min": 59,
+       "minutes": 60,
+       "missing": 0,
+       "rows": 464
+      }
+     },
+     "2026-09-15": {
+      "ohlcv": {
+       "first_min": null,
+       "last_min": null,
+       "minutes": 0,
+       "missing": 60,
+       "rows": 0
+      },
+      "trades": {
+       "first_min": 0,
+       "last_min": 10,
+       "minutes": 11,
+       "missing": 49,
+       "rows": 1000
+      }
+     },
+     "2026-10-15": {
+      "ohlcv": {
+       "first_min": null,
+       "last_min": null,
+       "minutes": 0,
+       "missing": 60,
+       "rows": 0
+      },
+      "trades": {
+       "first_min": 0,
+       "last_min": 11,
+       "minutes": 12,
+       "missing": 48,
+       "rows": 1000
+      }
+     }
+    },
+    "symbol": "ETH/USD"
+   },
+   "exchange": "kraken",
+   "has_ohlcv": true,
+   "has_trades": true
+  },
+  {
+   "BTC": {
+    "days": {
+     "2026-06-15": {
+      "ohlcv": {
+       "first_min": null,
+       "last_min": null,
+       "minutes": 0,
+       "missing": 60,
+       "rows": 0
+      },
+      "trades": {
+       "error": "ExchangeError: gemini Requested datetime 2026-06-15 14:00:00.000000000 is before the earliest available historical datetime 2026-08-21 00:36:50.766391880"
+      }
+     },
+     "2026-07-15": {
+      "ohlcv": {
+       "first_min": null,
+       "last_min": null,
+       "minutes": 0,
+       "missing": 60,
+       "rows": 0
+      },
+      "trades": {
+       "error": "ExchangeError: gemini Requested datetime 2026-07-15 14:00:00.000000000 is before the earliest available historical datetime 2026-08-21 00:36:51.936390090"
+      }
+     },
+     "2026-08-15": {
+      "ohlcv": {
+       "first_min": null,
+       "last_min": null,
+       "minutes": 0,
+       "missing": 60,
+       "rows": 0
+      },
+      "trades": {
+       "error": "ExchangeError: gemini Requested datetime 2026-08-15 14:00:00.000000000 is before the earliest available historical datetime 2026-08-21 00:36:55.466233391"
+      }
+     },
+     "2026-09-15": {
+      "ohlcv": {
+       "first_min": null,
+       "last_min": null,
+       "minutes": 0,
+       "missing": 60,
+       "rows": 0
+      },
+      "trades": {
+       "first_min": null,
+       "last_min": null,
+       "minutes": 0,
+       "missing": 60,
+       "rows": 0
+      }
+     },
+     "2026-10-15": {
+      "ohlcv": {
+       "first_min": null,
+       "last_min": null,
+       "minutes": 0,
+       "missing": 60,
+       "rows": 0
+      },
+      "trades": {
+       "first_min": null,
+       "last_min": null,
+       "minutes": 0,
+       "missing": 60,
+       "rows": 0
+      }
+     }
+    },
+    "symbol": "BTC/USD"
+   },
+   "ETH": {
+    "days": {
+     "2026-06-15": {
+      "ohlcv": {
+       "first_min": null,
+       "last_min": null,
+       "minutes": 0,
+       "missing": 60,
+       "rows": 0
+      },
+      "trades": {
+       "error": "ExchangeError: gemini Requested datetime 2026-06-15 14:00:00.000000000 is before the earliest available historical datetime 2026-08-21 00:36:59.318432510"
+      }
+     },
+     "2026-07-15": {
+      "ohlcv": {
+       "first_min": null,
+       "last_min": null,
+       "minutes": 0,
+       "missing": 60,
+       "rows": 0
+      },
+      "trades": {
+       "error": "ExchangeError: gemini Requested datetime 2026-07-15 14:00:00.000000000 is before the earliest available historical datetime 2026-08-21 00:37:01.179796173"
+      }
+     },
+     "2026-08-15": {
+      "ohlcv": {
+       "first_min": null,
+       "last_min": null,
+       "minutes": 0,
+       "missing": 60,
+       "rows": 0
+      },
+      "trades": {
+       "error": "ExchangeError: gemini Requested datetime 2026-08-15 14:00:00.000000000 is before the earliest available historical datetime 2026-08-21 00:37:02.871686148"
+      }
+     },
+     "2026-09-15": {
+      "ohlcv": {
+       "first_min": null,
+       "last_min": null,
+       "minutes": 0,
+       "missing": 60,
+       "rows": 0
+      },
+      "trades": {
+       "first_min": null,
+       "last_min": null,
+       "minutes": 0,
+       "missing": 60,
+       "rows": 0
+      }
+     },
+     "2026-10-15": {
+      "ohlcv": {
+       "first_min": null,
+       "last_min": null,
+       "minutes": 0,
+       "missing": 60,
+       "rows": 0
+      },
+      "trades": {
+       "first_min": null,
+       "last_min": null,
+       "minutes": 0,
+       "missing": 60,
+       "rows": 0
+      }
+     }
+    },
+    "symbol": "ETH/USD"
+   },
+   "exchange": "gemini",
+   "has_ohlcv": true,
+   "has_trades": true
+  },
+  {
+   "BTC": {
+    "days": {
+     "2026-06-15": {
+      "ohlcv": {
+       "first_min": 0,
+       "last_min": 59,
+       "minutes": 60,
+       "missing": 0,
+       "rows": 60
+      },
+      "trades": {
+       "first_min": null,
+       "last_min": null,
+       "minutes": 0,
+       "missing": 60,
+       "rows": 0
+      }
+     },
+     "2026-07-15": {
+      "ohlcv": {
+       "first_min": 0,
+       "last_min": 59,
+       "minutes": 60,
+       "missing": 0,
+       "rows": 60
+      },
+      "trades": {
+       "first_min": null,
+       "last_min": null,
+       "minutes": 0,
+       "missing": 60,
+       "rows": 0
+      }
+     },
+     "2026-08-15": {
+      "ohlcv": {
+       "first_min": 0,
+       "last_min": 59,
+       "minutes": 60,
+       "missing": 0,
+       "rows": 60
+      },
+      "trades": {
+       "first_min": null,
+       "last_min": null,
+       "minutes": 0,
+       "missing": 60,
+       "rows": 0
+      }
+     },
+     "2026-09-15": {
+      "ohlcv": {
+       "first_min": 0,
+       "last_min": 59,
+       "minutes": 60,
+       "missing": 0,
+       "rows": 60
+      },
+      "trades": {
+       "first_min": null,
+       "last_min": null,
+       "minutes": 0,
+       "missing": 60,
+       "rows": 0
+      }
+     },
+     "2026-10-15": {
+      "ohlcv": {
+       "first_min": 0,
+       "last_min": 59,
+       "minutes": 60,
+       "missing": 0,
+       "rows": 60
+      },
+      "trades": {
+       "first_min": null,
+       "last_min": null,
+       "minutes": 0,
+       "missing": 60,
+       "rows": 0
+      }
+     }
+    },
+    "symbol": "BTC/USD"
+   },
+   "ETH": {
+    "days": {
+     "2026-06-15": {
+      "ohlcv": {
+       "first_min": 0,
+       "last_min": 59,
+       "minutes": 60,
+       "missing": 0,
+       "rows": 60
+      },
+      "trades": {
+       "first_min": null,
+       "last_min": null,
+       "minutes": 0,
+       "missing": 60,
+       "rows": 0
+      }
+     },
+     "2026-07-15": {
+      "ohlcv": {
+       "first_min": 0,
+       "last_min": 59,
+       "minutes": 60,
+       "missing": 0,
+       "rows": 60
+      },
+      "trades": {
+       "first_min": null,
+       "last_min": null,
+       "minutes": 0,
+       "missing": 60,
+       "rows": 0
+      }
+     },
+     "2026-08-15": {
+      "ohlcv": {
+       "first_min": 0,
+       "last_min": 59,
+       "minutes": 60,
+       "missing": 0,
+       "rows": 60
+      },
+      "trades": {
+       "first_min": null,
+       "last_min": null,
+       "minutes": 0,
+       "missing": 60,
+       "rows": 0
+      }
+     },
+     "2026-09-15": {
+      "ohlcv": {
+       "first_min": 0,
+       "last_min": 59,
+       "minutes": 60,
+       "missing": 0,
+       "rows": 60
+      },
+      "trades": {
+       "first_min": null,
+       "last_min": null,
+       "minutes": 0,
+       "missing": 60,
+       "rows": 0
+      }
+     },
+     "2026-10-15": {
+      "ohlcv": {
+       "first_min": 0,
+       "last_min": 59,
+       "minutes": 60,
+       "missing": 0,
+       "rows": 60
+      },
+      "trades": {
+       "first_min": null,
+       "last_min": null,
+       "minutes": 0,
+       "missing": 60,
+       "rows": 0
+      }
+     }
+    },
+    "symbol": "ETH/USD"
+   },
+   "exchange": "cryptocom",
+   "has_ohlcv": true,
+   "has_trades": true
+  },
+  {
+   "BTC": {
+    "days": {
+     "2026-06-15": {
+      "ohlcv": {
+       "first_min": 1,
+       "last_min": 59,
+       "minutes": 58,
+       "missing": 2,
+       "rows": 58
+      },
+      "trades": {
+       "first_min": null,
+       "last_min": null,
+       "minutes": 0,
+       "missing": 60,
+       "rows": 0
+      }
+     },
+     "2026-07-15": {
+      "ohlcv": {
+       "first_min": 1,
+       "last_min": 59,
+       "minutes": 59,
+       "missing": 1,
+       "rows": 59
+      },
+      "trades": {
+       "first_min": null,
+       "last_min": null,
+       "minutes": 0,
+       "missing": 60,
+       "rows": 0
+      }
+     },
+     "2026-08-15": {
+      "ohlcv": {
+       "first_min": 8,
+       "last_min": 58,
+       "minutes": 32,
+       "missing": 28,
+       "rows": 32
+      },
+      "trades": {
+       "first_min": null,
+       "last_min": null,
+       "minutes": 0,
+       "missing": 60,
+       "rows": 0
+      }
+     },
+     "2026-09-15": {
+      "ohlcv": {
+       "first_min": 1,
+       "last_min": 59,
+       "minutes": 59,
+       "missing": 1,
+       "rows": 59
+      },
+      "trades": {
+       "first_min": null,
+       "last_min": null,
+       "minutes": 0,
+       "missing": 60,
+       "rows": 0
+      }
+     },
+     "2026-10-15": {
+      "ohlcv": {
+       "first_min": 1,
+       "last_min": 59,
+       "minutes": 59,
+       "missing": 1,
+       "rows": 59
+      },
+      "trades": {
+       "first_min": null,
+       "last_min": null,
+       "minutes": 0,
+       "missing": 60,
+       "rows": 0
+      }
+     }
+    },
+    "symbol": "BTC/USD"
+   },
+   "ETH": {
+    "days": {
+     "2026-06-15": {
+      "ohlcv": {
+       "first_min": 1,
+       "last_min": 59,
+       "minutes": 54,
+       "missing": 6,
+       "rows": 54
+      },
+      "trades": {
+       "first_min": null,
+       "last_min": null,
+       "minutes": 0,
+       "missing": 60,
+       "rows": 0
+      }
+     },
+     "2026-07-15": {
+      "ohlcv": {
+       "first_min": 1,
+       "last_min": 59,
+       "minutes": 59,
+       "missing": 1,
+       "rows": 59
+      },
+      "trades": {
+       "first_min": null,
+       "last_min": null,
+       "minutes": 0,
+       "missing": 60,
+       "rows": 0
+      }
+     },
+     "2026-08-15": {
+      "ohlcv": {
+       "first_min": 3,
+       "last_min": 53,
+       "minutes": 13,
+       "missing": 47,
+       "rows": 13
+      },
+      "trades": {
+       "first_min": null,
+       "last_min": null,
+       "minutes": 0,
+       "missing": 60,
+       "rows": 0
+      }
+     },
+     "2026-09-15": {
+      "ohlcv": {
+       "first_min": 1,
+       "last_min": 59,
+       "minutes": 59,
+       "missing": 1,
+       "rows": 59
+      },
+      "trades": {
+       "first_min": null,
+       "last_min": null,
+       "minutes": 0,
+       "missing": 60,
+       "rows": 0
+      }
+     },
+     "2026-10-15": {
+      "ohlcv": {
+       "first_min": 1,
+       "last_min": 59,
+       "minutes": 59,
+       "missing": 1,
+       "rows": 59
+      },
+      "trades": {
+       "first_min": null,
+       "last_min": null,
+       "minutes": 0,
+       "missing": 60,
+       "rows": 0
+      }
+     }
+    },
+    "symbol": "ETH/USD"
+   },
+   "exchange": "bullish",
+   "has_ohlcv": true,
+   "has_trades": true
+  }
+ ],
+ "kalshi": {
+  "KXBTC15M": {
+   "2025-10-15": {
+    "/historical/markets": 200,
+    "/markets": 0
+   },
+   "2025-12-15": {
+    "/historical/markets": 200,
+    "/markets": 0
+   },
+   "2026-02-15": {
+    "/historical/markets": 200,
+    "/markets": 0
+   },
+   "2026-04-15": {
+    "/historical/markets": 200,
+    "/markets": 0
+   },
+   "2026-06-15": {
+    "/historical/markets": 200,
+    "/markets": 0
+   },
+   "2026-07-15": {
+    "/historical/markets": 200,
+    "/markets": 0
+   },
+   "2026-08-15": {
+    "/historical/markets": 200,
+    "/markets": 0
+   },
+   "2026-09-15": {
+    "/historical/markets": 200,
+    "/markets": 97
+   },
+   "2026-10-15": {
+    "/historical/markets": 200,
+    "/markets": 89
+   }
+  },
+  "KXETH15M": {
+   "2025-10-15": {
+    "/historical/markets": 200,
+    "/markets": 0
+   },
+   "2025-12-15": {
+    "/historical/markets": 200,
+    "/markets": 0
+   },
+   "2026-02-15": {
+    "/historical/markets": 200,
+    "/markets": 0
+   },
+   "2026-04-15": {
+    "/historical/markets": 200,
+    "/markets": 0
+   },
+   "2026-06-15": {
+    "/historical/markets": 200,
+    "/markets": 0
+   },
+   "2026-07-15": {
+    "/historical/markets": 200,
+    "/markets": 0
+   },
+   "2026-08-15": {
+    "/historical/markets": 200,
+    "/markets": 0
+   },
+   "2026-09-15": {
+    "/historical/markets": 200,
+    "/markets": 97
+   },
+   "2026-10-15": {
+    "/historical/markets": 200,
+    "/markets": 89
+   }
+  }
+ },
+ "note": "existence and counts only; no prices, no Kalshi results",
+ "probe": "PROBE18",
+ "run": "2026-11-19T00:36:07.028411+00:00"
+}
