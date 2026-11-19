@@ -2125,3 +2125,17 @@ unfamiliar codebase ... do not change functionality. only upgrade the code quali
 - research/probe18.py + cloud/workflows/probe18.yml: before PLAN18 is written, counts which exchanges give past
   one-minute candles or trades (one hour on five sample days, Jun-Oct 2026) and on which sample days Kalshi's
   15-minute markets exist (to find a period no earlier plan has used). Counts only: no prices, no results.
+
+## 2026-11-18 21:50 (La Paz) - PLAN18 written, statistics-reviewed and frozen (research only)
+- research/PLAN18.md: a composite of 5 of the 7 index exchanges (median of one-minute closes; Bitstamp, Coinbase,
+  Crypto.com, Bullish, Kraken from trades), a frozen GARCH(1,1) (arch), a PELT shift detector (ruptures) and a small
+  ridge logistic; fit on windows closing Jun 1-Jul 31 2026, scored once on August 2026 (a period no plan has read).
+  Rules G (composite + GARCH random walk, 4-point edge), R (recent mean shift, 20-80c), M (learned); 6 tests under Holm
+  at 2.5% with t, 2-day block bootstrap and a per-window side-flip placebo. Q1 (descriptive): does the composite match
+  Kalshi's result more often than Coinbase? Expected: no edge shown.
+- Statistics review (agents/statistician.md): MUST GARCH recursion with gaps pinned, minute labels and Kraken paging,
+  M's rows need R's reading, missing inputs skip only that rule's signals (10% guard is a trigger), dispersion from the
+  three complete exchanges only (Bullish coverage drifts); SHOULD horizon T - k - 2/3, basis points, per-window
+  side-flip placebo, exact ruptures recipe, Coinbase comparison refits, Kalshi coverage check before the fit, fee
+  multiplier at the fill; NITs applied. Nothing left.
+- Frozen: research/PLAN18.md sha256 717909c8aaa78c8d217747d1cd3f75d27a9da5067d4d206e83b4d1b872969cff.
