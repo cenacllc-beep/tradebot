@@ -1,0 +1,44 @@
+# PROBE18 (research only): which of the bitcoin/ether index's constituent exchanges give past one-minute data, and how
+# far back Kalshi's 15-minute markets go - before PLAN18 is written. Counts only (no prices, no Kalshi results).
+# Started by hand only. ccxt pinned, installed on GitHub's runner only (approved by the user 2026-11-18). Read-only
+# public market data; never places, changes or cancels an order; commits only research/results/probe18*.
+name: PROBE18 index exchanges (research)
+on:
+  workflow_dispatch: {}
+concurrency:
+  group: tradebot-probe18
+  cancel-in-progress: false
+permissions:
+  contents: write
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09   # v5.1.0
+        with:
+          ref: main
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1   # v6.3.0
+        with:
+          python-version: "3.12"
+      - name: Install ccxt (pinned)
+        run: python -m pip install --disable-pip-version-check "ccxt==4.5.85"
+      - name: Probe
+        env:
+          TZ: UTC
+          PYTHONIOENCODING: utf-8
+        run: python research/probe18.py
+      - name: Save research/results/probe18* (and nothing else)
+        if: always()
+        run: |
+          others=$(git status --porcelain --untracked-files=all | grep -v -E '^.. "?research/results/probe18' || true)
+          if [ -n "$others" ]; then echo "refusing to commit: other files changed:"; echo "$others"; exit 1; fi
+          git config user.name "tradebot-runner"
+          git config user.email "tradebot-runner@users.noreply.github.com"
+          git add -A -- 'research/results/probe18*'
+          git commit -m "PROBE18 $(date -u +%FT%H:%MZ)" || { echo "nothing new"; exit 0; }
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:main && exit 0
+            sleep $((i * 10)); git pull --rebase origin main || { git rebase --abort 2>/dev/null || true; }
+          done
+          exit 1

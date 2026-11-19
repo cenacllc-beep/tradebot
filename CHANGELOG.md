@@ -2115,3 +2115,13 @@ unfamiliar codebase ... do not change functionality. only upgrade the code quali
   fit and score refuse unless PLAN15's inspect confirmed floor_strike; the md notes the 97% check is PLAN15's own.
 - Placebo detail not in the plan's text: when a stratum and both fallbacks are empty, the rule's own bet stands in
   (makes a pass harder); reported.
+
+## 2026-11-18 20:55 (La Paz) - approval recorded; PROBE18 (data check before PLAN18)
+- User (20:12): "we need better detection systems to improve our odds. any open source tools we can implement?";
+  offered ccxt (read all of the index's exchanges), arch (short-term volatility), ruptures (change points); (20:32)
+  "i want all options that will help with research and detection". Recorded in CLAUDE.md section 3: research only,
+  on GitHub's runners, pinned versions, read-only public data from the BRTI / ETHUSD_RTI constituent exchanges
+  (CF Benchmarks' list v13.7: Bitstamp, Coinbase, Kraken, Gemini, Crypto.com, Bullish, LMAX Digital).
+- research/probe18.py + cloud/workflows/probe18.yml: before PLAN18 is written, counts which exchanges give past
+  one-minute candles or trades (one hour on five sample days, Jun-Oct 2026) and on which sample days Kalshi's
+  15-minute markets exist (to find a period no earlier plan has used). Counts only: no prices, no results.
