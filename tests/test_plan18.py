@@ -87,7 +87,7 @@ assert abs(Q.horizon_var(dict(omega=1.0, alpha=0.5, beta=0.5), 4.0, 13) - (4 / 3
 Q.FIRST_COMP_DAY = date(2026, 5, 31)
 Q.FIT = (date(2026, 6, 1), date(2026, 6, 10))
 Q.TEST = (date(2026, 6, 11), date(2026, 7, 2))
-Q.BOOT_DRAWS, Q.PLACEBO_DRAWS = 2000, 200
+Q.BOOT_DRAWS, Q.PLACEBO_DRAWS = 2000, 400   # 1/401 < Holm's first level 0.42%
 P.multiplier_at = lambda insp, a, t: 1.0
 P.fee_problem = lambda insp, a: None
 INSP = {"x": 1}
