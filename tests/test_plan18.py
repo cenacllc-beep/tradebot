@@ -240,6 +240,19 @@ kg = {date(2026, 6, 3): dict(windows=[dict(w, c={}) if i < 20 else w for i, w in
 why, share = Q.guard(ser_g, kg)
 assert why and abs(share - 20 / 96.0) < 1e-9, (why, share)
 
+# amendments: an approved chain from the recorded hash to the current one is accepted; anything else is refused
+st = {"f": {"a": "b", "b": "c"}}
+assert Q._reaches(st["f"], "a", "c") and Q._reaches({}, "x", "x") and not Q._reaches(st["f"], "a", "d")
+assert not Q._reaches({"a": "b", "b": "a"}, "a", "z")
+am = os.path.join(OUT, "am.json")
+json.dump(dict(amendments=[dict(id="A1", approved_by_user=True, files={"f": {"old": "a", "new": "b"}}),
+                           dict(id="X", approved_by_user=False, files={"g": {"old": "a", "new": "b"}})]), open(am, "w"))
+assert Q.amendment_steps(am) == {"f": {"a": "b"}} and Q.amendment_ids(am) == ["A1"]
+open(am, "w").write("{broken")
+assert Q.amendment_steps(am) == {} and Q.amendment_ids(am) == []
+# an integrated GARCH (alpha + beta >= 1) is kept and its horizon variance is finite and positive
+assert Q.horizon_var(dict(omega=0.12, alpha=0.059, beta=0.9412), 30.0, 2) > 0
+
 # a model fitted under another plan is refused
 bad = dict(model, plan_sha256="x")
 assert Q.score(out_path=os.path.join(OUT, "r_bad.json"), data=testdata, insp=INSP, model=bad)[0] is None

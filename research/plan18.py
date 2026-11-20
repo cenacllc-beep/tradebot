@@ -83,6 +83,7 @@ DATA = os.path.join(RESULTS, "plan18")
 IDENTITY = os.path.join(RESULTS, "plan18_identity.json")
 MODEL = os.path.join(RESULTS, "plan18_model.json")
 RESULT = os.path.join(RESULTS, "plan18_result.json")
+AMENDMENTS = os.path.join(RESULTS, "plan18_amendments.json")
 
 
 # ---------- identity ----------
@@ -106,15 +107,50 @@ def pin_problems():
     return bad
 
 
-def identity_problems(root=ROOT, path=None, pins=True):
+def identity_problems(root=ROOT, path=None, pins=True, amend_path=None):
     rec, ok = P._read_json(path or IDENTITY)
     if not ok or not isinstance(rec, dict) or not isinstance(rec.get("identity"), dict):
         return ["no identity record (run freeze first)" if ok and rec is None else "identity record damaged"]
     now = identity_now(root)
-    bad = sorted(k for k, v in rec["identity"].items() if now.get(k) != v)
+    steps = amendment_steps(amend_path)
+    bad = sorted(k for k, v in rec["identity"].items() if not _reaches(steps.get(k, {}), v, now.get(k)))
     if P.bytes_hash(os.path.join(root, *PLAN.split("/"))) != PLAN_SHA256:
         bad.append("research/PLAN18.md differs from its frozen SHA-256")
     return bad + P.plan7_problems(root) + (pin_problems() if pins else [])
+
+
+def amendment_steps(path=None):
+    """{file: {old hash: new hash}} from the user-approved amendments (plan18_amendments.json); a damaged or missing
+    file gives none (so any code change is refused)."""
+    rec, ok = P._read_json(path or AMENDMENTS)
+    out = {}
+    if not ok or not isinstance(rec, dict):
+        return out
+    for a in rec.get("amendments") or []:
+        if not (isinstance(a, dict) and a.get("approved_by_user") and isinstance(a.get("files"), dict)):
+            continue
+        for f, h in a["files"].items():
+            if isinstance(h, dict) and h.get("old") and h.get("new"):
+                out.setdefault(f, {})[h["old"]] = h["new"]
+    return out
+
+
+def amendment_ids(path=None):
+    rec, ok = P._read_json(path or AMENDMENTS)
+    if not ok or not isinstance(rec, dict):
+        return []
+    return [a.get("id") for a in rec.get("amendments") or [] if isinstance(a, dict) and a.get("approved_by_user")]
+
+
+def _reaches(step, start, end):
+    """True when the recorded hash equals the current one, or approved amendments lead from it to the current one."""
+    seen, h = set(), start
+    while h != end:
+        if h in seen or h not in step:
+            return False
+        seen.add(h)
+        h = step[h]
+    return True
 
 
 def freeze(root=ROOT, path=None, now=None):
@@ -428,8 +464,11 @@ def fit_garch(returns):
              backcast=float(am.volatility.backcast(r)), n=len(returns), loglik=float(res.loglikelihood),
              convergence_flag=int(res.convergence_flag))
     if g["convergence_flag"] != 0 or not all(math.isfinite(g[k]) for k in ("omega", "alpha", "beta", "backcast")) \
-            or g["omega"] <= 0 or g["alpha"] < 0 or g["beta"] < 0 or g["alpha"] + g["beta"] >= 1:
+            or g["omega"] <= 0 or g["alpha"] < 0 or g["beta"] < 0:
         raise RuntimeError("GARCH fit not usable: %s" % g)
+    # Amendment A1 (research/results/plan18_amendments.json, approved by the user 2026-11-19): alpha + beta >= 1 is kept
+    # and recorded; horizon_var then uses the integrated form E[sigma2_{k+j}] = sigma2_{k+1} + (j - 1) x omega.
+    g["integrated"] = g["alpha"] + g["beta"] >= 1
     return g
 
 
@@ -612,7 +651,7 @@ def fit(path=None, data=None, now=None):
                  period=[FIT[0].isoformat(), FIT[1].isoformat()],
                  inputs_m=["logit_g", "logit_mid", "coinbase_gap", "dispersion", "r_stat", "minutes_left"],
                  inputs_m_coinbase=["logit_g", "logit_mid", "r_stat", "minutes_left"],
-                 libs=lib_versions(),
+                 libs=lib_versions(), amendments=amendment_ids(),
                  notes=["the GARCH filter starts at arch's backcast value (arch's own recursion starts at omega + "
                         "(alpha + beta) x backcast; the plan allows either)",
                         "logit(mid) is clipped at 0.5%-99.5% like G's p",
@@ -946,6 +985,7 @@ def score(out_path=None, data=None, insp=None, model=None, root=ROOT):
     res = dict(plan=PLAN, plan_sha256=PLAN_SHA256, scored=datetime.now(timezone.utc).isoformat(),
                period=[period[0].isoformat(), period[-1].isoformat()],
                model_sha256=P._sha(json.dumps(model, sort_keys=True)), assets={}, tests=[], coinbase_versions={},
+               amendments=amendment_ids(),
                settings=dict(edge=EDGE, band=list(BAND), k_g=list(K_G), k_r=list(K_R), k_m=list(K_M), r_pen=R_PEN,
                              r_cut=R_CUT, family=FAMILY, boot_draws=BOOT_DRAWS, placebo_draws=PLACEBO_DRAWS,
                              seed=SEED, min_signals=MIN_SIGNALS, min_days=MIN_DAYS, pins=PINS,
@@ -1034,6 +1074,8 @@ def markdown(res):
            "Plan: %s (SHA-256 %s). Windows closing %s to %s. Scored %s." % (
                res["plan"], res["plan_sha256"][:16], res["period"][0], res["period"][1], res["scored"]),
            "", "**Verdict: %s**" % res["verdict"], "",
+           "Amendments in force: %s (research/results/plan18_amendments.json)." % (", ".join(res.get("amendments") or []) or "none"),
+           "",
            "| Test | Signals | Days | Filled | Win rate | Avg price | Profit / contract (whole-cent) | Day mean (SE) | t | p | Holm level | Verdict |",
            "|---|---|---|---|---|---|---|---|---|---|---|---|"]
     for x in res["tests"]:
@@ -1068,9 +1110,10 @@ def markdown(res):
                                               q.get("composite_right_when_differ", "-"), q.get("coinbase_right_when_differ", "-"),
                                               _f(q.get("mcnemar_p"), "%.4f")))
         g = info.get("garch") or {}
-        out.append("  GARCH omega %s alpha %s beta %s; M slopes %s (the Coinbase gap is partly mechanical: Coinbase is one "
+        out.append("  GARCH omega %s alpha %s beta %s (integrated: %s; Coinbase's integrated: %s); M slopes %s (the Coinbase gap is partly mechanical: Coinbase is one "
                    "of the composite's exchanges); missing share %s; inputs missing %s; exchange presence by month %s." % (
                        _f(g.get("omega"), "%.4f"), _f(g.get("alpha"), "%.4f"), _f(g.get("beta"), "%.4f"),
+                       g.get("integrated"), (info.get("garch_coinbase") or {}).get("integrated"),
                        [round(c, 4) for c in (info.get("m") or {}).get("coef", [])], _f(info.get("missing_share"), "%.3f"),
                        info.get("missing_inputs"), info.get("presence")))
     out += ["", "A pass is a lead on past data, not a working system: it earns a rule in the live paper bot with a forward "
