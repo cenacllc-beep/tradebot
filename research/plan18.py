@@ -84,6 +84,7 @@ IDENTITY = os.path.join(RESULTS, "plan18_identity.json")
 MODEL = os.path.join(RESULTS, "plan18_model.json")
 RESULT = os.path.join(RESULTS, "plan18_result.json")
 AMENDMENTS = os.path.join(RESULTS, "plan18_amendments.json")
+INTEGRATED_TOL = 1e-4
 
 
 # ---------- identity ----------
@@ -127,19 +128,25 @@ def amendment_steps(path=None):
     if not ok or not isinstance(rec, dict):
         return out
     for a in rec.get("amendments") or []:
-        if not (isinstance(a, dict) and a.get("approved_by_user") and isinstance(a.get("files"), dict)):
+        if not _approved(a) or not isinstance(a.get("files"), dict):
             continue
         for f, h in a["files"].items():
             if isinstance(h, dict) and h.get("old") and h.get("new"):
+                if h["old"] in out.get(f, {}):
+                    return {}   # two approved steps from one hash: treat the file as damaged (fail closed)
                 out.setdefault(f, {})[h["old"]] = h["new"]
     return out
+
+
+def _approved(a):
+    return isinstance(a, dict) and a.get("approved_by_user") is True and isinstance(a.get("id"), str) and bool(a["id"])
 
 
 def amendment_ids(path=None):
     rec, ok = P._read_json(path or AMENDMENTS)
     if not ok or not isinstance(rec, dict):
         return []
-    return [a.get("id") for a in rec.get("amendments") or [] if isinstance(a, dict) and a.get("approved_by_user")]
+    return [a["id"] for a in rec.get("amendments") or [] if _approved(a)]
 
 
 def _reaches(step, start, end):
@@ -464,10 +471,12 @@ def fit_garch(returns):
              backcast=float(am.volatility.backcast(r)), n=len(returns), loglik=float(res.loglikelihood),
              convergence_flag=int(res.convergence_flag))
     if g["convergence_flag"] != 0 or not all(math.isfinite(g[k]) for k in ("omega", "alpha", "beta", "backcast")) \
-            or g["omega"] <= 0 or g["alpha"] < 0 or g["beta"] < 0:
+            or g["omega"] <= 0 or g["alpha"] < 0 or g["beta"] < 0 or g["alpha"] + g["beta"] > 1 + INTEGRATED_TOL:
         raise RuntimeError("GARCH fit not usable: %s" % g)
-    # Amendment A1 (research/results/plan18_amendments.json, approved by the user 2026-11-19): alpha + beta >= 1 is kept
-    # and recorded; horizon_var then uses the integrated form E[sigma2_{k+j}] = sigma2_{k+1} + (j - 1) x omega.
+    # Amendment A1 (research/results/plan18_amendments.json, approved by the user 2026-11-19), for both the composite
+    # fit and the Coinbase comparison fit: 1 <= alpha + beta <= 1 + 1e-4 (integrated within numerical tolerance) is
+    # kept and recorded; horizon_var then uses E[sigma2_{k+j}] = sigma2_{k+1} + (j - 1) x omega. An explosive fit
+    # (above that) is still refused.
     g["integrated"] = g["alpha"] + g["beta"] >= 1
     return g
 

@@ -250,8 +250,52 @@ json.dump(dict(amendments=[dict(id="A1", approved_by_user=True, files={"f": {"ol
 assert Q.amendment_steps(am) == {"f": {"a": "b"}} and Q.amendment_ids(am) == ["A1"]
 open(am, "w").write("{broken")
 assert Q.amendment_steps(am) == {} and Q.amendment_ids(am) == []
-# an integrated GARCH (alpha + beta >= 1) is kept and its horizon variance is finite and positive
-assert Q.horizon_var(dict(omega=0.12, alpha=0.059, beta=0.9412), 30.0, 2) > 0
+json.dump(dict(amendments=[dict(id="A1", approved_by_user="no", files={"f": {"old": "a", "new": "b"}}),
+                           dict(id="", approved_by_user=True, files={"f": {"old": "a", "new": "b"}})]), open(am, "w"))
+assert Q.amendment_steps(am) == {} and Q.amendment_ids(am) == []          # only a literal True with an id approves
+json.dump(dict(amendments=[dict(id="A1", approved_by_user=True, files={"f": {"old": "a", "new": "b"}}),
+                           dict(id="A2", approved_by_user=True, files={"f": {"old": "a", "new": "c"}})]), open(am, "w"))
+assert Q.amendment_steps(am) == {}                                         # two steps from one hash: damaged
+# identity_problems end to end: a changed file passes only through an approved chain
+idp = os.path.join(OUT, "id.json")
+now = Q.identity_now(WORK)
+rec = dict(identity=dict(now, **{"research/plan18.py": "old-hash"}))
+json.dump(rec, open(idp, "w"))
+def probs(amend):
+    return [b for b in Q.identity_problems(WORK, path=idp, pins=False, amend_path=amend) if "plan18.py" in b]
+json.dump(dict(amendments=[dict(id="A1", approved_by_user=True,
+                                files={"research/plan18.py": {"old": "old-hash", "new": now["research/plan18.py"]}})]), open(am, "w"))
+assert probs(am) == []
+open(am, "w").write("{broken")
+assert probs(am) == ["research/plan18.py"]
+json.dump(dict(amendments=[dict(id="A1", approved_by_user=False,
+                                files={"research/plan18.py": {"old": "old-hash", "new": now["research/plan18.py"]}})]), open(am, "w"))
+assert probs(am) == ["research/plan18.py"]
+# an integrated GARCH within tolerance is kept (integrated=True); an explosive one is refused
+import arch.univariate.base as AB
+class FakeRes(object):
+    def __init__(self, a, b):
+        import pandas as pd
+        self.params = pd.Series({"omega": 0.117, "alpha[1]": a, "beta[1]": b})
+        self.loglikelihood, self.convergence_flag = -1.0, 0
+real_fit = AB.ARCHModel.fit
+AB.ARCHModel.fit = lambda self, **kw: FakeRes(0.0588, 0.94122)
+g1 = Q.fit_garch([1.0, -2.0, 0.5] * 100)
+assert g1["integrated"] is True and abs(g1["alpha"] + g1["beta"] - 1.00002) < 1e-9
+AB.ARCHModel.fit = lambda self, **kw: FakeRes(0.3, 1.0)
+try:
+    Q.fit_garch([1.0, -2.0, 0.5] * 100)
+    raise AssertionError("an explosive GARCH must be refused")
+except RuntimeError:
+    pass
+AB.ARCHModel.fit = lambda self, **kw: FakeRes(0.05, 0.9)
+assert Q.fit_garch([1.0, -2.0, 0.5] * 100)["integrated"] is False
+AB.ARCHModel.fit = real_fit
+# the horizon variance joins smoothly at alpha + beta = 1
+for k in (2, 5, 10):
+    lo = Q.horizon_var(dict(omega=0.117, alpha=0.0588, beta=1 - 0.0588 - 1e-10), 30.0, k)
+    hi = Q.horizon_var(dict(omega=0.117, alpha=0.0588, beta=0.94122), 30.0, k)
+    assert abs(lo - hi) / hi < 1e-3, (k, lo, hi)
 
 # a model fitted under another plan is refused
 bad = dict(model, plan_sha256="x")
