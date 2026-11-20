@@ -2179,3 +2179,16 @@ unfamiliar codebase ... do not change functionality. only upgrade the code quali
   omits capacity (it is in the JSON); the PLAN17 verdict string names both floors but the bet floor applied; the
   "97%%" typo and "1 bets" in plan17.py's report text; price bands "1c" and "5c" are ranges (1.0-1.49c, 4.5-5.0c);
   calibration rows are up to 4 per window and correlated.
+
+## 2026-11-19 21:40 (La Paz) - PLAN18 amendment A1 (user-approved), before any August data
+- The one-time fit (11:18 UTC) refused and saved nothing: BTC's Coinbase-only comparison GARCH had alpha + beta =
+  1.00002 (omega 0.117, alpha 0.0588, beta 0.9412), failing the stationarity check added after the code review.
+- User (21:13): "yes. fix it". research/results/plan18_amendments.json A1: fits with 1 <= alpha + beta <= 1 + 1e-4 are
+  kept and marked integrated; horizon_var uses E[sigma2_{k+j}] = sigma2_{k+1} + (j - 1) x omega for them (continuous
+  with the stationary formula at 1); explosive fits are still refused. identity_problems accepts a change to a frozen
+  file only through approved amendment chains (literal approval, an id, no duplicate steps; damaged file fails closed).
+  The model and the result list the amendments in force. No rule, threshold, period or test changed.
+- Code review (agents/code-reviewer.md): no MUST; applied the upper bound, the strict approval check, duplicate steps
+  failing closed, and tests (chain end to end, damaged/unapproved records, integrated kept, explosive refused,
+  continuity at 1). Tests pass.
+- plan18_amendments.json sha256 86a9c4cb4ce9ebc4842ac4a72c40ca058774c5984b427de6c75428b5da5f70ca (a copy is kept outside the folder).

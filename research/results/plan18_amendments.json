@@ -1,0 +1,19 @@
+{
+ "plan": "research/PLAN18.md",
+ "amendments": [
+  {
+   "id": "A1",
+   "date": "2026-11-19",
+   "approved_by_user": true,
+   "user_words": "yes. fix it (2026-11-19 21:13 La Paz, answering the amendment offered in so many words)",
+   "reason": "The one-time fit refused: BTC's Coinbase-only comparison GARCH came out with alpha + beta = 1.00002, failing a stationarity check added after the code review; the plan's horizon formula needs alpha + beta < 1. Nothing August was downloaded or computed; nothing was saved.",
+   "change": "fit_garch keeps a fit with 1 <= alpha + beta <= 1 + 1e-4 (integrated within numerical tolerance), records integrated=True, and horizon_var uses E[sigma2_{k+j}] = sigma2_{k+1} + (j - 1) x omega for it (both the composite fit and the Coinbase comparison fit). Explosive fits are still refused. identity_problems accepts a change to a frozen file only through a chain of approved amendments in this file. No rule, threshold, period or test changes.",
+   "files": {
+    "research/plan18.py": {
+     "old": "7c547576032887695c287782bfed86c243d85c507250bdfc0965f3dbef4d4eea",
+     "new": "0251a9c2355e8c91862eec135e5bdf25b038307e77deb47e6a7997e4b5a2d92a"
+    }
+   }
+  }
+ ]
+}
