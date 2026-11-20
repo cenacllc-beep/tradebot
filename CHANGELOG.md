@@ -2192,3 +2192,21 @@ unfamiliar codebase ... do not change functionality. only upgrade the code quali
   failing closed, and tests (chain end to end, damaged/unapproved records, integrated kept, explosive refused,
   continuity at 1). Tests pass.
 - plan18_amendments.json sha256 86a9c4cb4ce9ebc4842ac4a72c40ca058774c5984b427de6c75428b5da5f70ca (a copy is kept outside the folder).
+
+## 2026-11-20 03:30 (La Paz) - PLAN18 scored once; statistics review (research only)
+- Scored 06:59 UTC on GitHub with amendment A1 in force. Verdict: NO EDGE SHOWN for G (composite + volatility model):
+  BTC 4,676 filled bets, day mean -1.48c +/- 0.70c, t -2.11; ETH 5,369, -1.99c +/- 0.59c, t -3.35; side-flip placebo
+  p 0.53 and 0.74 (side choice no better than a coin flip; the loss is about spread plus fee). G's power was high (an
+  edge of 2.2-2.6c would have shown 80% of the time). M (learned model: BTC 76, ETH 104 bets) and R (shift detector:
+  7 and 2 bets) are NOT TESTABLE under the 200-signal floor; their numbers (ETH M +5.3c, ETH R 2 of 2) are luck-sized
+  and are not leads; the plan forbids re-running them with new floors.
+- Q1 (descriptive): the five-exchange median ends on Kalshi's side of the strike more often than Coinbase alone
+  (August BTC 95.4% vs 93.9%, ETH 95.2% vs 94.5%, McNemar p < 0.0001 and 0.015; fit period BTC 96.4% vs 94.9%, ETH
+  96.4% vs 94.9%, from plan18_model.json). It uses minute 15's last close, so its levels are not comparable with
+  PLAN15's ~97% (minute-15 OHLC average, Sep-Oct). It did not turn into profit: G with Coinbase alone lost about the
+  same (BTC -1.44c, ETH -2.22c).
+- Statistics review (agents/statistician.md): re-ran the score independently; every number and the verdict match; no
+  MUST. Caveats recorded here (the result file is written once): fit-period Q1 is only in the model file; the headline
+  covers G only; R was close to inert (penalty 10.2 on a 3-5 minute window), so the shift detector was barely tested;
+  all four GARCH fits sit at alpha + beta ~ 1 (time-of-day volatility ignored, a stated limit); A1 could not have
+  changed the result (the integrated formula is the limit of the original; agreement to about 6e-6 bp^2).
