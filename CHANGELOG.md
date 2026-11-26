@@ -2358,3 +2358,8 @@ unfamiliar codebase ... do not change functionality. only upgrade the code quali
   operations, keys, locks, limits or rule changes (CLAUDE.md section 3 keeps those for the user alone), he chose "same
   permissions as Claude minus anything with real money; fixes as pull requests only". Recorded in CLAUDE.md section 3.
   Being built (ops/backup_ai.py, cloud/workflows/backup-ai.yml); code review before it is switched on.
+- 14:10: dashboard.py gets a "Backup AI" panel (user: "Can we add an option in the dashboard to add this api key?").
+  The key is not typed into the dashboard: dashboard.html is a plain file on the PC (and the phone page a hosted copy)
+  that anyone holding it could read. The panel's button opens GitHub's own secret form (name NVIDIA_API_KEY), which
+  stores the key encrypted for the GitHub jobs only, plus links to the backup AI's runs, status report and alerts.
+  Presentation only (no network, no file read). All tests pass; reviewed with the backup AI code before the PC deploy.

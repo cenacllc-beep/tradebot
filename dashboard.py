@@ -296,6 +296,23 @@ def real_section(D,tr,now):
     except Exception as ex:
         print("real-money view failed:",ex)
         return '<section class=panel><h2>Real money on Kalshi</h2><p class=neg>The real-money ledger could not be read (%s). <code>.\\run live status</code> shows the account.</p></section>'%e(str(ex))
+REPO_URL="https://github.com/cenacllc-beep/tradebot"
+def backup_ai_section():
+    """Backup AI (NVIDIA, on GitHub; CLAUDE.md section 3, 2026-11-26): links only. The key is never typed into this page:
+    it is a static file that anyone holding it could read, so the button opens GitHub's own secret form, which stores the
+    key encrypted where only the GitHub jobs can use it. Presentation only; no network, no file read."""
+    sec=REPO_URL+"/settings/secrets/actions/new"
+    return ('<section class=panel id=backupai><h2>Backup AI <span>NVIDIA, runs on GitHub when Claude is not available</span></h2>'
+      '<p class=note>The research and detection jobs (PLAN19, PLAN20, the 15-minute logger, the trial scan and settle) run on GitHub and on this PC '
+      'without Claude. The backup AI watches them every 3 hours, emails you through a GitHub issue when something fails or goes stale, '
+      're-runs a failed research job once and, after 24 hours without Claude, proposes fixes as pull requests for review. '
+      'It never places orders, never touches live.py, your Kalshi key, limits, locks or rules.</p>'
+      '<p class=note><b>Add or change the NVIDIA API key:</b> '
+      '<a href="%s" target=_blank rel=noopener>open GitHub&#8217;s secret form</a>, enter the name <code>NVIDIA_API_KEY</code>, paste the key there and save. '
+      'Do not paste it into this page, a chat or a file: GitHub keeps it encrypted and shows it to no one, not even you, after saving.</p>'
+      '<p class=note><a href="%s/actions/workflows/backup-ai.yml" target=_blank rel=noopener>Backup AI runs</a> &middot; '
+      '<a href="%s/blob/main/ops/status/status.md" target=_blank rel=noopener>latest status report</a> &middot; '
+      '<a href="%s/issues?q=label%%3Abackup-ai" target=_blank rel=noopener>alerts</a></p></section>')%(sec,REPO_URL,REPO_URL,REPO_URL)
 def live15_section(now=None):
     """PLAN15F's live paper bets on the 15-minute BTC/ETH markets (research/live15.py's own ledger, read-only;
     descriptive). Before the job's first run, a short "not started yet" note; an unreadable ledger shows a line."""
@@ -731,7 +748,7 @@ def build_page(D,live=False):
       '<details><summary>Data by estimator version</summary>%s</details></section>'
       '<p class=fine><b>Read with caution.</b> Early samples are noise. Cities share weather systems, so the effective sample is far smaller than the market count. Paper results ignore slippage and use approximate fees. The shadow tests are research only and never count toward the gate. Not financial advice. Data before Oct 13, 2026 was lost when the project folder was deleted; the test restarted that day.</p>'
       '</div><div id=tip role=tooltip></div>')%(
-      chips,when(datetime.now(BOT_TZ))+" (UTC-4)",real,acct+live15_section(),verdict(rg,bf,bm,rain,passed,mg,look),e(GV),npass,gate,calendar(rain,nd,tr),
+      chips,when(datetime.now(BOT_TZ))+" (UTC-4)",real,acct+live15_section()+backup_ai_section(),verdict(rg,bf,bm,rain,passed,mg,look),e(GV),npass,gate,calendar(rain,nd,tr),
       todo_html,lastline,money,backtest_panel(v4p),results(st),
       dsub,dumbbell(lrows),why,chart_table,
       e(GV),brier_view(bf,bm,len(rg),mg),shadow_view(so,sm,tr,v4,obs),ctl,
