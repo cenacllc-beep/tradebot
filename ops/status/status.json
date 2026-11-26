@@ -1,13 +1,13 @@
 {
  "ai": {
   "model": null,
-  "note": "NVIDIA API answered HTTP 404",
+  "note": "NVIDIA API answered HTTP 404 on /chat/completions",
   "task": "check-summary",
   "used": false
  },
  "data": [
   {
-   "age_hours": 1.5,
+   "age_hours": 1.6,
    "limit_hours": 6,
    "newest_commit_at": "2026-11-26T21:30:45Z",
    "path": "research/data/live20",
@@ -15,7 +15,7 @@
    "state": "ok"
   },
   {
-   "age_hours": 19.4,
+   "age_hours": 19.5,
    "limit_hours": 3,
    "newest_commit_at": "2026-11-26T03:34:50Z",
    "path": "research/data/plan19",
@@ -23,7 +23,7 @@
    "state": "inactive"
   },
   {
-   "age_hours": 3.4,
+   "age_hours": 3.6,
    "limit_hours": null,
    "newest_commit_at": "2026-11-26T19:32:10Z",
    "path": "research/data/plan20",
@@ -31,7 +31,7 @@
    "state": "info"
   },
   {
-   "age_hours": 3.4,
+   "age_hours": 3.6,
    "limit_hours": null,
    "newest_commit_at": "2026-11-26T19:32:10Z",
    "path": "research/results",
@@ -39,7 +39,7 @@
    "state": "info"
   },
   {
-   "age_hours": 20.9,
+   "age_hours": 21.0,
    "limit_hours": 30,
    "newest_commit_at": "2026-11-26T02:04:37Z",
    "path": "trial",
@@ -48,13 +48,13 @@
   }
  ],
  "errors": [],
- "generated_at": "2026-11-26T22:57:47Z",
- "generated_at_la_paz": "2026-11-26 18:57",
+ "generated_at": "2026-11-26T23:06:36Z",
+ "generated_at_la_paz": "2026-11-26 19:06",
  "issue": "none",
  "key_present": true,
  "note": "Reads GitHub only; the PC is not reachable from here.",
  "problems": [],
- "report_text": "No AI report (NVIDIA API answered HTTP 404). The table above is the non-AI status check.",
+ "report_text": "No AI report (NVIDIA API answered HTTP 404 on /chat/completions). The table above is the non-AI status check.",
  "repository": "cenacllc-beep/tradebot",
  "schema": 1,
  "workflows": [
@@ -66,23 +66,23 @@
     "attempt": 1,
     "branch": "main",
     "conclusion": null,
-    "created_at": "2026-11-26T22:57:39Z",
+    "created_at": "2026-11-26T23:06:26Z",
     "event": "workflow_dispatch",
-    "id": 45908006028,
+    "id": 45908918598,
     "status": "in_progress",
     "title": "Backup AI operator",
-    "url": "https://github.com/cenacllc-beep/tradebot/actions/runs/45908006028"
+    "url": "https://github.com/cenacllc-beep/tradebot/actions/runs/45908918598"
    },
    "latest_completed": {
     "attempt": 1,
     "branch": "main",
     "conclusion": "success",
-    "created_at": "2026-11-26T19:22:45Z",
+    "created_at": "2026-11-26T22:57:39Z",
     "event": "workflow_dispatch",
-    "id": 45883203992,
+    "id": 45908006028,
     "status": "completed",
     "title": "Backup AI operator",
-    "url": "https://github.com/cenacllc-beep/tradebot/actions/runs/45883203992"
+    "url": "https://github.com/cenacllc-beep/tradebot/actions/runs/45908006028"
    },
    "limit_minutes": 360,
    "name": "Backup AI operator",
@@ -93,7 +93,7 @@
    "state": "running"
   },
   {
-   "age_minutes": 411,
+   "age_minutes": 420,
    "expected_max_gap_minutes": 60,
    "file": "live20.yml",
    "latest": {
@@ -127,7 +127,7 @@
    "state": "ok"
   },
   {
-   "age_minutes": 18552,
+   "age_minutes": 18560,
    "expected_max_gap_minutes": null,
    "file": "plan10.yml",
    "latest": {
@@ -159,7 +159,7 @@
    "state": "manual-only"
   },
   {
-   "age_minutes": 11354,
+   "age_minutes": 11363,
    "expected_max_gap_minutes": null,
    "file": "plan15.yml",
    "latest": {
@@ -191,7 +191,7 @@
    "state": "manual-only"
   },
   {
-   "age_minutes": 10779,
+   "age_minutes": 10788,
    "expected_max_gap_minutes": null,
    "file": "plan16.yml",
    "latest": {
@@ -223,7 +223,7 @@
    "state": "manual-only"
   },
   {
-   "age_minutes": 10778,
+   "age_minutes": 10787,
    "expected_max_gap_minutes": null,
    "file": "plan17.yml",
    "latest": {
@@ -255,7 +255,7 @@
    "state": "manual-only"
   },
   {
-   "age_minutes": 9598,
+   "age_minutes": 9607,
    "expected_max_gap_minutes": null,
    "file": "plan18.yml",
    "latest": {
@@ -287,7 +287,7 @@
    "state": "manual-only"
   },
   {
-   "age_minutes": 210,
+   "age_minutes": 219,
    "expected_max_gap_minutes": 60,
    "file": "plan19.yml",
    "latest": {
@@ -321,7 +321,7 @@
    "state": "running"
   },
   {
-   "age_minutes": 411,
+   "age_minutes": 419,
    "expected_max_gap_minutes": null,
    "file": "plan20.yml",
    "latest": {
@@ -367,7 +367,7 @@
    "state": "disabled"
   },
   {
-   "age_minutes": 11422,
+   "age_minutes": 11430,
    "expected_max_gap_minutes": null,
    "file": "probe18.yml",
    "latest": {
@@ -399,7 +399,7 @@
    "state": "manual-only"
   },
   {
-   "age_minutes": 1250,
+   "age_minutes": 1259,
    "expected_max_gap_minutes": null,
    "file": "probe19.yml",
    "latest": {
@@ -431,7 +431,7 @@
    "state": "manual-only"
   },
   {
-   "age_minutes": 535,
+   "age_minutes": 544,
    "expected_max_gap_minutes": 1230,
    "file": "tradebot-scan.yml",
    "latest": {
@@ -467,7 +467,7 @@
    "state": "ok"
   },
   {
-   "age_minutes": 1261,
+   "age_minutes": 1270,
    "expected_max_gap_minutes": 1200,
    "file": "tradebot-settle.yml",
    "latest": {
@@ -501,7 +501,7 @@
    "state": "ok"
   },
   {
-   "age_minutes": 550,
+   "age_minutes": 559,
    "expected_max_gap_minutes": 1260,
    "file": "trial-scan-backstop.yml",
    "latest": {
