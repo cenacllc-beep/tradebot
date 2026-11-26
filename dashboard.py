@@ -300,9 +300,10 @@ REPO_URL="https://github.com/cenacllc-beep/tradebot"
 def backup_ai_section():
     """Backup AI (NVIDIA, on GitHub; CLAUDE.md section 3, 2026-11-26): links only. The key is never typed into this page:
     it is a static file that anyone holding it could read, so the button opens GitHub's own secret form, which stores the
-    key encrypted where only the GitHub jobs can use it. Presentation only; no network, no file read."""
+    key encrypted where only the GitHub jobs can use it. Presentation only; no network, no file read.
+    Shown last on the page, as a div (not a section), so it moves no other panel and adds no menu link."""
     sec=REPO_URL+"/settings/secrets/actions/new"
-    return ('<section class=panel id=backupai><h2>Backup AI <span>NVIDIA, runs on GitHub when Claude is not available</span></h2>'
+    return ('<div class=panel id=backupai role=region aria-labelledby=backupai-h><h2 id=backupai-h>Backup AI <span>NVIDIA, runs on GitHub when Claude is not available</span></h2>'
       '<p class=note>The research and detection jobs (PLAN19, PLAN20, the 15-minute logger, the trial scan and settle) run on GitHub and on this PC '
       'without Claude. The backup AI watches them every 3 hours, emails you through a GitHub issue when something fails or goes stale, '
       're-runs a failed research job once and, after 24 hours without Claude, proposes fixes as pull requests for review. '
@@ -312,7 +313,7 @@ def backup_ai_section():
       'Do not paste it into this page, a chat or a file: GitHub keeps it encrypted and shows it to no one, not even you, after saving.</p>'
       '<p class=note><a href="%s/actions/workflows/backup-ai.yml" target=_blank rel=noopener>Backup AI runs</a> &middot; '
       '<a href="%s/blob/main/ops/status/status.md" target=_blank rel=noopener>latest status report</a> &middot; '
-      '<a href="%s/issues?q=label%%3Abackup-ai" target=_blank rel=noopener>alerts</a></p></section>')%(sec,REPO_URL,REPO_URL,REPO_URL)
+      '<a href="%s/issues?q=label%%3Abackup-ai" target=_blank rel=noopener>alerts</a></p></div>')%(sec,REPO_URL,REPO_URL,REPO_URL)
 def live15_section(now=None):
     """PLAN15F's live paper bets on the 15-minute BTC/ETH markets (research/live15.py's own ledger, read-only;
     descriptive). Before the job's first run, a short "not started yet" note; an unreadable ledger shows a line."""
@@ -747,15 +748,17 @@ def build_page(D,live=False):
       '<h2>Open paper positions</h2>%s<h2>Recent settled trades</h2>%s'
       '<details><summary>Data by estimator version</summary>%s</details></section>'
       '<p class=fine><b>Read with caution.</b> Early samples are noise. Cities share weather systems, so the effective sample is far smaller than the market count. Paper results ignore slippage and use approximate fees. The shadow tests are research only and never count toward the gate. Not financial advice. Data before Oct 13, 2026 was lost when the project folder was deleted; the test restarted that day.</p>'
-      '</div><div id=tip role=tooltip></div>')%(
-      chips,when(datetime.now(BOT_TZ))+" (UTC-4)",real,acct+live15_section()+backup_ai_section(),verdict(rg,bf,bm,rain,passed,mg,look),e(GV),npass,gate,calendar(rain,nd,tr),
+      '%s</div><div id=tip role=tooltip></div>')%(
+      chips,when(datetime.now(BOT_TZ))+" (UTC-4)",real,acct+live15_section(),verdict(rg,bf,bm,rain,passed,mg,look),e(GV),npass,gate,calendar(rain,nd,tr),
       todo_html,lastline,money,backtest_panel(v4p),results(st),
       dsub,dumbbell(lrows),why,chart_table,
       e(GV),brier_view(bf,bm,len(rg),mg),shadow_view(so,sm,tr,v4,obs),ctl,
       e(GV),table(["Forecast","Markets","Avg forecast","Actual rain","Avg market"],cal_rows,"Appears after %s rain markets resolve."%e(GV),num=(1,2,3,4)),
       table(["Market","Ver","Side","Contracts","Price","Fair","Cost incl. fee"],open_rows,"No open paper positions.",num=(3,4,5,6)),
       table(["Market","Ver","Side","Result","Outcome","P&amp;L"],done_rows,"No settled trades yet.",num=(5,)),
-      table(["Version and type","Role","Logged","Resolved","Brier forecast","Brier market","Settled trades","P&amp;L"],ver_rows,"Nothing yet.",num=(2,3,4,5,6,7)))
+      table(["Version and type","Role","Logged","Resolved","Brier forecast","Brier market","Settled trades","P&amp;L"],ver_rows,"Nothing yet.",num=(2,3,4,5,6,7)),
+      backup_ai_section())   # last on the page: placed above the verdict it pushed it below the fold, so its
+                             # entrance animation was still running when the tooltip check hovered it (test_ui.py)
     return ('<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover">'
           '<title>Tradebot Dashboard</title><style>'+CSS+(AV.ACCT_CSS if AV else "")+(RV.CSS if RV else "")+(CV.CSS if CV else "")+'</style></head><body'+(' data-live=1' if live else '')+'>'+body+'<script>'+JS+(AV.ACCT_JS if AV else "")+(RV.JS if RV else "")+'</script></body></html>')
 def main():

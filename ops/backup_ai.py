@@ -1,23 +1,35 @@
 """Backup AI operator (added 2026-11-26 at the user's request; ops/README.md). Runs on GitHub Actions
-(.github/workflows/backup-ai.yml) and watches the repository's own scheduled jobs when Claude is not around.
+(.github/workflows/backup-ai.yml, once switched on; repository copy cloud/workflows/backup-ai.yml) and watches the
+repository's own scheduled jobs when Claude is not around.
 
-    python3 ops/backup_ai.py check | report | rerun | fix | all
+    python3 ops/backup_ai.py check | report | rerun | fix | all          (job "operate")
+    python3 ops/backup_ai.py push-status DIR                               (job "status")
+    python3 ops/backup_ai.py test-proposal DIR RESULT_DIR                  (job "test")
+    python3 ops/backup_ai.py publish DIR RESULT_DIR                        (job "publish")
 
-check   deterministic, no AI: the latest runs of every workflow in .github/workflows against the schedule in its cron
-        lines, and the age of the research data the jobs commit. Writes ops/status/status.json and status.md.
+check   deterministic, no AI: the latest runs on main of every workflow in .github/workflows against the schedule in
+        its cron lines, and the age of the research data the jobs commit. Writes ops/status/status.json and status.md.
 report  asks an NVIDIA-hosted model (OpenAI-compatible API) for a plain-English report, then opens, updates or closes ONE
         GitHub issue labelled backup-ai, so GitHub e-mails the user when something is wrong.
-rerun   re-runs a failed run once, only for an allowlist of research and paper logging workflows; never twice.
-fix     only when no commit carrying Claude's co-author trailer reached main in the last 24 hours: asks the model for a
-        minimal diff for one failing workflow, refuses any protected path, applies it on a branch in a separate
-        worktree, runs the tests and opens a pull request for a human or Claude to review. It never merges.
+rerun   no AI: re-runs a failed run once, only for an allowlist of research and paper logging workflows; never twice.
+fix     only PROPOSES: when no commit carrying Claude's co-author trailer reached main in the last 24 hours, asks the
+        model for a minimal diff for one failing scheduled or hand-started workflow, refuses any path outside the
+        allowlist or on the deny list, and writes the diff and its metadata to a folder (uploaded as an artifact).
+        No proposed code ever runs in this job, which holds the NVIDIA key and a GitHub token.
+test-proposal  the job with no token, no secret and `permissions: {}`: re-checks the diff, applies it, runs the tests
+        (hard limit 300 s) and fails unless the files changed afterwards are exactly the diff's own files.
+publish the job that may push a branch and open a pull request: runs NO proposed code. Re-checks the diff, applies it
+        to a fresh checkout, stages exactly the diff's paths, commits without hooks, pushes backup-ai/fix-<run id>
+        and opens a pull request "Do not merge without review". It never merges.
+push-status  copies the status files into ops/status/ and pushes ONE commit to main touching only ops/status/
+        (refused otherwise).
 
 Same permissions as Claude minus anything to do with real money: it never imports or runs the order-placing module,
 never opens the bot's databases, and never writes outside ops/status/ on main. Its output is advice only.
 Python 3.8 syntax; standard library plus requests (only for the NVIDIA API). The API key comes from the environment
-variable NVIDIA_API_KEY and is never printed, logged or written. Without it, only the non-AI check (and the issue)
-runs and the report says the key is missing."""
-import base64, json, os, posixpath, re, shutil, subprocess, sys, tempfile, time
+variable NVIDIA_API_KEY and is never printed, logged or written. Without it, check, rerun and the issue still run and
+the report says the key is missing."""
+import ast, base64, hashlib, json, os, posixpath, re, shutil, signal, subprocess, sys, tempfile, time
 from datetime import datetime, timedelta, timezone
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -27,8 +39,15 @@ NVIDIA_BASE = "https://integrate.api.nvidia.com/v1"
 USER_AGENT = "tradebot-paper-research/1.0"
 LABEL = "backup-ai"
 MAX_AI_CALLS = 6
+AI_TOTAL_SECONDS = 360         # all model calls of one run together (requests, retries and waits)
+AI_REQUEST_SECONDS = 90        # one HTTP request to the model
+TEST_SECONDS = 300             # the test suite on a proposed fix
 LA_PAZ = timezone(timedelta(hours=-4))
 SCHEMA = 1
+RUNNER_NAME = "tradebot-runner"
+RUNNER_EMAIL = "tradebot-runner@users.noreply.github.com"
+FIX_EVENTS = ("schedule", "workflow_dispatch")
+NOHOOKS = ["-c", "core.hooksPath=/dev/null"]
 
 # ---------------------------------------------------------------------------------------------------------------
 # What may be re-run automatically (once). Research and paper logging only, whose steps are safe to repeat:
@@ -56,40 +75,129 @@ DATA = (
 )
 
 # ---------------------------------------------------------------------------------------------------------------
-# Protected paths: a fix proposal touching any of these is refused (hard-coded; tests/test_backup_ai.py checks it).
+# What a fix proposal may change. First an ALLOWLIST (presentation, monitoring and non-frozen research helpers), then
+# the deny list as a second check; both are hard-coded and tests/test_backup_ai.py checks them.
+EDITABLE_FILES = ("freshness.py", "check.py", "marks.py", "learn.py", "dashboard.py", "dashboard_assets.py",
+                  "control_view.py", "account_view.py")
+EDITABLE_PATTERNS = (r"^tbcommon/(?:[a-z0-9_]+/)*[a-z0-9_]+\.py$", r"^research/[a-z0-9_]+\.py$")
+NOT_EDITABLE_RESEARCH = (r"^research/plan[^/]*\.py$", r"^research/live[^/]*\.py$", r"^research/nov11\.py$",
+                         r"^research/backtest[^/]*\.py$", r"^research/lip\.py$", r"^research/fetch\.py$",
+                         r"^research/placebo\.py$")
+
 PROTECTED_FILES = ("live.py", "live.db", "paper.db", "config.py", "strategy.py", "weather.py", "nws.py", "gate.py",
                    "core.py", "claude.md", "run.bat", "ops/backup_ai.py", "tests/test_backup_ai.py",
-                   "tests/run_all.py", ".gitignore", "cloud/repo.gitignore")
+                   "tests/run_all.py", ".gitignore", "cloud/repo.gitignore", ".gitattributes", ".gitmodules",
+                   "pyproject.toml", "setup.cfg", "setup.py", "kalshi.py", "stationfc.py", "shadow.py", "main.py",
+                   "backup.py", "jobs.py", "export.py", "joblock.py", "scan_window.py", "audit.py")
 PROTECTED_DIRS = (".claude/", ".github/", "cloud/workflows/", "agents/", "tasks/", "backups/", "trial/",
-                  "research/results/", "ops/status/", ".git/", ".kalshi/")
+                  "research/results/", "research/data/", "ops/", "tests/", ".git/", ".kalshi/")
 PROTECTED_ANYWHERE = ("live.py", "live.db", "paper.db")     # by file name, in any folder
-PROTECTED_SUFFIXES = (".cmd", ".ps1", ".bat", ".pem", ".key")
+PROTECTED_NAMES = ("sitecustomize.py", "usercustomize.py", "conftest.py", "__init__.py")   # run on import or by tools
+PROTECTED_SUFFIXES = (".cmd", ".ps1", ".bat", ".pem", ".key", ".pth", ".sh")
 
 
-def protected(path):
-    """The reason a path may not be changed by a fix proposal, or None. Fails closed: anything odd is protected."""
+def live_closure(root=None):
+    """The repository modules live.py imports, directly or through each other (paths relative to root, lower case),
+    found with ast. None when live.py cannot be read or parsed (callers then refuse every path: fail closed)."""
+    root = root or ROOT
+    seen, todo = set(), ["live.py"]
+    while todo:
+        rel = todo.pop()
+        if rel in seen:
+            continue
+        seen.add(rel)
+        try:
+            with open(os.path.join(root, rel), encoding="utf-8") as f:
+                tree = ast.parse(f.read(), filename=rel)
+        except (OSError, SyntaxError, ValueError):
+            if rel == "live.py":
+                return None
+            continue
+        pkg = posixpath.dirname(rel)
+        names = []
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                names += [a.name for a in node.names]
+            elif isinstance(node, ast.ImportFrom):
+                if node.level:
+                    base = pkg
+                    for _ in range(node.level - 1):
+                        base = posixpath.dirname(base)
+                    mod = ".".join(x for x in (base.replace("/", "."), node.module or "") if x)
+                else:
+                    mod = node.module or ""
+                if mod:
+                    names.append(mod)
+                names += [mod + "." + a.name if mod else a.name for a in node.names if a.name != "*"]
+            elif isinstance(node, ast.Call) and node.args and isinstance(node.args[0], ast.Constant) \
+                    and isinstance(node.args[0].value, str):
+                fn = node.func
+                fname = fn.attr if isinstance(fn, ast.Attribute) else (fn.id if isinstance(fn, ast.Name) else "")
+                if fname in ("import_module", "__import__"):
+                    names.append(node.args[0].value)
+        for name in names:
+            parts = name.split(".")
+            for i in range(1, len(parts) + 1):
+                p = "/".join(parts[:i])
+                for cand in (p + ".py", p + "/__init__.py"):
+                    if os.path.isfile(os.path.join(root, cand)):
+                        todo.append(cand)
+    return sorted(x.lower() for x in seen)
+
+
+_CLOSURE = {}
+
+
+def _live_closure_cached():
+    if ROOT not in _CLOSURE:
+        _CLOSURE[ROOT] = live_closure(ROOT)
+    return _CLOSURE[ROOT]
+
+
+def _norm(path):
+    """(normalised lower-case path, reason) for a path in a diff; reason is set when it is refused outright."""
     if not isinstance(path, str) or not path.strip() or "\x00" in path:
-        return "empty or invalid path"
+        return None, "empty or invalid path"
     p = path.strip().replace("\\", "/")
     if p.startswith("/") or re.match(r"^[a-zA-Z]:", p) or p.startswith("~"):
-        return "absolute path"
+        return None, "absolute path"
     if any(part == ".." for part in p.split("/")):
-        return "path leaves the repository"
+        return None, "path leaves the repository"
     p = posixpath.normpath(p)
     while p.startswith("./"):
         p = p[2:]
     if p in (".", "") or p.startswith("../"):
-        return "path leaves the repository"
-    low = p.lower()      # the PC is Windows: Live.py and live.py are the same file there
+        return None, "path leaves the repository"
+    return p.lower(), None      # the PC is Windows: Live.py and live.py are the same file there
+
+
+def editable(path):
+    """True when a normalised lower-case path is on the allowlist."""
+    if path in EDITABLE_FILES:
+        return True
+    if any(re.match(r, path) for r in NOT_EDITABLE_RESEARCH):
+        return False
+    return any(re.match(r, path) for r in EDITABLE_PATTERNS)
+
+
+def protected(path):
+    """The reason a path may not be changed by a fix proposal, or None. Fails closed: anything odd is protected."""
+    low, why = _norm(path)
+    if why:
+        return why
     base = low.rsplit("/", 1)[-1]
     if low in PROTECTED_FILES:
         return "protected file"
     for d in PROTECTED_DIRS:
         if low.startswith(d) or low + "/" == d:
             return "protected folder " + d
+    if any(part.startswith(".") for part in low.split("/")):
+        return "dotfile or dot folder"
     for name in PROTECTED_ANYWHERE:
         if base == name or base.startswith(name + "-") or base.startswith(name + "."):
             return "protected file name"
+    if base in PROTECTED_NAMES:
+        return "runs on import"
     if "frozen" in base:
         return "frozen file"
     if base.endswith(PROTECTED_SUFFIXES):
@@ -98,6 +206,13 @@ def protected(path):
         return "pre-registered plan"
     if re.match(r"^research/plan\d+[^/]*\.py$", low) or re.match(r"^research/live\d+[^/]*\.py$", low):
         return "frozen research code"
+    closure = _live_closure_cached()
+    if closure is None:
+        return "live.py's imports could not be read (fail closed)"
+    if low in closure:
+        return "imported by live.py"
+    if not editable(low):
+        return "not on the list of files a fix may edit"
     return None
 
 
@@ -129,8 +244,8 @@ def diff_paths(diff):
             add(line[4:])
         elif line.startswith(("rename from ", "rename to ", "copy from ", "copy to ")):
             add(line.split(" ", 2)[2])
-        elif line.startswith(("deleted file mode", "old mode", "new mode")):
-            problems.append("deletes a file or changes a file mode: " + line.strip())
+        elif line.startswith(("deleted file mode", "old mode", "new mode", "similarity index", "dissimilarity index")):
+            problems.append("deletes, renames or copies a file or changes a file mode: " + line.strip())
         elif line.startswith("new file mode") and not line.strip().endswith(("100644",)):
             problems.append("new file with an unusual mode: " + line.strip())
         elif line.startswith(("GIT binary patch", "Binary files")):
@@ -271,12 +386,24 @@ def read_status(name, default=None):
         return default
 
 
-def kill_present():
+def kill_present(root=None):
     """A KILL file (any case, any ending) in the repository stops rerun and fix too, as on the PC."""
     try:
-        return any(n.upper().startswith("KILL") for n in os.listdir(ROOT))
+        return any(n.upper().startswith("KILL") for n in os.listdir(root or ROOT))
     except OSError:
         return True
+
+
+def _auth_args():
+    tok = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN") or ""
+    if not tok:
+        return []
+    hdr = base64.b64encode(("x-access-token:" + tok).encode()).decode()
+    return ["-c", "http.https://github.com/.extraheader=AUTHORIZATION: basic " + hdr]
+
+
+def add_problem(st, text):
+    st.setdefault("problems", []).append(redact(text)[:300])
 
 
 # ---------------------------------------------------------------------------------------------------------------
@@ -368,7 +495,7 @@ def _run_summary(r):
 
 
 def judge_workflow(wf, runs, t):
-    """One status.json workflow row from the workflow's file facts and its newest runs (newest first)."""
+    """One status.json workflow row from the workflow's file facts and its newest runs on main (newest first)."""
     gap = max_gap_minutes(wf["crons"]) if wf["crons"] else None
     lim = limit_minutes(gap)
     row = dict(file=wf["file"], name=wf["name"], schedule=wf["crons"], expected_max_gap_minutes=gap,
@@ -376,6 +503,7 @@ def judge_workflow(wf, runs, t):
     if runs is None:
         row["state"], row["problem"] = "unknown", "could not list its runs"
         return row
+    runs = [r for r in runs if (r.get("headBranch") or "main") == "main"]     # main only, even if gh ignored --branch
     runs = sorted(runs, key=lambda r: r.get("createdAt") or "", reverse=True)
     if not runs:
         row["state"] = "no-runs" if lim else "manual-only"
@@ -436,7 +564,7 @@ def check():
               ai=dict(used=False, task=None, model=None, note=None), note="Reads GitHub only; the PC is not reachable from here.")
     for wf in read_workflows():
         try:
-            runs = gh_json(["run", "list", "--workflow", wf["file"], "--limit", "5", "--json",
+            runs = gh_json(["run", "list", "--workflow", wf["file"], "--branch", "main", "--limit", "5", "--json",
                             "databaseId,status,conclusion,createdAt,event,attempt,url,headBranch,displayTitle"], [])
         except RuntimeError as e:
             st["errors"].append(redact(str(e))); runs = None
@@ -445,16 +573,20 @@ def check():
         st["data"].append(judge_data(spec, git_newest(spec[0]), t))
     st["problems"] = [w["file"] + ": " + w["problem"] for w in st["workflows"] if w["problem"]] + \
                      [d["problem"] for d in st["data"] if d["problem"]]
-    write_status("status.json", st)
-    write_status("status.md", status_md(st))
+    save_status(st)
     return st
+
+
+def save_status(st):
+    write_status("status.json", st)
+    write_status("status.md", status_md(st, st.get("report_text")))
 
 
 def status_md(st, report_text=None):
     lines = ["# Backup AI status", "", "Generated %s La Paz (%s UTC). Reads GitHub only; the PC is not reachable from here."
              % (st["generated_at_la_paz"], st["generated_at"]), ""]
     if not st.get("key_present"):
-        lines += ["**NVIDIA_API_KEY is missing:** non-AI status check only (add it as a repository secret).", ""]
+        lines += ["**NVIDIA_API_KEY is missing:** non-AI status check and re-runs only (add it as a repository secret).", ""]
     lines += ["Problems: %d" % len(st["problems"])] + ["- " + p for p in st["problems"]] + [""]
     lines += ["| Workflow | State | Age (h) | Limit (h) |", "|---|---|---|---|"]
     for w in st["workflows"]:
@@ -523,27 +655,37 @@ def http_post(url, headers, body, timeout):
 
 
 class AI(object):
-    """The model client. Never stores the key anywhere but in the request header."""
+    """The model client. Never stores the key anywhere but in the request header. All its calls together get at most
+    `total` seconds (AI_TOTAL_SECONDS), one request at most AI_REQUEST_SECONDS."""
 
-    def __init__(self, key=None, base=NVIDIA_BASE, max_calls=MAX_AI_CALLS, sleep=time.sleep):
+    def __init__(self, key=None, base=NVIDIA_BASE, max_calls=MAX_AI_CALLS, sleep=time.sleep, clock=time.monotonic,
+                 total=AI_TOTAL_SECONDS):
         self._key = key if key is not None else os.environ.get("NVIDIA_API_KEY", "")
         self.base, self.max_calls, self.calls, self.sleep = base.rstrip("/"), max_calls, 0, sleep
+        self.clock, self.deadline = clock, clock() + total
         self._models, self.used = None, []
 
     def available(self):
         return bool(self._key)
 
+    def remaining(self):
+        return self.deadline - self.clock()
+
     def _headers(self):
         return {"Authorization": "Bearer " + self._key, "Accept": "application/json",
                 "Content-Type": "application/json", "User-Agent": USER_AGENT}
 
-    def _request(self, fn, *args):
-        """fn(...) -> (status, headers, text); up to 4 tries on 429 and 5xx, with backoff."""
+    def _request(self, fn, url, *args):
+        """fn(url, headers, [body,] timeout) -> (status, headers, text); up to 4 tries on 429 and 5xx, with backoff,
+        all inside the run's time budget."""
         last = None
         for i in range(4):
+            left = self.remaining()
+            if left < 5:
+                raise RuntimeError("AI time budget (%d s) spent" % AI_TOTAL_SECONDS)
             try:
-                code, headers, text = fn(*args)
-            except Exception as e:  # network errors: retried
+                code, headers, text = fn(url, self._headers(), *(args + (min(AI_REQUEST_SECONDS, left),)))
+            except Exception as e:  # network errors and timeouts: retried
                 code, headers, text = 0, {}, type(e).__name__
             if code == 200:
                 return text
@@ -556,12 +698,14 @@ class AI(object):
             except (TypeError, ValueError):
                 pass
             if i < 3:
+                if wait >= self.remaining() - 5:
+                    raise RuntimeError("AI time budget (%d s) spent" % AI_TOTAL_SECONDS)
                 self.sleep(wait)
         raise RuntimeError("NVIDIA API answered HTTP %s" % last)
 
     def models(self):
         if self._models is None:
-            text = self._request(http_get, self.base + "/models", self._headers(), 30)
+            text = self._request(http_get, self.base + "/models")
             data = json.loads(text).get("data") or []
             self._models = [m.get("id") for m in data if isinstance(m, dict) and m.get("id")]
         return self._models
@@ -579,7 +723,7 @@ class AI(object):
         body = dict(model=model, temperature=0.2, top_p=0.9, max_tokens=MAX_TOKENS[task], stream=False,
                     messages=[dict(role="system", content=SYSTEM_RULES + "\n\n" + system),
                               dict(role="user", content=redact(user))])
-        text = self._request(http_post, self.base + "/chat/completions", self._headers(), body, 180)
+        text = self._request(http_post, self.base + "/chat/completions", body)
         msg = json.loads(text)["choices"][0]["message"].get("content") or ""
         msg = re.sub(r"(?s)<think>.*?</think>", "", msg).strip()
         self.used.append(dict(task=task, model=model))
@@ -591,8 +735,8 @@ SYSTEM_RULES = (
     "a human or another assistant reviews everything before it is used. Hard rules you must follow: never suggest "
     "loosening any limit, lock, threshold, kill switch, stop date, pre-registered plan or rule; never suggest anything "
     "involving real money, order placing, account keys or the files live.py, strategy.py, config.py, gate.py, core.py; "
-    "never suggest editing frozen research code, research/results, workflows or CLAUDE.md; never ask for or repeat "
-    "secrets. If a fix would need any of those, say so and stop. Plain English, short, no hype.")
+    "never suggest editing frozen research code, research/results, workflows, tests or CLAUDE.md; never ask for or "
+    "repeat secrets. If a fix would need any of those, say so and stop. Plain English, short, no hype.")
 
 
 # ---------------------------------------------------------------------------------------------------------------
@@ -622,29 +766,41 @@ def _body_file(text):
 
 
 def sync_issue(st, report_text):
+    """Opens, updates or closes the one issue. A failed gh call is recorded in st["problems"] and the result is
+    "error"."""
     try:
         issues = gh_json(["issue", "list", "--label", LABEL, "--state", "open", "--json", "number,title"], []) or []
     except RuntimeError as e:
-        st["errors"].append(redact(str(e))); return "error"
+        st["errors"].append(redact(str(e))); add_problem(st, "backup AI: could not list its issues")
+        return "error"
     action, num, extra = issue_action(len(st["problems"]), issues)
     body = status_md(st, report_text) + "\n---\nOpened by ops/backup_ai.py (GitHub Actions). Advice only; it changes no " \
         "rule, limit or lock and never touches real money. It closes this issue itself when everything is green.\n"
+    failed = []
     if action in ("create", "update"):
         ensure_label()
         p = _body_file(body)
         try:
             if action == "create":
-                gh(["issue", "create", "--title", issue_title(st), "--label", LABEL, "--body-file", p])
+                rc, _o, err = gh(["issue", "create", "--title", issue_title(st), "--label", LABEL, "--body-file", p])
             else:
-                gh(["issue", "edit", str(num), "--title", issue_title(st), "--body-file", p])
+                rc, _o, err = gh(["issue", "edit", str(num), "--title", issue_title(st), "--body-file", p])
         finally:
             os.unlink(p)
+        if rc != 0:
+            failed.append("could not %s its issue: %s" % (action, redact(err.strip())[:200]))
     elif action == "close":
-        gh(["issue", "close", str(num), "--comment", "All workflows and data are within their limits (%s La Paz)."
-            % st["generated_at_la_paz"]])
+        rc, _o, err = gh(["issue", "close", str(num), "--comment", "All workflows and data are within their limits "
+                          "(%s La Paz)." % st["generated_at_la_paz"]])
+        if rc != 0:
+            failed.append("could not close issue #%s: %s" % (num, redact(err.strip())[:200]))
     for n in extra:
-        gh(["issue", "close", str(n), "--comment", "Duplicate of #%s." % num])
-    return action
+        rc, _o, err = gh(["issue", "close", str(n), "--comment", "Duplicate of #%s." % num])
+        if rc != 0:
+            failed.append("could not close duplicate issue #%s: %s" % (n, redact(err.strip())[:200]))
+    for f in failed:
+        add_problem(st, "backup AI: " + f)
+    return "error" if failed else action
 
 
 def failed_log(run_id, lines=200):
@@ -681,8 +837,8 @@ def report(ai=None):
             text = "No AI report (%s). The table above is the non-AI status check." % redact(str(e))
             st["ai"] = dict(used=False, task=task, model=None, note=redact(str(e)))
     st["issue"] = sync_issue(st, text)
-    write_status("status.json", st)
-    write_status("status.md", status_md(st, text))
+    st["report_text"] = text
+    save_status(st)
     write_status("report.md", text + "\n")
     return st, text
 
@@ -695,7 +851,7 @@ def _brief(st):
 
 
 # ---------------------------------------------------------------------------------------------------------------
-# rerun
+# rerun (no AI: runs with or without the key)
 def rerun_candidates(st, done, t):
     """Failed runs that may be re-run: allowlisted workflow, the newest run of its workflow, first attempt, recent, and
     never re-run before."""
@@ -707,6 +863,8 @@ def rerun_candidates(st, done, t):
         last, latest = w.get("latest_completed") or {}, w.get("latest") or {}
         rid = last.get("id")
         if not rid or str(rid) in seen or latest.get("id") != rid or int(last.get("attempt") or 1) > 1:
+            continue
+        if (last.get("branch") or "main") != "main":
             continue
         created = parse_time(last.get("created_at"))
         if created is None or (t - created) > timedelta(hours=RERUN_MAX_AGE_H):
@@ -726,12 +884,16 @@ def rerun(st=None):
         c.update(at=iso(now()), ok=(rc == 0), error=None if rc == 0 else redact(err.strip())[:300])
         done.append(c); out.append(c)
         write_status("reruns.json", done)   # recorded at once: never the same run twice, even if this run stops
-    print("rerun: %d re-run(s)" % len(out))
+        if rc != 0:
+            add_problem(st, "backup AI: re-run of %s run %s failed: %s" % (c["workflow"], c["run_id"], c["error"]))
+    if any(not c["ok"] for c in out) and st.get("generated_at"):
+        save_status(st)
+    print("rerun: %d re-run(s), %d failed" % (len(out), sum(1 for c in out if not c["ok"])))
     return out
 
 
 # ---------------------------------------------------------------------------------------------------------------
-# fix
+# fix, step 1 (job "operate"): propose only. Nothing from the model is executed here.
 CLAUDE_TRAILER = re.compile(r"^\s*co-authored-by:\s*claude\b", re.I | re.M)
 
 
@@ -804,40 +966,26 @@ def open_fix_workflows():
     return out
 
 
-def _test_env():
-    """No token, key or Actions credential reaches the tests, which run the proposed code."""
-    env = {}
-    for k, v in os.environ.items():
-        ku = k.upper()
-        if any(s in ku for s in ("TOKEN", "KEY", "SECRET", "PASSWORD", "ACTIONS_")) or ku.startswith("GH_"):
-            continue
-        env[k] = v
-    env["PYTHONIOENCODING"] = "utf-8"
-    return env
-
-
-def _auth_args():
-    tok = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN") or ""
-    if not tok:
-        return []
-    hdr = base64.b64encode(("x-access-token:" + tok).encode()).decode()
-    return ["-c", "http.https://github.com/.extraheader=AUTHORIZATION: basic " + hdr]
-
-
 def fix_candidates(st, attempted, open_wfs):
+    """Failed workflows whose latest finished run on main was started by its schedule or by hand."""
     out = []
     tried = set(str(a.get("run_id")) for a in (attempted or []))
     for w in st["workflows"]:
-        rid = (w.get("latest_completed") or {}).get("id")
+        last = w.get("latest_completed") or {}
+        rid = last.get("id")
         if w["state"] != "failed" or not rid or str(rid) in tried or w["file"] in open_wfs:
             continue
-        if w["file"] == "backup-ai.yml":
+        if w["file"] == "backup-ai.yml" or last.get("event") not in FIX_EVENTS or (last.get("branch") or "main") != "main":
             continue
         out.append(dict(workflow=w["file"], run_id=rid))
     return out
 
 
-def fix(st=None, ai=None):
+def proposal_dir():
+    return os.environ.get("BACKUP_AI_PROPOSAL") or os.path.join(tempfile.gettempdir(), "backup-ai-proposal")
+
+
+def fix(st=None, ai=None, out_dir=None):
     st = st or read_status("status.json") or check()
     ai = ai or AI()
     if kill_present():
@@ -859,14 +1007,18 @@ def fix(st=None, ai=None):
     attempted.append(rec)
     write_status("fixes.json", attempted)   # never the same run twice
     try:
-        rec["result"], rec["model"] = _propose(c, ai)
+        rec["result"], rec["model"] = _propose(c, ai, out_dir or proposal_dir())
     except Exception as e:  # noqa: any failure ends this proposal, never the job
         rec["result"] = "failed: " + redact("%s: %s" % (type(e).__name__, e))[:300]
     write_status("fixes.json", attempted)
     return rec["result"]
 
 
-def _propose(c, ai):
+def _sha256(text):
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def _propose(c, ai, out_dir):
     log = failed_log(c["run_id"], 200)
     files = related_files(log)
     wf_rel = ".github/workflows/" + c["workflow"]
@@ -876,83 +1028,347 @@ def _propose(c, ai):
     for rel in files[:6]:
         with open(os.path.join(ROOT, rel), encoding="utf-8", errors="replace") as f:
             body = f.read()
-        tag = "READ-ONLY (protected: %s)" % protected(rel) if protected(rel) else "editable"
+        tag = "READ-ONLY (%s)" % protected(rel) if protected(rel) else "editable"
         parts.append("=== %s [%s]\n%s%s" % (rel, tag, body[:12000], "\n... (truncated)" if len(body) > 12000 else ""))
     prompt = ("Workflow %s failed (run %s). Last lines of its log:\n%s\n\nRelevant files:\n%s\n\n"
               "Propose the smallest fix as a unified git diff (diff --git a/... b/... headers, paths relative to the "
-              "repository root) in one ```diff block, editing only files marked editable. Before the block write one "
-              "line starting CAUSE: with the cause in plain English. If the cause is outside the code (GitHub outage, "
-              "network, a data source down) or a fix would need a protected file, answer NO_FIX and the cause only."
+              "repository root) in one ```diff block, editing only files marked editable. Do not add, delete or "
+              "rename files and do not edit tests. Before the block write one line starting CAUSE: with the cause in "
+              "plain English. If the cause is outside the code (GitHub outage, network, a data source down) or a fix "
+              "would need a read-only file, answer NO_FIX and the cause only."
               % (c["workflow"], c["run_id"], log, "\n\n".join(parts)))
     model, answer = ai.ask("code-fix", "Write a minimal fix proposal.", prompt)
     m = re.search(r"CAUSE:\s*(.+)", answer)
-    cause = (m.group(1).strip() if m else "not stated")[:200]
+    cause = redact(m.group(1).strip() if m else "not stated")[:200]
     if "NO_FIX" in answer and "diff --git" not in answer:
         return "no fix proposed: " + cause, model
     diff = extract_diff(answer)
     refused = check_diff(diff)
     if refused:
         return "refused: " + "; ".join(refused)[:400], model
-    return _apply_and_open(c, diff, cause, model), model
-
-
-def _apply_and_open(c, diff, cause, model):
     branch = "backup-ai/fix-%s" % c["run_id"]
-    rc, out, _ = run(["git", "ls-remote", "--heads", "origin", branch], timeout=60)
+    rc, out, _ = run(["git"] + _auth_args() + ["ls-remote", "--heads", "origin", branch], timeout=60)
     if rc == 0 and out.strip():
-        return "branch %s already exists" % branch
-    wt = tempfile.mkdtemp(prefix="backup_ai_fix_")
-    os.rmdir(wt)
-    rc, _o, err = run(["git", "worktree", "add", "-q", "-b", branch, wt, "HEAD"], timeout=180)
-    if rc != 0:
-        return "could not create a worktree: " + redact(err)[:200]
+        return "branch %s already exists" % branch, model
+    tmp = tempfile.mkdtemp(prefix="backup_ai_check_")
     try:
-        pf = os.path.join(tempfile.mkdtemp(prefix="backup_ai_diff_"), "fix.diff")
+        pf = os.path.join(tmp, "fix.diff")
         with open(pf, "w", encoding="utf-8", newline="\n") as f:
             f.write(diff)
-        rc, _o, err = run(["git", "apply", "--check", "--recount", pf], cwd=wt)
-        if rc != 0:
-            return "diff does not apply: " + redact(err)[:300]
-        rc, _o, err = run(["git", "apply", "--recount", pf], cwd=wt)
-        if rc != 0:
-            return "diff did not apply: " + redact(err)[:300]
-        rc, out, _ = run(["git", "status", "--porcelain", "--untracked-files=all"], cwd=wt)
-        changed = [l[3:].split(" -> ")[-1].strip('"') for l in out.splitlines() if l.strip()]
-        bad = [p for p in changed if protected(p)]
-        if bad or not changed:
-            return "refused after apply: " + (", ".join(bad) or "no change")
-        rc, tout, terr = run([sys.executable, os.path.join("tests", "run_all.py")], cwd=wt, env=_test_env(), timeout=540)
-        test_tail = "\n".join((tout + terr).splitlines()[-40:])
-        run(["git", "add", "-A"], cwd=wt)
-        run(["git", "-c", "user.name=tradebot-backup-ai", "-c", "user.email=tradebot-runner@users.noreply.github.com",
-             "commit", "-q", "-m", "Backup AI fix proposal for %s (run %s)\n\nUnreviewed; do not merge without review."
-             % (c["workflow"], c["run_id"])], cwd=wt)
-        rc, _o, err = run(["git"] + _auth_args() + ["push", "-q", "origin", "HEAD:refs/heads/" + branch], cwd=wt, timeout=180)
-        if rc != 0:
-            return "push failed: " + redact(err)[:200]
-        body = ("<!-- backup-ai-workflow: %s -->\n**Do not merge without review.** Proposed by the backup AI operator "
-                "(model %s) because Claude made no commit in the last 24 hours. It never merges anything itself.\n\n"
-                "**Failing run:** %s (workflow %s)\n\n**Likely cause:** %s\n\n**Diff:**\n```diff\n%s```\n\n"
-                "**Tests** (`python3 tests/run_all.py`, exit %s; test_ui.py skips without Playwright):\n```\n%s\n```\n\n"
-                "Checked against the protected-path list in ops/backup_ai.py before it was applied.\n"
-                % (c["workflow"], model, c["run_id"], c["workflow"], cause, diff[:30000], rc, test_tail))
-        title = "Backup AI fix proposal: [%s] %s" % (c["workflow"], cause[:80])
-        ensure_label()
-        p = _body_file(body)
-        try:
-            rc2, out2, err2 = gh(["pr", "create", "--base", "main", "--head", branch, "--title", title,
-                                  "--body-file", p, "--label", LABEL])
-        finally:
-            os.unlink(p)
-        return ("pull request opened: " + out2.strip()) if rc2 == 0 else ("pull request failed: " + redact(err2)[:200])
+        rc, _o, err = run(["git", "apply", "--check", pf])     # reads only; nothing is applied or run here
     finally:
-        run(["git", "worktree", "remove", "--force", wt], timeout=120)
+        shutil.rmtree(tmp, ignore_errors=True)
+    if rc != 0:
+        return "diff does not apply: " + redact(err)[:300], model
+    rc, sha, _e = run(["git", "rev-parse", "HEAD"], timeout=60)
+    if rc != 0 or not re.match(r"^[0-9a-f]{40}$", sha.strip()):
+        return "could not read the base commit", model
+    paths, _p = diff_paths(diff)
+    meta = dict(workflow=c["workflow"], run_id=c["run_id"], cause=cause, model=model, base_sha=sha.strip(),
+                branch=branch, paths=paths, diff_sha256=_sha256(diff))
+    if os.path.isdir(out_dir):
+        shutil.rmtree(out_dir)
+    os.makedirs(out_dir)
+    with open(os.path.join(out_dir, "fix.diff"), "w", encoding="utf-8", newline="\n") as f:
+        f.write(diff)
+    with open(os.path.join(out_dir, "meta.json"), "w", encoding="utf-8", newline="\n") as f:
+        json.dump(meta, f, indent=1, sort_keys=True)
+    ensure_label()
+    return "proposed for testing on branch %s" % branch, model
+
+
+def load_proposal(pdir):
+    """(diff, meta, problems): the proposal re-read and re-checked from scratch (path rules, hash, file set, branch)."""
+    problems = []
+    try:
+        with open(os.path.join(pdir, "fix.diff"), encoding="utf-8") as f:
+            diff = f.read()
+        with open(os.path.join(pdir, "meta.json"), encoding="utf-8") as f:
+            meta = json.load(f)
+    except (OSError, ValueError) as e:
+        return None, None, ["proposal unreadable: %s" % type(e).__name__]
+    if not isinstance(meta, dict):
+        return None, None, ["proposal metadata unreadable"]
+    problems += check_diff(diff)
+    paths, _p = diff_paths(diff)
+    if meta.get("diff_sha256") != _sha256(diff):
+        problems.append("the diff does not match its recorded hash")
+    if sorted(meta.get("paths") or []) != paths:
+        problems.append("the diff's files do not match its metadata")
+    if not re.match(r"^backup-ai/fix-\d+$", str(meta.get("branch") or "")) or \
+            meta.get("branch") != "backup-ai/fix-%s" % meta.get("run_id"):
+        problems.append("unexpected branch name")
+    if not re.match(r"^[0-9a-f]{40}$", str(meta.get("base_sha") or "")):
+        problems.append("unexpected base commit")
+    return diff, meta, problems
+
+
+def changed_files(cwd):
+    """Every path that differs from HEAD in a work tree: tracked changes, untracked and ignored files. Paths that git
+    has to quote are returned as they are and never match a diff path (so they are refused)."""
+    out = set()
+    rc, s, err = run(["git", "status", "--porcelain", "-z", "--no-renames", "--ignored", "--untracked-files=all"],
+                     cwd=cwd, timeout=120)
+    if rc != 0:
+        raise RuntimeError("git status failed")
+    for rec in s.split("\x00"):
+        if len(rec) > 3:
+            out.add(rec[3:])
+    rc, s, err = run(["git", "diff", "--no-renames", "--name-only", "-z", "HEAD"], cwd=cwd, timeout=120)
+    if rc != 0:
+        raise RuntimeError("git diff failed")
+    out.update(x for x in s.split("\x00") if x)
+    return sorted(out)
+
+
+def _apply(diff, cwd):
+    tmp = tempfile.mkdtemp(prefix="backup_ai_apply_")
+    try:
+        pf = os.path.join(tmp, "fix.diff")
+        with open(pf, "w", encoding="utf-8", newline="\n") as f:
+            f.write(diff)
+        rc, _o, err = run(["git", "apply", "--check", pf], cwd=cwd)
+        if rc == 0:
+            rc, _o, err = run(["git", "apply", pf], cwd=cwd)
+        return rc, err
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def _test_env():
+    """No token, key or Actions credential reaches the tests, which run the proposed code; no bytecode files either,
+    so the work tree after the tests holds only the diff's changes."""
+    env = {}
+    for k, v in os.environ.items():
+        ku = k.upper()
+        if any(s in ku for s in ("TOKEN", "KEY", "SECRET", "PASSWORD", "ACTIONS_", "NVIDIA")) or ku.startswith("GH_"):
+            continue
+        env[k] = v
+    env["PYTHONIOENCODING"] = "utf-8"
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
+    return env
+
+
+def run_tests(cwd, timeout=None):
+    """(returncode, output) of tests/run_all.py with a hard time limit; the whole process group is killed at the
+    limit (124)."""
+    timeout = TEST_SECONDS if timeout is None else timeout
+    p = subprocess.Popen([sys.executable, os.path.join("tests", "run_all.py")], cwd=cwd, env=_test_env(),
+                         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
+                         start_new_session=True)
+    try:
+        out, _e = p.communicate(timeout=timeout)
+        return p.returncode, out.decode("utf-8", "replace")
+    except subprocess.TimeoutExpired:
+        try:
+            os.killpg(p.pid, signal.SIGKILL)
+        except OSError:
+            p.kill()
+        out, _e = p.communicate()
+        return 124, out.decode("utf-8", "replace") + "\n(tests stopped at the %d s limit)" % timeout
+
+
+def _write_result(rdir, res):
+    os.makedirs(rdir, exist_ok=True)
+    with open(os.path.join(rdir, "result.json"), "w", encoding="utf-8", newline="\n") as f:
+        json.dump(res, f, indent=1, sort_keys=True)
+
+
+def test_proposal(pdir, rdir, root=None):
+    """Job "test" (no token, no secret): re-check, apply, run the tests, compare the changed files with the diff's.
+    Returns 0 only when the tests passed and nothing but the diff's own files changed."""
+    root = root or ROOT
+    res = dict(ok=False, tests_rc=None, tail="", files=[], expected=[], problems=[])
+    try:
+        if kill_present(root):
+            res["problems"].append("KILL file present")
+            return 1
+        diff, meta, problems = load_proposal(pdir)
+        if problems:
+            res["problems"] += problems
+            return 1
+        expected = sorted(meta["paths"])
+        res["expected"] = expected
+        rc, err = _apply(diff, root)
+        if rc != 0:
+            res["problems"].append("diff does not apply: " + redact(err)[:300]); return 1
+        before = changed_files(root)
+        if before != expected:
+            res["files"] = before
+            res["problems"].append("files changed by applying the diff differ from its own files"); return 1
+        rc, out = run_tests(root)
+        res["tests_rc"], res["tail"] = rc, redact("\n".join(out.splitlines()[-40:]))
+        after = changed_files(root)
+        res["files"] = after
+        if after != expected:
+            res["problems"].append("the tests changed files outside the diff: " + ", ".join(sorted(set(after) ^ set(expected)))[:400])
+            return 1
+        if rc != 0:
+            res["problems"].append("tests failed (exit %s)" % rc); return 1
+        res["ok"] = True
+        return 0
+    finally:
+        _write_result(rdir, res)
+
+
+# ---------------------------------------------------------------------------------------------------------------
+# fix, step 3 (job "publish"): branch, commit and pull request. Runs nothing from the diff.
+def _fence(text):
+    return (text or "").replace("```", "'''")
+
+
+def publish(pdir, rdir, root=None):
+    """Re-check the proposal, apply it to a fresh checkout, stage exactly its paths, commit without hooks, push the
+    branch and open the pull request. Never merges. Returns 0 on success."""
+    root = root or ROOT
+    if kill_present(root):
+        print("publish: KILL file present"); return 1
+    diff, meta, problems = load_proposal(pdir)
+    if problems:
+        print("publish: refused: " + "; ".join(problems)[:600]); return 1
+    try:
+        with open(os.path.join(rdir, "result.json"), encoding="utf-8") as f:
+            result = json.load(f)       # written by the job that ran the proposed code: shown as text only
+    except (OSError, ValueError):
+        result = {}
+    if not isinstance(result, dict):
+        result = {}
+    branch, paths = meta["branch"], sorted(meta["paths"])
+    rc, out, _ = run(["git"] + _auth_args() + ["ls-remote", "--heads", "origin", branch], timeout=60)
+    if rc != 0 or out.strip():
+        print("publish: branch %s exists or the remote could not be read" % branch); return 1
+    rc, head, _ = run(["git", "rev-parse", "HEAD"], cwd=root, timeout=60)
+    if rc != 0 or head.strip() != meta["base_sha"]:
+        print("publish: the checkout is not the proposal's base commit"); return 1
+    rc, err = _apply(diff, root)
+    if rc != 0:
+        print("publish: diff does not apply: " + redact(err)[:300]); return 1
+    if changed_files(root) != paths:
+        print("publish: refused: the work tree holds other changes than the diff's"); return 1
+    rc, _o, err = run(["git", "checkout", "-q", "-b", branch], cwd=root, timeout=60)
+    if rc != 0:
+        print("publish: could not create the branch"); return 1
+    rc, _o, err = run(["git", "--literal-pathspecs", "add", "--"] + paths, cwd=root, timeout=120)
+    rc2, staged, _e = run(["git", "diff", "--cached", "--no-renames", "--name-only", "-z"], cwd=root, timeout=60)
+    if rc != 0 or rc2 != 0 or sorted(x for x in staged.split("\x00") if x) != paths:
+        print("publish: refused: staged files differ from the diff's"); return 1
+    msg = "Backup AI fix proposal for %s (run %s)\n\nUnreviewed; do not merge without review." % (meta["workflow"], meta["run_id"])
+    rc, _o, err = run(["git"] + NOHOOKS + ["-c", "user.name=" + RUNNER_NAME, "-c", "user.email=" + RUNNER_EMAIL,
+                       "commit", "-q", "--no-verify", "-m", msg], cwd=root, timeout=120)
+    if rc != 0:
+        print("publish: commit failed"); return 1
+    rc, stat, _e = run(["git", "show", "--stat", "--format=commit %H%n%s", "HEAD"], cwd=root, timeout=60)
+    rc, _o, err = run(["git"] + NOHOOKS + _auth_args() + ["push", "-q", "origin", "HEAD:refs/heads/" + branch],
+                      cwd=root, timeout=180)
+    if rc != 0:
+        print("publish: push failed: " + redact(err)[:200]); return 1
+    tests = "passed" if result.get("ok") else "NOT passed"
+    body = ("<!-- backup-ai-workflow: %s -->\n**Do not merge without review.** Proposed by the backup AI operator "
+            "(model %s) because Claude made no commit in the last 24 hours. It never merges anything itself.\n\n"
+            "**Read the Files tab**: it shows the real change. Text below is redacted and may be cut short.\n\n"
+            "**Failing run:** %s (workflow %s)\n\n**Likely cause (model's words):** %s\n\n"
+            "**Commit (`git show --stat`):**\n```\n%s\n```\n\n"
+            "**Tests** (`python3 tests/run_all.py` in a job with no token or secret, %d s limit): %s, exit %s; "
+            "files changed after the tests: %s\n```\n%s\n```\n\n"
+            "Checked against the allowlist and the deny list in ops/backup_ai.py in each of the three jobs.\n"
+            % (meta["workflow"], _fence(str(meta.get("model"))), meta["run_id"], meta["workflow"],
+               _fence(str(meta.get("cause"))), _fence(stat.strip()), TEST_SECONDS, tests, result.get("tests_rc"),
+               _fence(", ".join(str(x) for x in (result.get("files") or [])))[:2000],
+               _fence(str(result.get("tail") or ""))[-6000:]))
+    title = "Backup AI fix proposal: [%s] %s" % (meta["workflow"], str(meta.get("cause"))[:80])
+    p = _body_file(body)
+    try:
+        rc, out, err = gh(["pr", "create", "--base", "main", "--head", branch, "--title", title,
+                           "--body-file", p, "--label", LABEL])
+    finally:
+        os.unlink(p)
+    if rc != 0:
+        print("publish: pull request failed: " + redact(err)[:200]); return 1
+    print("publish: pull request opened: " + out.strip())
+    return 0
+
+
+# ---------------------------------------------------------------------------------------------------------------
+# push-status (job "status"): one commit on main, ops/status/ only
+STATUS_FILE_RE = re.compile(r"^[A-Za-z0-9_\-]+\.(json|md)$")
+
+
+def push_guard(cwd):
+    """Reasons to refuse pushing to main (empty = allowed): HEAD must be exactly one commit ahead of origin/main, made
+    by the runner identity, touching only ops/status/."""
+    out = []
+    rc, names, _e = run(["git", "diff", "--no-renames", "--name-only", "-z", "origin/main..HEAD"], cwd=cwd, timeout=60)
+    if rc != 0:
+        return ["could not compare with origin/main"]
+    bad = [n for n in names.split("\x00") if n and not n.startswith("ops/status/")]
+    if bad:
+        out.append("files outside ops/status/: " + ", ".join(bad)[:300])
+    rc, revs, _e = run(["git", "rev-list", "origin/main..HEAD"], cwd=cwd, timeout=60)
+    revs = [r for r in revs.split() if r]
+    if rc != 0 or len(revs) != 1:
+        out.append("expected exactly one new commit, found %s" % (len(revs) if rc == 0 else "unknown"))
+    else:
+        rc, who, _e = run(["git", "log", "-1", "--format=%an%x1f%ae%x1f%cn%x1f%ce", revs[0]], cwd=cwd, timeout=60)
+        if rc != 0 or who.strip().split("\x1f") != [RUNNER_NAME, RUNNER_EMAIL, RUNNER_NAME, RUNNER_EMAIL]:
+            out.append("the new commit is not the runner's")
+    return out
+
+
+def push_status(src, cwd=None, tries=6, sleep=time.sleep):
+    """Copy the status files from src into ops/status/, commit them as the runner and push to main. Refuses anything
+    else changed, staged or committed. Returns 0 when pushed or nothing changed."""
+    cwd = cwd or ROOT
+    sdir = os.path.join(cwd, "ops", "status")
+    rc, s, _e = run(["git", "status", "--porcelain", "-z", "--no-renames", "--untracked-files=all"], cwd=cwd, timeout=60)
+    others = [r[3:] for r in s.split("\x00") if len(r) > 3 and not r[3:].startswith("ops/status/")]
+    if rc != 0 or others:
+        print("push-status: refusing: files outside ops/status changed: %s" % ", ".join(others)[:300]); return 1
+    os.makedirs(sdir, exist_ok=True)
+    for n in sorted(os.listdir(src)) if os.path.isdir(src) else []:
+        p = os.path.join(src, n)
+        if STATUS_FILE_RE.match(n) and os.path.isfile(p) and not os.path.islink(p):
+            shutil.copyfile(p, os.path.join(sdir, n))
+    run(["git", "--literal-pathspecs", "add", "--", "ops/status"], cwd=cwd, timeout=60)
+    rc, staged, _e = run(["git", "diff", "--cached", "--no-renames", "--name-only", "-z"], cwd=cwd, timeout=60)
+    staged = [x for x in staged.split("\x00") if x]
+    if rc != 0 or any(not x.startswith("ops/status/") for x in staged):
+        print("push-status: refusing: staged files outside ops/status"); return 1
+    if not staged:
+        print("push-status: nothing new"); return 0
+    rc, _o, _e = run(["git"] + NOHOOKS + ["-c", "user.name=" + RUNNER_NAME, "-c", "user.email=" + RUNNER_EMAIL,
+                      "commit", "-q", "--no-verify", "-m", "Backup AI status %s" % iso(now())], cwd=cwd, timeout=60)
+    if rc != 0:
+        print("push-status: commit failed"); return 1
+    auth = _auth_args()
+    for i in range(tries):
+        why = push_guard(cwd)
+        if why:
+            print("push-status: refusing to push: " + "; ".join(why)); return 1
+        rc, _o, _e = run(["git"] + NOHOOKS + auth + ["push", "-q", "origin", "HEAD:refs/heads/main"], cwd=cwd, timeout=120)
+        if rc == 0:
+            print("push-status: pushed"); return 0
+        sleep((i + 1) * 10)
+        rc, _o, _e = run(["git"] + NOHOOKS + auth + ["fetch", "-q", "origin", "+refs/heads/main:refs/remotes/origin/main"],
+                         cwd=cwd, timeout=120)
+        rc2, _o, _e = run(["git"] + NOHOOKS + ["-c", "user.name=" + RUNNER_NAME, "-c", "user.email=" + RUNNER_EMAIL,
+                           "rebase", "-q", "origin/main"], cwd=cwd, timeout=120)
+        if rc != 0 or rc2 != 0:
+            run(["git", "rebase", "--abort"], cwd=cwd, timeout=60)
+            print("push-status: could not rebase onto main"); return 1
+    print("push-status: push failed %d times" % tries)
+    return 1
 
 
 # ---------------------------------------------------------------------------------------------------------------
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     mode = argv[0] if argv else "all"
+    if mode == "push-status" and len(argv) == 2:
+        return push_status(argv[1])
+    if mode == "test-proposal" and len(argv) == 3:
+        return test_proposal(argv[1], argv[2])
+    if mode == "publish" and len(argv) == 3:
+        return publish(argv[1], argv[2])
     if mode not in ("check", "report", "rerun", "fix", "all"):
         print(__doc__); return 2
     st = check()
@@ -965,13 +1381,13 @@ def main(argv=None):
     if mode in ("report", "all"):
         st, _t = report(ai)
         print("report: issue %s; model %s" % (st.get("issue"), st["ai"].get("model") or "none"))
-    if not ai.available():
-        print("NVIDIA_API_KEY is missing: rerun and fix skipped (non-AI status check only)")
-        return 0
     if mode in ("rerun", "all"):
-        rerun(st)
+        rerun(st)                      # no AI: runs without the key too
     if mode in ("fix", "all"):
-        print("fix: " + fix(st, ai))
+        if not ai.available():
+            print("fix: skipped: NVIDIA_API_KEY is missing")
+        else:
+            print("fix: " + fix(st, ai))
     return 0
 
 

@@ -20,35 +20,79 @@ assert not re.search(r"^\s*(import live\b|from live\b)", src, re.M) and "import 
 assert "pr merge" not in src and '"merge"' not in src, "it never merges"
 assert "sqlite3" not in src
 assert "live" not in sys.modules, "live.py was imported"
-for w in (os.path.join(WORK, ".github", "workflows", "backup-ai.yml"), os.path.join(WORK, "cloud", "workflows", "backup-ai.yml")):
-    assert os.path.exists(w), w
-assert open(os.path.join(WORK, ".github", "workflows", "backup-ai.yml"), "rb").read() == \
-    open(os.path.join(WORK, "cloud", "workflows", "backup-ai.yml"), "rb").read(), "the two workflow copies must be identical"
-wf = open(os.path.join(WORK, "cloud", "workflows", "backup-ai.yml"), encoding="utf-8").read()
+GH_COPY = os.path.join(WORK, ".github", "workflows", "backup-ai.yml")
+CLOUD_COPY = os.path.join(WORK, "cloud", "workflows", "backup-ai.yml")
+assert os.path.exists(CLOUD_COPY), CLOUD_COPY
+if os.path.exists(GH_COPY):      # created only when the operator is switched on; then it must equal the cloud copy
+    assert open(GH_COPY, "rb").read() == open(CLOUD_COPY, "rb").read(), "the two workflow copies must be identical"
+wf = open(CLOUD_COPY, encoding="utf-8").read()
 for need in ('cron: "37 */3 * * *"', "group: tradebot-backup-ai", "cancel-in-progress: false", "timeout-minutes: 30",
              "NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}", "requests==2.32.3", "persist-credentials: false",
-             "refusing: staged files outside ops/status", "issues: write", "pull-requests: write", "actions: write",
-             "TZ: America/La_Paz"):
+             "issues: write", "pull-requests: write", "actions: write", "TZ: America/La_Paz", "push-status",
+             "test-proposal", "publish", "backup-ai-proposal"):
     assert need in wf, need
 assert "@v" not in wf.replace("# v", ""), "actions pinned by SHA"
+for u in re.findall(r"uses:\s*(\S+)", wf):
+    assert re.match(r"^actions/[a-z\-]+@[0-9a-f]{40}$", u), u
+assert "git add -A" not in wf and "pr merge" not in wf
 
-# ---- protected paths (deny list)
-blocked = ["live.py", "./live.py", "Live.py", "LIVE.PY", "sub/../live.py", "../live.py", "/etc/passwd", "C:/x.py", "~/x.py",
-           "live.db", "paper.db", "trial/paper.db", "backups/paper.db", "research/paper.db-journal", "config.py",
-           "strategy.py", "weather.py", "nws.py", "gate.py", "core.py", "CLAUDE.md", ".claude/settings.json",
-           ".claude/skills/new/SKILL.md", ".github/workflows/x.yml", "cloud/workflows/new.yml", "agents/x.md",
-           "tasks/evening.cmd", "tasks/new.py", "run.bat", "x.cmd", "tools/a.ps1", "research/PLAN7.md",
-           "research/PLAN15F.md", "research/plan_new.md", "research/results/plan19_result.json",
-           "research/results/new_dir/a.txt", "research/frozen_model.py", "docs/FROZEN.txt", "research/plan7.py",
-           "research/plan20.py", "research/plan15.py", "research/live15.py", "research/live20.py",
-           "ops/backup_ai.py", "ops/status/status.json", "tests/test_backup_ai.py", "tests/run_all.py", "", "  ",
-           "a\x00b", "..", ".", "research\\plan9.py", ".git/config", "keys/k.pem", "x/live.py"]
-for p in blocked:
-    assert B.protected(p), "should be protected: %r" % p
-allowed = ["research/lip.py", "research/discover.py", "freshness.py", "check.py", "tests/test_freshness.py",
-           "ops/README.md", "tbcommon/http.py", "research/fetch.py", "docs/notes.md", "research/data_tools.py"]
-for p in allowed:
-    assert B.protected(p) is None, "should be allowed: %r -> %s" % (p, B.protected(p))
+
+def job(name):
+    """The text of one job of the workflow (from '  name:' to the next job)."""
+    m = re.search(r"(?ms)^  %s:\n(.*?)(?=^  [a-z][\w-]*:\n|\Z)" % re.escape(name), wf.split("\njobs:\n", 1)[1])
+    assert m, name
+    return m.group(1)
+
+
+assert re.search(r"(?m)^permissions: \{\}$", wf), "nothing granted at the workflow level"
+ops_job, st_job, test_job, pub_job = job("operate"), job("status"), job("test"), job("publish")
+# (a) the job that runs proposed code: no permissions, no secret, no token, no stored credentials
+assert re.search(r"(?m)^    permissions: \{\}$", test_job), "test job: permissions: {}"
+for bad in ("secrets.", "github.token", "GH_TOKEN", "GITHUB_TOKEN", "NVIDIA", "contents: write", "persist-credentials: true"):
+    assert bad not in test_job, "test job must not have " + bad
+assert "persist-credentials: false" in test_job and "test-proposal" in test_job and "needs: operate" in test_job
+# the jobs holding a token or the key never run the tests or apply anything themselves
+for j in (ops_job, st_job, pub_job):
+    assert "run_all" not in j and "test-proposal" not in j
+assert "pip install" not in pub_job and "pip install" not in st_job
+assert "NVIDIA" not in st_job and "NVIDIA" not in pub_job and "secrets." not in pub_job and "secrets." not in st_job
+assert "contents: read" in ops_job and "contents: write" not in ops_job
+assert "contents: write" in pub_job and "pull-requests: write" in pub_job and "needs.test.result == 'success'" in pub_job
+assert "contents: write" in st_job and "pull-requests" not in st_job
+for j in (ops_job, st_job, test_job, pub_job):
+    assert "persist-credentials: false" in j
+
+# ---- (e) live.py's import closure is computed with ast and denied, whatever the allowlist says
+cl = B.live_closure(WORK)
+for m in ("live.py", "config.py", "kalshi.py", "core.py", "strategy.py"):
+    assert m in cl, (m, cl)
+for m in cl:
+    assert B.protected(m), "imported by live.py, must be protected: " + m
+fake = os.path.join(OUT, "closure"); os.makedirs(os.path.join(fake, "tbcommon")); os.makedirs(os.path.join(fake, "research"))
+open(os.path.join(fake, "live.py"), "w").write("import os\nimport freshness\nfrom tbcommon import clock\n"
+                                              "def f():\n    import importlib\n    importlib.import_module('research.micro')\n")
+open(os.path.join(fake, "freshness.py"), "w").write("from marks import x\n")
+open(os.path.join(fake, "marks.py"), "w").write("x = 1\n")
+open(os.path.join(fake, "check.py"), "w").write("x = 1\n")
+open(os.path.join(fake, "tbcommon", "__init__.py"), "w").write("")
+open(os.path.join(fake, "tbcommon", "clock.py"), "w").write("from . import http\n")
+open(os.path.join(fake, "tbcommon", "http.py"), "w").write("")
+open(os.path.join(fake, "research", "micro.py"), "w").write("")
+assert B.live_closure(fake) == ["freshness.py", "live.py", "marks.py", "research/micro.py", "tbcommon/__init__.py",
+                                "tbcommon/clock.py", "tbcommon/http.py"], B.live_closure(fake)
+_root = B.ROOT
+B.ROOT = fake
+for m in ("freshness.py", "marks.py", "tbcommon/clock.py", "tbcommon/http.py", "research/micro.py"):
+    assert B.protected(m) == "imported by live.py", (m, B.protected(m))
+assert B.protected("check.py") is None, "not imported by live.py: still editable"
+os.remove(os.path.join(fake, "live.py"))
+B._CLOSURE.clear()
+assert B.live_closure(fake) is None and "fail closed" in B.protected("check.py"), "missing live.py: refuse all"
+open(os.path.join(fake, "live.py"), "w").write("def (:\n")
+B._CLOSURE.clear()
+assert "fail closed" in B.protected("check.py"), "unparsable live.py: refuse all"
+B.ROOT = _root
+B._CLOSURE.clear()
 
 
 def d(a, b=None, extra=""):
@@ -155,6 +199,8 @@ def fake_run(cmd, cwd=None, env=None, timeout=300, input_text=None):
 
 B.run = fake_run
 st = B.check()
+assert all("--branch" in c and c[c.index("--branch") + 1] == "main" for c in calls if c[:3] == ["gh", "run", "list"]), "S2: main only"
+assert B.judge_workflow(hourly, [dict(runrec(5, concl="failure"), headBranch="feature")], T)["state"] == "no-runs"
 saved = json.load(open(os.path.join(B.STATUS_DIR, "status.json")))
 for k in ("schema", "generated_at", "generated_at_la_paz", "repository", "key_present", "workflows", "data", "problems",
           "errors", "ai", "note"):
@@ -240,6 +286,37 @@ try:
 except RuntimeError:
     assert len(api3.posts) == 4, "limited retries"
 
+class Clock(object):
+    def __init__(self):
+        self.t = 0.0
+
+    def __call__(self):
+        return self.t
+
+
+clk = Clock()
+timeouts = []
+
+
+def slow_post(url, headers, body, timeout):
+    timeouts.append(timeout); clk.t += timeout
+    return 0, {}, "timeout"
+
+
+api4 = FakeAPI(ALL); B.http_get, B.http_post = api4.get, slow_post
+ai4 = B.AI(key="k123456789", sleep=lambda w: setattr(clk, "t", clk.t + w), clock=clk)
+try:
+    ai4.ask("diagnose", "s", "u"); raise SystemExit("time budget not enforced")
+except RuntimeError as e:
+    assert "budget" in str(e) or "HTTP" in str(e)
+assert timeouts and max(timeouts) <= B.AI_REQUEST_SECONDS == 90, timeouts
+assert clk.t <= B.AI_TOTAL_SECONDS == 360, clk.t
+try:
+    ai4.ask("diagnose", "s", "u"); raise SystemExit("time budget not enforced")
+except RuntimeError as e:
+    assert "budget" in str(e)
+B.http_get, B.http_post = api.get, api.post
+
 # ---- issue logic
 assert B.issue_action(2, []) == ("create", None, [])
 assert B.issue_action(2, [dict(number=7)]) == ("update", 7, [])
@@ -281,6 +358,23 @@ assert st["issue"] == "close" and st["ai"]["task"] == "check-summary" and st["ai
 assert any(c[:3] == ["gh", "issue", "close"] and "5" in c for c in calls)
 assert json.load(open(os.path.join(B.STATUS_DIR, "status.json")))["ai"]["model"] == "meta/llama-3.1-8b-instruct"
 
+def failing_issue_run(cmd, cwd=None, env=None, timeout=300, input_text=None):
+    if cmd[:3] in (["gh", "issue", "create"], ["gh", "issue", "edit"], ["gh", "issue", "close"]):
+        return 1, "", "HTTP 403: Resource not accessible by integration"
+    return issue_run(cmd, cwd, env, timeout, input_text)
+
+
+B.run = failing_issue_run
+OPEN_ISSUES[:] = []
+fst0 = dict(generated_at="x", generated_at_la_paz="2026-11-26 14:00", key_present=False, workflows=[], data=[],
+            problems=["live20.yml: failed"], errors=[])
+assert B.sync_issue(fst0, "t") == "error" and any("could not create its issue" in p for p in fst0["problems"])
+OPEN_ISSUES[:] = [dict(number=5, title="old")]
+fst0["problems"] = []
+assert B.sync_issue(fst0, "t") == "error" and any("could not close issue #5" in p for p in fst0["problems"])
+OPEN_ISSUES[:] = []
+B.run = issue_run
+
 # ---- rerun: allowlist, newest run only, first attempt, recent, never twice
 assert "live20.yml" in B.RERUN_ALLOW and "plan19.yml" in B.RERUN_ALLOW and "tradebot-settle.yml" in B.RERUN_ALLOW
 for never in ("plan10.yml", "plan15.yml", "plan16.yml", "plan17.yml", "plan18.yml", "plan20.yml", "backup-ai.yml",
@@ -307,32 +401,52 @@ out = B.rerun(fake_st)
 assert [c["run_id"] for c in out] == [21] and ["gh", "run", "rerun", "21", "--failed"] in calls
 assert B.rerun(fake_st) == [], "never the same run twice"
 assert json.load(open(os.path.join(B.STATUS_DIR, "reruns.json")))[0]["run_id"] == 21
+def failing_rerun(cmd, cwd=None, env=None, timeout=300, input_text=None):
+    if cmd[:3] == ["gh", "run", "rerun"]:
+        calls.append(list(cmd)); return 1, "", "HTTP 403"
+    return fake_run(cmd, cwd, env, timeout, input_text)
+
+
+B.run = failing_rerun
+fst1 = dict(generated_at=None, workflows=[wrow("probe18.yml", runrec(32, concl="failure"), runrec(32, concl="failure"))], problems=[])
+out = B.rerun(fst1)
+assert out and out[0]["ok"] is False and any("re-run of probe18.yml run 32 failed" in p for p in fst1["problems"])
+# S4: rerun needs no AI, so main() re-runs without the key
+B.run = fake_run
+GH["live20.yml"] = [runrec(33, concl="failure", ago_min=20)]
+B.WORKFLOW_DIR = wfdir
+del calls[:]
+assert B.main(["rerun"]) == 0 and ["gh", "run", "rerun", "33", "--failed"] in calls, "rerun without NVIDIA_API_KEY"
 open(os.path.join(root, "kill.txt"), "w").close()
 assert B.kill_present() and B.rerun(dict(workflows=[wrow("live20.yml", runrec(31, concl="failure"), runrec(31, concl="failure"))])) == []
 os.remove(os.path.join(root, "kill.txt"))
 
 
-# ---- fix: a real throwaway git repository with a bare "origin"
-def git(args, cwd):
-    r = subprocess.run(["git"] + args, cwd=cwd, capture_output=True, text=True)
+# ---- fix: propose (operate job), test (no token), publish (no proposed code run), on throwaway git repositories
+def git(args, cwd, env=None):
+    r = subprocess.run(["git"] + args, cwd=cwd, capture_output=True, text=True, env=env)
     assert r.returncode == 0, (args, r.stderr)
     return r.stdout
 
 
+ID = ["-c", "user.name=t", "-c", "user.email=t@t"]
 repo, bare = os.path.join(OUT, "repo"), os.path.join(OUT, "origin.git")
 os.makedirs(os.path.join(repo, "tests")); os.makedirs(os.path.join(repo, "research"))
 git(["init", "-q", "--bare", bare], OUT)
+git(["symbolic-ref", "HEAD", "refs/heads/main"], bare)
 git(["init", "-q", "-b", "main"], repo)
 open(os.path.join(repo, "freshness.py"), "w").write("def f():\n    return 1 / 0\n")
 open(os.path.join(repo, "live.py"), "w").write("X = 1\n")
+open(os.path.join(repo, ".gitignore"), "w").write("*.log\n")
 open(os.path.join(repo, "tests", "run_all.py"), "w").write(
     "import os, sys\nassert not any('TOKEN' in k or 'NVIDIA' in k for k in os.environ), 'secret in test env'\n"
     "sys.path.insert(0, os.getcwd())\nimport freshness\nprint('All tests passed', freshness.f())\n")
-git(["-c", "user.name=t", "-c", "user.email=t@t", "add", "-A"], repo)
-git(["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "start"], repo)
+git(ID + ["add", "-A"], repo)
+git(ID + ["commit", "-q", "-m", "start"], repo)
 git(["remote", "add", "origin", bare], repo)
 git(["push", "-q", "origin", "main"], repo)
 B.ROOT = repo
+B._CLOSURE.clear()
 B.STATUS_DIR = os.path.join(OUT, "status_fix")
 
 
@@ -340,16 +454,17 @@ def commit_at(msg, when):
     open(os.path.join(repo, "note.txt"), "a").write(msg + "\n")
     env = dict(os.environ, GIT_COMMITTER_DATE=B.iso(when), GIT_AUTHOR_DATE=B.iso(when))
     git(["add", "-A"], repo)
-    subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", msg], cwd=repo, env=env, check=True)
+    subprocess.run(["git"] + ID + ["commit", "-q", "-m", msg], cwd=repo, env=env, check=True)
     git(["push", "-q", "origin", "main"], repo)
 
 
 GOOD = "CAUSE: division by zero in f\n```diff\ndiff --git a/freshness.py b/freshness.py\n--- a/freshness.py\n+++ b/freshness.py\n@@ -1,2 +1,2 @@\n def f():\n-    return 1 / 0\n+    return 1\n```\n"
 BAD = "CAUSE: x\n```diff\ndiff --git a/live.py b/live.py\n--- a/live.py\n+++ b/live.py\n@@ -1 +1 @@\n-X = 1\n+X = 2\n```\n"
-PRS, PR_CREATES = [], []
+PRS, PR_CREATES, ALLCMDS = [], [], []
 
 
 def fix_run(cmd, cwd=None, env=None, timeout=300, input_text=None):
+    ALLCMDS.append(list(cmd))
     if cmd[0] == "gh":
         calls.append(list(cmd))
         if cmd[:3] == ["gh", "pr", "list"]:
@@ -360,13 +475,17 @@ def fix_run(cmd, cwd=None, env=None, timeout=300, input_text=None):
         if cmd[:3] == ["gh", "run", "view"]:
             return 0, 'Traceback\n  File "/home/runner/work/tradebot/tradebot/freshness.py", line 2, in f\nZeroDivisionError\n', ""
         return 0, "", ""
-    return real_run(cmd, cwd=cwd or repo, env=env, timeout=timeout, input_text=input_text)
+    return real_run(cmd, cwd=cwd or B.ROOT, env=env, timeout=timeout, input_text=input_text)
 
 
 B.run = fix_run
 os.environ["GH_TOKEN"] = "ghs_faketoken1234567890abcdef"
-fst = dict(workflows=[dict(file="live20.yml", state="failed", latest_completed=dict(id=41), latest=dict(id=41)),
-                      dict(file="plan19.yml", state="failed", latest_completed=dict(id=42), latest=dict(id=42))])
+fst = dict(workflows=[dict(file="live20.yml", state="failed", latest_completed=dict(id=41, event="schedule"), latest=dict(id=41)),
+                      dict(file="plan19.yml", state="failed", latest_completed=dict(id=42, event="workflow_dispatch"), latest=dict(id=42)),
+                      dict(file="probe18.yml", state="failed", latest_completed=dict(id=43, event="push"), latest=dict(id=43)),
+                      dict(file="probe19.yml", state="failed", latest_completed=dict(id=44, event="schedule", branch="dev"), latest=dict(id=44))])
+# S2: only scheduled or hand-started runs on main
+assert [c["run_id"] for c in B.fix_candidates(fst, [], set())] == [41, 42]
 
 assert B.related_files('File "/home/runner/work/tradebot/tradebot/freshness.py", line 2\n  research/none.py tests/run_all.py', repo) == ["freshness.py", "tests/run_all.py"]
 commit_at("work\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>", T - timedelta(hours=3))
@@ -380,7 +499,6 @@ assert B.claude_active(T, "no-such-ref") is True, "fails closed"
 B.now = lambda: T + timedelta(hours=22)
 
 
-# the model proposes a change to live.py: refused, nothing pushed
 def answer(text):
     def post(url, headers, body, timeout):
         api.posts.append((url, headers, body))
@@ -388,36 +506,160 @@ def answer(text):
     return post
 
 
+prop = os.path.join(OUT, "proposal")
+# the model proposes a change to live.py: refused, nothing written
 B.http_post = answer(BAD)
-res = B.fix(fst, B.AI(key="k123456789", sleep=sleeps.append))
+res = B.fix(fst, B.AI(key="k123456789", sleep=sleeps.append), out_dir=prop)
 assert res.startswith("refused") and "live.py" in res, res
-assert not PR_CREATES and "backup-ai" not in git(["ls-remote", "--heads", bare], repo)
+assert not os.path.exists(prop) and not PR_CREATES
 assert api.posts[-1][2]["model"] == "qwen/qwen3-coder-480b-a35b-instruct", "code-fix tier"
 
-# next failing workflow (live20's run 41 is recorded as tried): a good diff becomes a branch and a pull request
+# next failing workflow (live20's run 41 is recorded as tried): a good diff is only PROPOSED in the operate job
 B.http_post = answer(GOOD)
-res = B.fix(fst, B.AI(key="k123456789", sleep=sleeps.append))
-assert res.startswith("pull request opened"), res
-cmd, body = PR_CREATES[-1]
-assert "--base" in cmd and "main" in cmd and "backup-ai/fix-42" in cmd and "backup-ai" in cmd
-assert "Do not merge without review" in body and "qwen/qwen3-coder-480b-a35b-instruct" in body
-assert "backup-ai-workflow: plan19.yml" in body and "All tests passed" in body and "exit 0" in body
-assert "[plan19.yml]" in cmd[cmd.index("--title") + 1] and cmd[cmd.index("--title") + 1].startswith("Backup AI fix proposal: ")
-assert "backup-ai/fix-42" in git(["ls-remote", "--heads", bare], repo)
-assert git(["rev-parse", "--abbrev-ref", "HEAD"], repo).strip() == "main" and "1 / 0" in open(os.path.join(repo, "freshness.py")).read(), \
-    "main's working tree is untouched"
-assert "Co-Authored-By: Claude" not in git(["log", "-1", "--format=%B", "backup-ai/fix-42"], repo)
-assert not any(c[:3] == ["gh", "pr", "merge"] for c in calls)
+del ALLCMDS[:]
+res = B.fix(fst, B.AI(key="k123456789", sleep=sleeps.append), out_dir=prop)
+assert res.startswith("proposed for testing on branch backup-ai/fix-42"), res
+meta = json.load(open(os.path.join(prop, "meta.json")))
+assert meta["paths"] == ["freshness.py"] and meta["branch"] == "backup-ai/fix-42" and meta["workflow"] == "plan19.yml"
+assert meta["model"] == "qwen/qwen3-coder-480b-a35b-instruct" and meta["base_sha"] == git(["rev-parse", "HEAD"], repo).strip()
+assert not any("run_all.py" in " ".join(c) or c[:2] == ["git", "commit"] or "push" in c or c[:3] == ["gh", "pr", "create"]
+               or (c[:2] == ["git", "apply"] and "--check" not in c) for c in ALLCMDS), "operate runs and applies nothing"
+assert "1 / 0" in open(os.path.join(repo, "freshness.py")).read() and git(["status", "--porcelain"], repo) == "", \
+    "the operate job's work tree is untouched"
+assert "backup-ai" not in git(["ls-remote", "--heads", bare], repo) and not PR_CREATES
 tried = json.load(open(os.path.join(B.STATUS_DIR, "fixes.json")))
 assert [t["run_id"] for t in tried] == [41, 42] and tried[1]["model"] == "qwen/qwen3-coder-480b-a35b-instruct"
-# never twice, and at most one open pull request per workflow
+assert B.fix(fst, B.AI(key="k123456789", sleep=sleeps.append), out_dir=os.path.join(OUT, "p2")) == "nothing to fix"
+
+
+def checkout(name, sha=None):
+    d = os.path.join(OUT, name)
+    git(["clone", "-q", bare, d], OUT)
+    if sha:
+        git(["checkout", "-q", sha], d)
+    return d
+
+
+# test job: a fresh checkout at the base commit, no token in the tests' environment
+res_dir = os.path.join(OUT, "result")
+tj = checkout("testjob", meta["base_sha"])
+assert B.test_proposal(prop, res_dir, root=tj) == 0, open(os.path.join(res_dir, "result.json")).read()
+result = json.load(open(os.path.join(res_dir, "result.json")))
+assert result["ok"] and result["tests_rc"] == 0 and result["files"] == ["freshness.py"] and "All tests passed" in result["tail"]
+
+# (b) tests that change another file (tracked, untracked or ignored) are refused
+for k, extra in enumerate(("open('extra.txt','w').write('x')\n", "open('debug.log','w').write('x')\n",
+                           "open('live.py','a').write('#')\n")):
+    cj = checkout("changes%d" % k)
+    open(os.path.join(cj, "tests", "run_all.py"), "a").write(extra)
+    git(ID + ["commit", "-q", "-am", "tests write a file"], cj)
+    r_dir = os.path.join(OUT, "r%d" % k)
+    assert B.test_proposal(prop, r_dir, root=cj) == 1, extra
+    rr = json.load(open(os.path.join(r_dir, "result.json")))
+    assert not rr["ok"] and any("outside the diff" in p for p in rr["problems"]) and len(rr["files"]) == 2, rr
+# failing tests are not passed on
+fj = checkout("failing")
+open(os.path.join(fj, "tests", "run_all.py"), "a").write("raise SystemExit(1)\n")
+git(ID + ["commit", "-q", "-am", "fail"], fj)
+assert B.test_proposal(prop, os.path.join(OUT, "rf"), root=fj) == 1
+# the 300 s limit: the whole process group is stopped
+sj = checkout("slow")
+open(os.path.join(sj, "tests", "run_all.py"), "w").write("import subprocess, time\nsubprocess.Popen(['sleep', '60'])\ntime.sleep(60)\n")
+import time as _time
+t0 = _time.time()
+rc, outp = B.run_tests(sj, timeout=2)
+assert rc == 124 and _time.time() - t0 < 20 and "limit" in outp
+assert B.TEST_SECONDS == 300
+# a tampered proposal is refused in the test and publish jobs (hash, path rules)
+bad_prop = os.path.join(OUT, "bad_prop"); shutil.copytree(prop, bad_prop)
+open(os.path.join(bad_prop, "fix.diff"), "w").write(BAD.split("```diff\n")[1].split("```")[0])
+_d, _m, probs = B.load_proposal(bad_prop)
+assert any("hash" in p for p in probs) and any("live.py" in p for p in probs)
+assert B.test_proposal(bad_prop, os.path.join(OUT, "rb"), root=checkout("tamper")) == 1
+
+# publish job: fresh checkout, no proposed code run, no hooks, exactly the diff's paths, never merged
+pj = checkout("publish", meta["base_sha"])
+hook = os.path.join(pj, ".git", "hooks", "pre-commit")
+open(hook, "w").write("#!/bin/sh\ntouch HOOK_RAN\n"); os.chmod(hook, 0o755)
+open(os.path.join(pj, ".git", "hooks", "pre-push"), "w").write("#!/bin/sh\ntouch PUSH_HOOK_RAN\nexit 1\n")
+os.chmod(os.path.join(pj, ".git", "hooks", "pre-push"), 0o755)
+assert B.publish(prop, res_dir, root=pj) == 0
+assert not os.path.exists(os.path.join(pj, "HOOK_RAN")) and not os.path.exists(os.path.join(pj, "PUSH_HOOK_RAN")), "hooks never run"
+cmd, body = PR_CREATES[-1]
+assert "--base" in cmd and "main" in cmd and "backup-ai/fix-42" in cmd and "backup-ai" in cmd
+assert "Do not merge without review" in body and "qwen/qwen3-coder-480b-a35b-instruct" in body and "Files tab" in body
+assert "backup-ai-workflow: plan19.yml" in body and "All tests passed" in body and "passed, exit 0" in body
+assert "freshness.py | 2" in body, "git show --stat of the real commit"
+assert "[plan19.yml]" in cmd[cmd.index("--title") + 1] and cmd[cmd.index("--title") + 1].startswith("Backup AI fix proposal: ")
+assert "backup-ai/fix-42" in git(["ls-remote", "--heads", bare], repo)
+assert git(["diff", "--name-only", meta["base_sha"], "origin/backup-ai/fix-42"], pj).split() == ["freshness.py"]
+assert git(["log", "-1", "--format=%an %ae", "origin/backup-ai/fix-42"], pj).strip() == "tradebot-runner tradebot-runner@users.noreply.github.com"
+assert "Co-Authored-By: Claude" not in git(["log", "-1", "--format=%B", "origin/backup-ai/fix-42"], pj)
+git(["fetch", "-q", "origin"], repo)
+assert "1 / 0" in git(["show", "origin/main:freshness.py"], repo), "main is never changed"
+assert not any(c[:3] == ["gh", "pr", "merge"] for c in calls)
 n = len(PR_CREATES)
-assert B.fix(fst, B.AI(key="k123456789", sleep=sleeps.append)) == "nothing to fix" and len(PR_CREATES) == n
-assert B.fix_candidates(dict(workflows=[dict(file="plan19.yml", state="failed", latest_completed=dict(id=99))]), [],
+assert B.publish(prop, res_dir, root=checkout("publish2", meta["base_sha"])) == 1 and len(PR_CREATES) == n, "branch exists"
+assert B.publish(bad_prop, res_dir, root=checkout("publish3", meta["base_sha"])) == 1 and len(PR_CREATES) == n
+prop77 = os.path.join(OUT, "prop77"); shutil.copytree(prop, prop77)
+m77 = dict(meta, run_id=77, branch="backup-ai/fix-77"); json.dump(m77, open(os.path.join(prop77, "meta.json"), "w"))
+p4 = checkout("publish4"); git(ID + ["commit", "-q", "--allow-empty", "-m", "moved on"], p4)
+assert B.publish(prop77, res_dir, root=p4) == 1 and len(PR_CREATES) == n, "only on the base commit"
+assert "fix-77" not in git(["ls-remote", "--heads", bare], repo)
+# at most one open pull request per workflow
+assert B.fix_candidates(dict(workflows=[dict(file="plan19.yml", state="failed", latest_completed=dict(id=99, event="schedule"))]), [],
                         {"plan19.yml"}) == []
 PRS[:] = [dict(number=1, title="Backup AI fix proposal: [live20.yml] x", body="", headRefName="backup-ai/fix-1")]
 assert B.open_fix_workflows() == {"live20.yml"}
 assert B.fix(fst, B.AI(key="")) == "skipped: NVIDIA_API_KEY is missing"
+
+# ---- (c) pushes to main: ops/status/ only, exactly one runner commit, no hooks, re-checked after each rebase
+src = os.path.join(OUT, "status_src"); os.makedirs(src)
+open(os.path.join(src, "status.json"), "w").write('{"a": 1}\n')
+open(os.path.join(src, "evil.py"), "w").write("x\n")             # never copied
+sp = checkout("status_job")
+open(os.path.join(sp, ".git", "hooks", "pre-commit"), "w").write("#!/bin/sh\ntouch HOOK_RAN\n")
+os.chmod(os.path.join(sp, ".git", "hooks", "pre-commit"), 0o755)
+other = checkout("other_writer")                                  # main moves on between commit and push
+open(os.path.join(other, "data.txt"), "w").write("x\n")
+git(["add", "-A"], other); git(ID + ["commit", "-q", "-m", "data"], other)
+pushes = []
+
+
+def racing_run(cmd, cwd=None, env=None, timeout=300, input_text=None):
+    if "push" in cmd and "HEAD:refs/heads/main" in cmd and not pushes:
+        pushes.append(1); git(["push", "-q", "origin", "main"], other)     # someone else pushed first
+    return real_run(cmd, cwd=cwd, env=env, timeout=timeout, input_text=input_text)
+
+
+B.run = racing_run
+assert B.push_status(src, cwd=sp, sleep=lambda s: None) == 0
+assert not os.path.exists(os.path.join(sp, "HOOK_RAN")) and not os.path.exists(os.path.join(sp, "ops", "status", "evil.py"))
+top = git(["log", "-1", "--format=%an %ae", "origin/main"], sp).strip()
+assert top == "tradebot-runner tradebot-runner@users.noreply.github.com", top
+assert git(["diff", "--name-only", "origin/main~1", "origin/main"], sp).split() == ["ops/status/status.json"]
+assert "data.txt" in git(["ls-tree", "--name-only", "origin/main"], sp), "rebased onto the other push"
+assert B.push_status(src, cwd=sp) == 0, "nothing new"
+# an extra local commit, a non-status path, or another author: refused
+open(os.path.join(src, "status.json"), "w").write('{"a": 2}\n')
+open(os.path.join(sp, "freshness.py"), "a").write("# x\n")
+assert B.push_status(src, cwd=sp) == 1, "dirty file outside ops/status"
+git(["checkout", "-q", "--", "freshness.py"], sp)
+git(ID + ["-c", "core.hooksPath=/dev/null", "commit", "-q", "--allow-empty", "-m", "extra local commit"], sp)
+assert B.push_status(src, cwd=sp) == 1, "two commits ahead"
+assert B.push_guard(sp) == ["expected exactly one new commit, found 2"], B.push_guard(sp)
+head_before = git(["rev-parse", "origin/main"], sp)
+assert git(["ls-remote", bare, "refs/heads/main"], sp).split()[0] == head_before.strip(), "nothing pushed"
+gj = checkout("guard")
+open(os.path.join(gj, "x.py"), "w").write("x\n")
+git(["add", "-A"], gj)
+git(["-c", "user.name=tradebot-runner", "-c", "user.email=tradebot-runner@users.noreply.github.com", "commit", "-q", "-m", "x"], gj)
+assert any("outside ops/status" in r for r in B.push_guard(gj))
+gk = checkout("guard2")
+os.makedirs(os.path.join(gk, "ops", "status"), exist_ok=True)
+open(os.path.join(gk, "ops", "status", "s.json"), "w").write("{}\n")
+git(["add", "-A"], gk); git(ID + ["commit", "-q", "-m", "s"], gk)
+assert any("not the runner" in r for r in B.push_guard(gk)), "another identity"
 os.environ.pop("GH_TOKEN", None)
 B.run = real_run
 

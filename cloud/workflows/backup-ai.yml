@@ -1,11 +1,20 @@
 # Backup AI operator (ops/backup_ai.py, ops/README.md; approved by the user 2026-11-26 13:40). Every 3 hours it checks
-# the latest run of every workflow here and the age of the research data the jobs commit, asks a model on NVIDIA's
-# hosted API (integrate.api.nvidia.com; key only from the repository secret NVIDIA_API_KEY) for a plain-English report,
-# keeps ONE GitHub issue labelled backup-ai open while anything is wrong (GitHub e-mails it), re-runs an allowlisted
-# failed research or paper-logging run once, and, only when Claude has made no commit for 24 hours, proposes a fix as a
-# pull request for review. It never merges, never runs live.py, never touches paper.db, live.db or keys, and commits
-# only ops/status/** on main (it refuses to commit anything else). Without the secret it does the non-AI check only.
+# the latest run on main of every workflow here and the age of the research data the jobs commit, asks a model on
+# NVIDIA's hosted API (integrate.api.nvidia.com; key only from the repository secret NVIDIA_API_KEY) for a plain-English
+# report, keeps ONE GitHub issue labelled backup-ai open while anything is wrong (GitHub e-mails it), re-runs an
+# allowlisted failed research or paper-logging run once, and, only when Claude has made no commit for 24 hours, proposes
+# a fix as a pull request for review. It never merges, never runs live.py, never touches paper.db, live.db or keys, and
+# commits only ops/status/** on main (it refuses anything else). Without the secret: check, rerun and the issue only.
 # Advice only: it changes no rule, limit or lock. The PC is not reachable from here.
+#
+# Four jobs, so that code written by the model never runs where a token or the key can be reached:
+#   operate  key + GitHub token (contents read, issues/actions write): check, report, rerun; a fix is only PROPOSED
+#            (diff + metadata uploaded as an artifact), never applied or run here.
+#   status   contents write, no key: commits ops/status/ to main (one runner commit, ops/status/ only, no hooks).
+#   test     permissions: {} and no secret: applies the proposed diff, runs the tests (300 s), and fails unless the
+#            changed files are exactly the diff's own files.
+#   publish  contents + pull-requests write, runs nothing from the diff: fresh checkout, re-check, apply, stage the
+#            diff's paths only, commit without hooks, push backup-ai/fix-<run id>, open the pull request. Never merges.
 name: Backup AI operator
 on:
   schedule:
@@ -21,15 +30,19 @@ on:
 concurrency:
   group: tradebot-backup-ai   # its own group: never cancels or queues behind a scan, settle or plan
   cancel-in-progress: false
-permissions:
-  contents: write
-  issues: write
-  pull-requests: write
-  actions: write
+permissions: {}
 jobs:
   operate:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: read
+      issues: write
+      actions: write
+      pull-requests: read
+    outputs:
+      proposed: ${{ steps.op.outputs.proposed }}
+      sha: ${{ steps.op.outputs.sha }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09   # v5.1.0
         timeout-minutes: 5
@@ -37,45 +50,134 @@ jobs:
           ref: main
           fetch-depth: 0          # history: data freshness and the "Claude committed in 24 hours" check
           filter: blob:none       # history without old file contents (the data folders are large)
-          persist-credentials: false   # no token on disk: the tests of a fix proposal run its code
+          persist-credentials: false
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1   # v6.3.0
         timeout-minutes: 3
         with:
           python-version: "3.12"
       - run: python -m pip install --disable-pip-version-check requests==2.32.3
         timeout-minutes: 3
-      - name: Operate (check, report, rerun, fix)
+      - name: Operate (check, report, rerun; fix = propose only)
+        id: op
         timeout-minutes: 15
         env:
           TZ: America/La_Paz
           PYTHONIOENCODING: utf-8
+          PYTHONDONTWRITEBYTECODE: "1"
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
           MODE: ${{ inputs.mode || 'all' }}
+          BACKUP_AI_PROPOSAL: ${{ runner.temp }}/proposal
         run: |
           case "$MODE" in check|report|rerun|fix|all) ;; *) echo "unknown mode $MODE"; exit 1 ;; esac
           python ops/backup_ai.py "$MODE"
-      - name: Save ops/status (and nothing else)
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          if [ -f "$BACKUP_AI_PROPOSAL/fix.diff" ]; then echo "proposed=true" >> "$GITHUB_OUTPUT"; fi
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4.6.2
         if: always()
+        with:
+          name: backup-ai-status
+          path: ops/status/
+          if-no-files-found: ignore
+          retention-days: 7
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4.6.2
+        if: steps.op.outputs.proposed == 'true'
+        with:
+          name: backup-ai-proposal
+          path: ${{ runner.temp }}/proposal/
+          if-no-files-found: error
+          retention-days: 14
+  status:
+    needs: operate
+    if: always() && needs.operate.result != 'skipped'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09   # v5.1.0
+        timeout-minutes: 5
+        with:
+          ref: main
+          fetch-depth: 0
+          filter: blob:none
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093   # v4.3.0
+        timeout-minutes: 3
+        with:
+          name: backup-ai-status
+          path: ${{ runner.temp }}/status
+      - name: Save ops/status (one runner commit, ops/status/ only)
         timeout-minutes: 5
         env:
+          PYTHONDONTWRITEBYTECODE: "1"
           GH_TOKEN: ${{ github.token }}
-        run: |
-          git checkout -q main 2>/dev/null || true
-          others=$(git status --porcelain --untracked-files=all | grep -v -E '^.. "?ops/status/' || true)
-          if [ -n "$others" ]; then echo "refusing to commit: files outside ops/status changed:"; echo "$others"; exit 1; fi
-          find ops/status -name '*.tmp' -type f -delete 2>/dev/null || true
-          git config user.name "tradebot-runner"
-          git config user.email "tradebot-runner@users.noreply.github.com"
-          [ -d ops/status ] || { echo "no status written"; exit 0; }
-          git add -A -- ops/status
-          git diff --cached --name-only | grep -v -E '^ops/status/' && { echo "refusing: staged files outside ops/status"; exit 1; }
-          git commit -q -m "Backup AI status $(date -u +%FT%H:%MZ)" || { echo "nothing new"; exit 0; }
-          auth="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
-          for i in 1 2 3 4 5 6; do
-            git -c http.https://github.com/.extraheader="$auth" push -q origin HEAD:main && exit 0
-            sleep $((i * 10))
-            git -c http.https://github.com/.extraheader="$auth" pull -q --rebase origin main || { git rebase --abort 2>/dev/null || true; }
-          done
-          exit 1
+        run: python3 ops/backup_ai.py push-status "$RUNNER_TEMP/status"
+  test:
+    needs: operate
+    if: needs.operate.outputs.proposed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions: {}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09   # v5.1.0
+        timeout-minutes: 5
+        with:
+          ref: ${{ needs.operate.outputs.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1   # v6.3.0
+        timeout-minutes: 3
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --disable-pip-version-check requests==2.32.3
+        timeout-minutes: 3
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093   # v4.3.0
+        timeout-minutes: 3
+        with:
+          name: backup-ai-proposal
+          path: ${{ runner.temp }}/proposal
+      - name: Re-check, apply, run the tests (300 s), compare the changed files
+        timeout-minutes: 7
+        env:
+          PYTHONIOENCODING: utf-8
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python ops/backup_ai.py test-proposal "$RUNNER_TEMP/proposal" "$RUNNER_TEMP/result"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4.6.2
+        if: always()
+        with:
+          name: backup-ai-test-result
+          path: ${{ runner.temp }}/result/
+          if-no-files-found: ignore
+          retention-days: 14
+  publish:
+    needs: [operate, test]
+    if: needs.operate.outputs.proposed == 'true' && needs.test.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09   # v5.1.0
+        timeout-minutes: 5
+        with:
+          ref: ${{ needs.operate.outputs.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093   # v4.3.0
+        timeout-minutes: 3
+        with:
+          name: backup-ai-proposal
+          path: ${{ runner.temp }}/proposal
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093   # v4.3.0
+        timeout-minutes: 3
+        with:
+          name: backup-ai-test-result
+          path: ${{ runner.temp }}/result
+      - name: Branch, commit (no hooks), push, open the pull request (never merged)
+        timeout-minutes: 5
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: python3 ops/backup_ai.py publish "$RUNNER_TEMP/proposal" "$RUNNER_TEMP/result"

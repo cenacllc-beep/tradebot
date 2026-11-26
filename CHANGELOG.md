@@ -2367,3 +2367,12 @@ unfamiliar codebase ... do not change functionality. only upgrade the code quali
   the dashboard"); the PC copy matched the pre-panel version (original in backups\code_pre_r95\). The 14:20 hourly run
   rebuilt dashboard.html with the panel. The code review found the panel fine (static links only). The backup AI
   itself stays off: the review found model-written code would run in a job holding the write token (fixes under way).
+- 15:00: backup AI review fixes (agents/code-reviewer.md findings M1-M3, S1-S6, N1): the workflow is split into four
+  jobs (operate: key, no proposed code run; status: commits only ops/status with hooks off and a one-commit,
+  ops/status-only push guard; test: no permissions, no secrets, 300 s, changed files must equal the diff's; publish:
+  applies and pushes a fix branch and PR, runs nothing from the diff, never merges); fixes limited to an allowlist plus
+  the deny list and live.py's import closure (worked out with ast; fails closed); runs read on main only; rerun works
+  without the key; model time capped (6 min, 90 s a request); gh failures reported. upload-artifact v4.6.2 and
+  download-artifact v4.3.0 SHA pins checked against GitHub's tags. The dashboard panel moved to the end of the page
+  (it pushed the verdict down and made test_ui's tooltip check flaky). All tests pass. A second review follows before
+  the job is switched on.
