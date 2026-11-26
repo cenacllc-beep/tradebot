@@ -7,7 +7,7 @@
  },
  "data": [
   {
-   "age_hours": 1.7,
+   "age_hours": 1.8,
    "limit_hours": 6,
    "newest_commit_at": "2026-11-26T21:30:45Z",
    "path": "research/data/live20",
@@ -15,7 +15,7 @@
    "state": "ok"
   },
   {
-   "age_hours": 19.6,
+   "age_hours": 19.7,
    "limit_hours": 3,
    "newest_commit_at": "2026-11-26T03:34:50Z",
    "path": "research/data/plan19",
@@ -23,7 +23,7 @@
    "state": "inactive"
   },
   {
-   "age_hours": 3.7,
+   "age_hours": 3.8,
    "limit_hours": null,
    "newest_commit_at": "2026-11-26T19:32:10Z",
    "path": "research/data/plan20",
@@ -31,7 +31,7 @@
    "state": "info"
   },
   {
-   "age_hours": 3.7,
+   "age_hours": 3.8,
    "limit_hours": null,
    "newest_commit_at": "2026-11-26T19:32:10Z",
    "path": "research/results",
@@ -48,13 +48,13 @@
   }
  ],
  "errors": [],
- "generated_at": "2026-11-26T23:13:43Z",
- "generated_at_la_paz": "2026-11-26 19:13",
+ "generated_at": "2026-11-26T23:19:03Z",
+ "generated_at_la_paz": "2026-11-26 19:19",
  "issue": "none",
  "key_present": true,
  "note": "Reads GitHub only; the PC is not reachable from here.",
  "problems": [],
- "report_text": "",
+ "report_text": "**Status Report**\n\n**What works:**  \n- `backup-ai.yml` just started (age\u202f0\u202fmin, limit\u202f360\u202fmin).  \n- `live20.yml`, `tradebot-scan.yml`, `tradebot-settle.yml`, `trial-scan-backstop.yml` and `trial` data are all `ok` and within their time limits.  \n- `research/data/live20` is fresh (1.8\u202fh old, 6\u202fh limit).  \n\n**Stale or over limit:**  \n- `live20.yml`: running 433\u202fmin vs 180\u202fmin limit \u2192 likely exceeded allocated time; may be stuck or auto\u2011cancel didn\u2019t trigger. *Next step:* monitor the run to completion; no PC involvement.  \n- `plan19.yml`: manual\u2011only for ~6.7\u202fdays \u2192 designed for manual trigger or forgotten. *Next step:* use the GitHub Actions UI to trigger manually if needed.  \n- `research/data/plan19`: 19.7\u202fh old, limit 3\u202fh, state `inactive` \u2192 data window exceeded, marked inactive. *Next step:* refresh or re\u2011run the data pull when ready.  \n- `plan5-lip.yml`: `disabled` \u2192 intentionally off. *Next step:* re\u2011enable via repository settings if required.  \n- `plan10,15,16,17,18,probe18.yml`: manual\u2011only for 7\u201313\u202fdays \u2192 likely waiting for a manual start or paused. *Next step:* trigger manually via the GitHub UI or review the intended schedule.  \n\n**Note:** All issues are within the GitHub repository/Actions; the user\u2019s local PC is not involved.",
  "repository": "cenacllc-beep/tradebot",
  "schema": 1,
  "workflows": [
@@ -66,23 +66,23 @@
     "attempt": 1,
     "branch": "main",
     "conclusion": null,
-    "created_at": "2026-11-26T23:13:33Z",
+    "created_at": "2026-11-26T23:18:44Z",
     "event": "workflow_dispatch",
-    "id": 45909652394,
+    "id": 45910176226,
     "status": "in_progress",
     "title": "Backup AI operator",
-    "url": "https://github.com/cenacllc-beep/tradebot/actions/runs/45909652394"
+    "url": "https://github.com/cenacllc-beep/tradebot/actions/runs/45910176226"
    },
    "latest_completed": {
     "attempt": 1,
     "branch": "main",
     "conclusion": "success",
-    "created_at": "2026-11-26T23:08:05Z",
+    "created_at": "2026-11-26T23:13:33Z",
     "event": "workflow_dispatch",
-    "id": 45909084975,
+    "id": 45909652394,
     "status": "completed",
     "title": "Backup AI operator",
-    "url": "https://github.com/cenacllc-beep/tradebot/actions/runs/45909084975"
+    "url": "https://github.com/cenacllc-beep/tradebot/actions/runs/45909652394"
    },
    "limit_minutes": 360,
    "name": "Backup AI operator",
@@ -93,7 +93,7 @@
    "state": "running"
   },
   {
-   "age_minutes": 427,
+   "age_minutes": 433,
    "expected_max_gap_minutes": 60,
    "file": "live20.yml",
    "latest": {
@@ -127,7 +127,7 @@
    "state": "ok"
   },
   {
-   "age_minutes": 18567,
+   "age_minutes": 18573,
    "expected_max_gap_minutes": null,
    "file": "plan10.yml",
    "latest": {
@@ -159,7 +159,7 @@
    "state": "manual-only"
   },
   {
-   "age_minutes": 11370,
+   "age_minutes": 11376,
    "expected_max_gap_minutes": null,
    "file": "plan15.yml",
    "latest": {
@@ -191,7 +191,7 @@
    "state": "manual-only"
   },
   {
-   "age_minutes": 10795,
+   "age_minutes": 10800,
    "expected_max_gap_minutes": null,
    "file": "plan16.yml",
    "latest": {
@@ -223,7 +223,7 @@
    "state": "manual-only"
   },
   {
-   "age_minutes": 10794,
+   "age_minutes": 10799,
    "expected_max_gap_minutes": null,
    "file": "plan17.yml",
    "latest": {
@@ -255,7 +255,7 @@
    "state": "manual-only"
   },
   {
-   "age_minutes": 9614,
+   "age_minutes": 9619,
    "expected_max_gap_minutes": null,
    "file": "plan18.yml",
    "latest": {
@@ -287,7 +287,7 @@
    "state": "manual-only"
   },
   {
-   "age_minutes": 226,
+   "age_minutes": 231,
    "expected_max_gap_minutes": 60,
    "file": "plan19.yml",
    "latest": {
@@ -321,7 +321,7 @@
    "state": "running"
   },
   {
-   "age_minutes": 427,
+   "age_minutes": 432,
    "expected_max_gap_minutes": null,
    "file": "plan20.yml",
    "latest": {
@@ -367,7 +367,7 @@
    "state": "disabled"
   },
   {
-   "age_minutes": 11438,
+   "age_minutes": 11443,
    "expected_max_gap_minutes": null,
    "file": "probe18.yml",
    "latest": {
@@ -399,7 +399,7 @@
    "state": "manual-only"
   },
   {
-   "age_minutes": 1266,
+   "age_minutes": 1271,
    "expected_max_gap_minutes": null,
    "file": "probe19.yml",
    "latest": {
@@ -431,7 +431,7 @@
    "state": "manual-only"
   },
   {
-   "age_minutes": 551,
+   "age_minutes": 557,
    "expected_max_gap_minutes": 1230,
    "file": "tradebot-scan.yml",
    "latest": {
@@ -467,7 +467,7 @@
    "state": "ok"
   },
   {
-   "age_minutes": 1277,
+   "age_minutes": 1282,
    "expected_max_gap_minutes": 1200,
    "file": "tradebot-settle.yml",
    "latest": {
@@ -501,7 +501,7 @@
    "state": "ok"
   },
   {
-   "age_minutes": 566,
+   "age_minutes": 572,
    "expected_max_gap_minutes": 1260,
    "file": "trial-scan-backstop.yml",
    "latest": {
