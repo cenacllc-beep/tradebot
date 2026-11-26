@@ -2347,3 +2347,14 @@ unfamiliar codebase ... do not change functionality. only upgrade the code quali
 - tests/test_live20.py: one check assumed PLAN20 was not frozen; it now uses a missing identity record. All tests pass
   (test_gatelook failed once in a full run and passed alone and on the rerun: a same-second backup-name clash, left
   as is).
+
+## 2026-11-26 13:40 (La Paz) - backup AI approved (NVIDIA, on GitHub); Finviz and Polifly skipped
+- User: "Can we use finviz and polifly.io to improve our 15 min live betting accuracy and research? Also we need to add
+  a second ai provider to intelligently resume operations when claude is not available. We'll use Nvidia api but with
+  an automatic model selector". Checked: Finviz is a US-stock screener (futures 15-20 min delayed; export/API need the
+  paid Elite plan); Polifly has no public API or verifiable product description. Neither fits Kalshi's 15-minute
+  crypto, metals, energy and currency markets; the user chose to skip both.
+- Backup AI: the user first answered "All operations"; told plainly that an unattended model cannot be given real-money
+  operations, keys, locks, limits or rule changes (CLAUDE.md section 3 keeps those for the user alone), he chose "same
+  permissions as Claude minus anything with real money; fixes as pull requests only". Recorded in CLAUDE.md section 3.
+  Being built (ops/backup_ai.py, cloud/workflows/backup-ai.yml); code review before it is switched on.
