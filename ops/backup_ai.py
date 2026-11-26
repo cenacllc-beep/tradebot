@@ -727,6 +727,16 @@ PREFERENCES = {
 MAX_TOKENS = {"check-summary": 1200, "diagnose": 2000, "code-fix": 3000}
 
 
+def candidates(task, available):
+    """Every listed id that fits a task, best first: the preferred ids in order, then the family matches (sorted)."""
+    pref = PREFERENCES[task]
+    avail = [a for a in (available or []) if isinstance(a, str)]
+    out = [m for m in pref["ids"] if m in avail]
+    pat = re.compile(pref["pattern"], re.I)
+    out += [m for m in sorted(avail) if pat.search(m) and m not in out]
+    return out
+
+
 def pick(task, available):
     """The model id for a task from the ids the API lists: the first preferred id that is listed, else the first listed
     id matching the tier's family pattern, else None. Nothing is trusted until the API lists it."""
@@ -752,6 +762,13 @@ def http_post(url, headers, body, timeout):
     import requests
     r = requests.post(url, headers=headers, json=body, timeout=timeout)
     return r.status_code, r.headers, r.text
+
+
+class ApiError(RuntimeError):
+    """An HTTP failure; the message names the endpoint path (never the key or the body)."""
+    def __init__(self, code, url):
+        self.code = code
+        RuntimeError.__init__(self, "NVIDIA API answered HTTP %s on %s" % (code, url.split("/v1", 1)[-1] or url))
 
 
 class AI(object):
@@ -801,7 +818,7 @@ class AI(object):
                 if wait >= self.remaining() - 5:
                     raise RuntimeError("AI time budget (%d s) spent" % AI_TOTAL_SECONDS)
                 self.sleep(wait)
-        raise RuntimeError("NVIDIA API answered HTTP %s" % last)
+        raise ApiError(last, url)
 
     def models(self):
         if self._models is None:
@@ -816,14 +833,27 @@ class AI(object):
             raise RuntimeError("NVIDIA_API_KEY is missing")
         if self.calls >= self.max_calls:
             raise RuntimeError("AI call budget (%d) spent" % self.max_calls)
-        model = pick(task, self.models())
-        if not model:
+        cands = candidates(task, self.models())
+        if not cands:
             raise RuntimeError("no model for %s is listed by the API" % task)
-        self.calls += 1
-        body = dict(model=model, temperature=0.2, top_p=0.9, max_tokens=MAX_TOKENS[task], stream=False,
-                    messages=[dict(role="system", content=SYSTEM_RULES + "\n\n" + system),
-                              dict(role="user", content=redact(user))])
-        text = self._request(http_post, self.base + "/chat/completions", body)
+        # The catalogue lists some models that this key cannot call (HTTP 404 or 403 on chat): try the next one, up to 3.
+        text = None; model = None; err = None
+        for model in cands[:3]:
+            if self.calls >= self.max_calls:
+                break
+            self.calls += 1
+            body = dict(model=model, temperature=0.2, top_p=0.9, max_tokens=MAX_TOKENS[task], stream=False,
+                        messages=[dict(role="system", content=SYSTEM_RULES + "\n\n" + system),
+                                  dict(role="user", content=redact(user))])
+            try:
+                text = self._request(http_post, self.base + "/chat/completions", body)
+                break
+            except ApiError as e:
+                err = e
+                if e.code not in (404, 403, 400, 422):
+                    raise
+        if text is None:
+            raise err or RuntimeError("AI call budget (%d) spent" % self.max_calls)
         msg = json.loads(text)["choices"][0]["message"].get("content") or ""
         msg = re.sub(r"(?s)<think>.*?</think>", "", msg).strip()
         self.used.append(dict(task=task, model=model))

@@ -2410,3 +2410,7 @@ unfamiliar codebase ... do not change functionality. only upgrade the code quali
   alternative). tests/test_settings.py (fake gh; skipped on Windows). All tests pass.
 - Deployed to the PC 15:54: settings.py, run.bat, dashboard.py, tests\test_settings.py (originals of the changed files
   in backups\code_pre_r96\). The user installs gh (`winget install --id GitHub.cli`) and runs `gh auth login` himself.
+- 19:10: the user added the NVIDIA_API_KEY secret (GitHub's form). First report run (18:57 La Paz): key present, check
+  green (0 problems), but NVIDIA answered HTTP 404, so no AI report. NVIDIA's catalogue lists models that a given key
+  cannot call; ops/backup_ai.py now tries up to 3 listed candidates for a task when chat answers 404/403/400/422, and
+  its error names the endpoint path (never the key). Tests added; all pass.

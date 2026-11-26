@@ -320,6 +320,24 @@ try:
     B.AI(key="", sleep=sleeps.append).ask("diagnose", "s", "u"); raise SystemExit("ran without a key")
 except RuntimeError as e:
     assert "missing" in str(e)
+# a listed model this key cannot call (HTTP 404 on chat): the next candidate is tried; the error names the endpoint
+class Gone(FakeAPI):
+    def post(self, url, headers, body, timeout):
+        self.posts.append((url, headers, body))
+        if body["model"] == "deepseek-ai/deepseek-r1":
+            return 404, {}, "not found"
+        return FakeAPI.post(self, url, headers, body, timeout)
+apiG = Gone(ALL + ["qwen/qwq-32b"]); B.http_get, B.http_post = apiG.get, apiG.post
+m2, _ = B.AI(key="k123456789", sleep=sleeps.append).ask("diagnose", "s", "u")
+assert m2 != "deepseek-ai/deepseek-r1" and apiG.posts[0][2]["model"] == "deepseek-ai/deepseek-r1" and len(apiG.posts) <= 3, (m2, len(apiG.posts))
+class AllGone(FakeAPI):
+    def post(self, url, headers, body, timeout):
+        self.posts.append((url, headers, body)); return 404, {}, "not found"
+apiN = AllGone(ALL + ["qwen/qwq-32b"]); B.http_get, B.http_post = apiN.get, apiN.post
+try:
+    B.AI(key="k123456789", sleep=sleeps.append).ask("diagnose", "s", "u"); raise SystemExit("should fail")
+except RuntimeError as e:
+    assert "404" in str(e) and "/chat/completions" in str(e) and "k123456789" not in str(e) and len(apiN.posts) == 2
 api2 = FakeAPI(["x/embed"]); B.http_get, B.http_post = api2.get, api2.post
 try:
     B.AI(key="k123456789", sleep=sleeps.append).ask("code-fix", "s", "u"); raise SystemExit("no model should fit")
