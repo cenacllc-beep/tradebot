@@ -2330,3 +2330,6 @@ unfamiliar codebase ... do not change functionality. only upgrade the code quali
   and before any market or outcome was read: crypto 12, metals 5, energy 3, fx 22, other 9 (Treasury yields, stock
   indices, coffee, KPOW midterms; never tested), BTC/ETH 2. A once-only file was rewritten: logged here on purpose.
 - tests: test_plan20/test_live20 accept the switched-on .github workflow copy when it equals the cloud copy. All pass.
+- live20's first run (00:13-05:38 La Paz) logged 8,954 snapshots of 24 active series (4 missed minutes, 57 single
+  failed reads); GitHub then started no scheduled run until 12:05 (a 6.5-hour gap). Its schedule is now hourly
+  (":07"); runs share one concurrency group, so a queued run starts as the previous one ends. Logistics only.

@@ -12,7 +12,7 @@
 name: PLAN20 forward logger (research)
 on:
   schedule:
-    - cron: "0 */6 * * *"
+    - cron: "7 * * * *"   # hourly: GitHub skips or delays scheduled starts; one queued run waits and starts as the last ends (2026-11-26: a 6.5-hour gap)
   workflow_dispatch: {}
 concurrency:
   group: tradebot-live20   # its own group: never cancels or queues behind a scan, settle or another plan
