@@ -37,6 +37,7 @@ jobs:
         with:
           ref: main
           fetch-depth: 0   # full history: the once-only guards look for any earlier commit of a file
+          filter: blob:none   # commits and trees only; file contents are fetched when checked out or read
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1   # v6.3.0
         with:
           python-version: "3.12"
@@ -49,8 +50,8 @@ jobs:
       - name: Refuse freeze when the code is already frozen, or without the committed series table
         if: inputs.stage == 'freeze'
         run: |
-          if git ls-files --error-unmatch research/results/plan20_identity.json >/dev/null 2>&1; then
-            echo "already frozen: research/results/plan20_identity.json is committed; it is stored once"; exit 1
+          if git log --oneline -- research/results/plan20_identity.json | grep -q .; then
+            echo "already frozen: research/results/plan20_identity.json was committed once; it is stored once"; exit 1
           fi
           f=research/results/plan20_series.json
           git ls-files --error-unmatch "$f" >/dev/null 2>&1 || { echo "$f is not committed: run the series stage first"; exit 1; }
@@ -71,7 +72,9 @@ jobs:
       - name: Refuse a second fit, or a fit before the map
         if: inputs.stage == 'fit'
         run: |
-          if git log --oneline -- research/results/plan20_model.json | grep -q .; then echo "the model was committed once: fitted once"; exit 1; fi
+          for f in research/results/plan20_model.json research/results/plan20_model_sha256.json; do
+            if git log --oneline -- "$f" | grep -q .; then echo "$f was committed once: fitted once"; exit 1; fi
+          done
           for f in research/results/plan20_map.md research/results/plan20_map.json research/results/plan20_map_sha256.json; do
             git ls-files --error-unmatch "$f" >/dev/null 2>&1 || { echo "$f is not committed: run map first"; exit 1; }
             git diff --quiet HEAD -- "$f" || { echo "$f differs from the commit: stopping"; exit 1; }
@@ -79,9 +82,10 @@ jobs:
       - name: Refuse a second score, or a score before the model
         if: inputs.stage == 'score'
         run: |
-          f=research/results/plan20_model.json
-          git ls-files --error-unmatch "$f" >/dev/null 2>&1 || { echo "no committed model: run fit first"; exit 1; }
-          git diff --quiet HEAD -- "$f" || { echo "$f differs from the commit: stopping"; exit 1; }
+          for f in research/results/plan20_model.json research/results/plan20_model_sha256.json; do
+            git ls-files --error-unmatch "$f" >/dev/null 2>&1 || { echo "$f is not committed: run fit first"; exit 1; }
+            git diff --quiet HEAD -- "$f" || { echo "$f differs from the commit: stopping"; exit 1; }
+          done
           for f in research/results/plan20_result.json research/results/plan20_result.md; do
             if git log --oneline -- "$f" | grep -q .; then echo "$f was committed once: the plan is scored once"; exit 1; fi
           done

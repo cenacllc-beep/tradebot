@@ -2291,3 +2291,30 @@ unfamiliar codebase ... do not change functionality. only upgrade the code quali
   (the score never reads them; about 1.5-5 MB a day saved). Left as noted: reward fields in committed fill rows are
   public before the score (nobody reads or sums them before Dec 29); CLOSE_MAX 23:59:59.
 - .github/workflows/plan19.yml switched on (runs at :05/:25/:45; samples only from 2026-11-28 00:00 La Paz).
+
+## 2026-11-26 (La Paz) - PLAN20 code-review fixes (research/plan20.py, research/live20.py, workflows, tests)
+- Independent code review of research/plan20.py, research/live20.py, cloud/workflows/plan20.yml and live20.yml; fixed
+  before the freeze and before any download. research/PLAN20.md untouched; no rule, constant, threshold, feature or
+  statistic changed.
+- plan20.py: a market whose candle request fails in 3 runs (research/data/plan20/candle_failures.json) is saved marked
+  candles_error (no candles, never a chance) so its day is not blocked for good; /historical/markets is asked with no
+  time filter (as PLAN15), the close time is filtered locally, /markets keeps its bounds; the format check records
+  markets per series-day, counts candles_error markets and flags days with 0 or under 96 markets between two days with
+  markets (each re-downloaded once at most, first copy kept in research/data/plan20/refetched/, only before a stage
+  used that period); freeze re-derives every series row's group with group_of() and refuses on any difference; the
+  series stage prints the group counts and the full "other" list; the fit writes the model's SHA-256 once
+  (research/results/plan20_model_sha256.json) and the score, the August-October download and live20 paper refuse a
+  model file that differs from it.
+- live20.py: paper also requires plan20's identity check to be clean (fails closed); each paper row carries stage_c
+  (True only for a group research/results/plan20_result.json shows passed, from the first full La Paz day after its
+  timestamp; otherwise descriptive); snapshots as one small gzip file per 30-minute chunk; candles bundled per series
+  and La Paz day (old formats still read); JSONL appends start a new line after a torn last line (local helper;
+  tbcommon/jsonio.py unchanged); docstring states the KILL file is on the PC only, so GitHub does not see it.
+- Workflows: plan20.yml freeze guard by commit history (git log), blobless full clone (filter: blob:none), model hash
+  record in the fit and score guards; live20.yml samples about 325 minutes, paper --budget-seconds 300, a time limit on
+  every step (sum 353 of the job's 355). tests/test_plan20.py and tests/test_live20.py cover each fix; all tests pass.
+
+## 2026-11-26 (La Paz, after midnight) - numpy approved for PLAN20 (runner only)
+- The user answered "Yes, approve numpy" to the question, asked in so many words, whether numpy may be installed for
+  PLAN20 (pinned, GitHub's runner only, never the PC; fit and score only). Recorded in CLAUDE.md section 3. This closes
+  the code review's must-fix 1; the other review items are fixed above.

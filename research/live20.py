@@ -11,21 +11,36 @@ What it never does: place, change or cancel an order (no order endpoint exists i
 paper.db, live.db or trial/. Kalshi's public API only, read-only GETs, through tbcommon's JsonClient (the project's only
 User-Agent, retries, a minimum gap between requests).
 
+Kill switch: `paper` checks the project's KILL file (core.kill_file) and writes nothing while it is on. The KILL file
+lives on the PC only (it is never committed), so on GitHub's runner the switch is not seen and `paper` writes there
+regardless. That is harmless: paper.jsonl is a research ledger of hypothetical bets, nothing here can place an order,
+and the PC's kill switch still stops every step that trades.
+
 Files (research/data/live20/, overridable with LIVE20_DATA for tests):
-- snap-YYYYMMDD.jsonl: one row per open market per minute (UTC day of the minute). A finished day is gzipped to
-  snap-YYYYMMDD.jsonl.gz at the end of a run (readers take both).
+- snap-YYYYMMDD-HHMM.jsonl.gz: one row per open market per minute, one small file per 30-minute chunk (UTC; HHMM is
+  the chunk's start, :00 or :30). Rows are appended to snap-YYYYMMDD-HHMM.jsonl while the chunk is written and the
+  finished chunk is gzipped (merged with an earlier .gz of the same chunk, when two runs shared it). Readers also take
+  the old one-file-a-day snap-YYYYMMDD.jsonl and snap-YYYYMMDD.jsonl.gz.
   Row: ts (read time), minute (the minute boundary the row stands for: the close of PLAN20's candle ending there),
   ticker, series, event, open, close (epoch seconds), status, yes_bid, yes_ask, no_bid, no_ask, last (dollars),
   volume, oi (contracts; volume is Kalshi's running total for the market). NO is derived as PLAN20 section 2 says:
   no_ask = 1 - yes_bid, no_bid = 1 - yes_ask.
 - log.jsonl: run_start / run_end rows, a "gap" row for every minute not read (late or every request failed) and an
   "error" row for every series that failed in a minute.
+- Every JSONL append starts a new line first when the file's last byte is not a newline (a line torn by a crash is
+  then one unreadable line, skipped by the readers, and never swallows the next row).
 - results.json: {ticker: {result, yes_pay, no_pay, status, close, settled_ts}} by strategy.payout's rules.
-- candles/SERIES/TICKER.json: Kalshi's one-minute candlesticks of each logged market, fetched once after its close.
-- paper.jsonl: the paper bets (rebuilt in full by each `paper` run, so it is idempotent).
+- candles/SERIES/YYYY-MM-DD.json.gz: Kalshi's one-minute candlesticks of the logged markets, one bundle per series and
+  La Paz day of the close ({"markets": {ticker: {open, close, period_interval, fetched, candlesticks}}}), each market
+  fetched once after its close. The old one-file-a-market candles/SERIES/TICKER.json is still read.
+- paper.jsonl: the paper bets (rebuilt in full by each `paper` run, so it is idempotent). Each row carries stage_c:
+  True only when research/results/plan20_result.json (under this plan's text) shows the row's group passed and the
+  row's window opened on or after the first full La Paz day after the result's timestamp (PLAN20 section 5); every
+  other row is descriptive only.
 
 The paper rule (PLAN20 sections 2 and 5) is research/plan20.py's own code, imported lazily (fail closed without it,
-without the model file, or with a model fitted under another plan text): for every logged window (one series, one
+with plan20's identity check not clean, without the model file, with a model whose SHA-256 differs from the one
+recorded at fit time, or with a model fitted under another plan text): for every logged window (one series, one
 close time; start = close - 15 minutes) that opened at or after the model's freeze time, has closed and whose logged
 markets all have a result, Kalshi's one-minute candles of each market are fetched once (the endpoint, interval and
 span plan20.py downloads), parsed by plan20.parse_candles, and replayed exactly as plan20's score stage does
@@ -43,7 +58,7 @@ import os
 import re
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -57,6 +72,10 @@ from tbcommon import jsonio   # noqa: E402
 DATA = os.environ.get("LIVE20_DATA") or os.path.join(HERE, "data", "live20")
 SERIES_FILE = os.environ.get("LIVE20_SERIES") or os.path.join(HERE, "results", "plan20_series.json")
 MODEL_FILE = os.environ.get("LIVE20_MODEL") or os.path.join(HERE, "results", "plan20_model.json")
+MODEL_SHA_FILE = os.environ.get("LIVE20_MODEL_SHA") or os.path.join(HERE, "results", "plan20_model_sha256.json")
+RESULT_FILE = os.environ.get("LIVE20_RESULT") or os.path.join(HERE, "results", "plan20_result.json")
+LAPAZ = timezone(timedelta(hours=-4), "La Paz")   # UTC-4 all year (tbcommon.clock.BOT_TZ), as in plan20.py
+CHUNK = 30 * 60       # snapshot files: one per 30-minute UTC chunk
 
 OFFSET = 5            # seconds after each minute boundary that the snapshot is read
 LATE = 25             # a minute whose read cannot start within OFFSET + LATE seconds of its boundary is a gap
@@ -91,14 +110,39 @@ def _p(name):
     return os.path.join(DATA, name)
 
 
+def append_rows(path, rows):
+    """Append JSONL rows, one compact object per line. When the file's last byte is not a newline (a line torn by a
+    crash), a newline is written first so the torn line stays alone and the new rows stay readable. (A local helper:
+    tbcommon.jsonio.append keeps its behaviour for its other callers.)"""
+    if not rows:
+        return
+    folder = os.path.dirname(path)
+    if folder:
+        os.makedirs(folder, exist_ok=True)
+    with open(path, "ab+") as f:
+        f.seek(0, os.SEEK_END)
+        if f.tell() > 0:
+            f.seek(-1, os.SEEK_END)
+            if f.read(1) != b"\n":
+                f.seek(0, os.SEEK_END)
+                f.write(b"\n")
+        f.seek(0, os.SEEK_END)
+        f.write("".join(json.dumps(r, separators=(",", ":")) + "\n" for r in rows).encode("utf-8"))
+
+
 def log_row(kind, **f):
     row = dict(kind=kind, ts=round(now(), 1))
     row.update(f)
-    jsonio.append(_p("log.jsonl"), [row])
+    append_rows(_p("log.jsonl"), [row])
 
 
 def day_of(t):
     return datetime.fromtimestamp(t, timezone.utc).strftime("%Y%m%d")
+
+
+def chunk_of(t):
+    """'YYYYMMDD-HHMM' of the 30-minute UTC chunk holding minute t (HHMM = the chunk's start)."""
+    return datetime.fromtimestamp(int(t // CHUNK) * CHUNK, timezone.utc).strftime("%Y%m%d-%H%M")
 
 
 def _epoch(s):
@@ -240,7 +284,14 @@ def run(minutes):
         return 1
     target = (int(start // 60) + 1) * 60
     read = gaps = nrows = 0
+    chunk = None
     while target + OFFSET <= end:
+        if chunk is not None and chunk_of(target) != chunk:
+            try:   # the previous 30-minute chunk is finished: gzip it
+                compact(keep=chunk_of(target))
+            except Exception as ex:
+                log_row("error", where="compact", error=str(ex)[:200])
+        chunk = chunk_of(target)
         sleep_until(target + OFFSET)
         late = now() - (target + OFFSET)
         if late > LATE:
@@ -250,7 +301,7 @@ def run(minutes):
             continue
         try:
             rows, failed = snapshot(series, target)
-            jsonio.append(_p("snap-%s.jsonl" % day_of(target)), rows)
+            append_rows(_p("snap-%s.jsonl" % chunk_of(target)), rows)
         except Exception as ex:   # e.g. a disk error: logged, the loop goes on
             rows, failed = [], list(series)
             log_row("error", minute=int(target), where="write", error=str(ex)[:200])
@@ -271,16 +322,18 @@ def run(minutes):
 
 
 # ---------- reading the day files ----------
+SNAP_NAME = re.compile(r"snap-(\d{8})(?:-(\d{4}))?\.jsonl(\.gz)?$")
+
+
 def _day_files():
-    """{YYYYMMDD: [paths]} (gz before plain)."""
+    """{YYYYMMDD: [paths]}: the old whole-day files first, then the 30-minute chunks in time order; within one name,
+    gz before plain."""
     out = {}
     for f in glob.glob(_p("snap-*.jsonl*")):
-        m = re.match(r"snap-(\d{8})\.jsonl(\.gz)?$", os.path.basename(f))
+        m = SNAP_NAME.match(os.path.basename(f))
         if m:
-            out.setdefault(m.group(1), []).append(f)
-    for k in out:
-        out[k].sort(key=lambda f: 0 if f.endswith(".gz") else 1)
-    return out
+            out.setdefault(m.group(1), []).append((m.group(2) or "", 0 if m.group(3) else 1, f))
+    return {k: [f for _, _, f in sorted(v)] for k, v in out.items()}
 
 
 def _read_lines(path):
@@ -309,26 +362,41 @@ def snapshots():
                 yield r
 
 
-def compact(today=None):
-    """Gzip every finished UTC day's file (days before today); a day with both a .gz and a plain file is merged."""
-    today = today or day_of(now())
-    for d, paths in _day_files().items():
-        plain = _p("snap-%s.jsonl" % d)
-        if d >= today or plain not in paths:
+def _merge_gz(plain):
+    """Gzip one plain snapshot file into plain + '.gz' (merged with that .gz when it exists; a (minute, ticker) once),
+    then remove the plain file."""
+    gz = plain + ".gz"
+    seen, rows = set(), []
+    for f in (gz, plain):
+        if not os.path.exists(f):
             continue
-        gz = plain + ".gz"
-        seen, rows = set(), []
-        for f in paths:
-            for r in _read_lines(f):
-                k = (r.get("minute"), r.get("ticker"))
-                if k not in seen:
-                    seen.add(k); rows.append(r)
-        tmp = gz + ".tmp"
-        with gzip.open(tmp, "wt", encoding="utf-8") as f:
-            for r in rows:
-                f.write(json.dumps(r, separators=(",", ":")) + "\n")
-        os.replace(tmp, gz)
-        os.remove(plain)
+        for r in _read_lines(f):
+            if not isinstance(r, dict):
+                continue
+            k = (r.get("minute"), r.get("ticker"))
+            if k not in seen:
+                seen.add(k); rows.append(r)
+    tmp = gz + ".tmp"
+    with gzip.open(tmp, "wt", encoding="utf-8") as f:
+        for r in rows:
+            f.write(json.dumps(r, separators=(",", ":")) + "\n")
+    os.replace(tmp, gz)
+    os.remove(plain)
+
+
+def compact(today=None, keep=None):
+    """Gzip every plain 30-minute chunk file except the chunk `keep` (the one being written); and, for the old format,
+    every finished UTC day's plain file (days before today)."""
+    today = today or day_of(now())
+    for f in glob.glob(_p("snap-*.jsonl")):
+        m = SNAP_NAME.match(os.path.basename(f))
+        if not m or m.group(3):
+            continue
+        if m.group(2):
+            if "%s-%s" % (m.group(1), m.group(2)) != keep:
+                _merge_gz(f)
+        elif m.group(1) < today:
+            _merge_gz(f)
 
 
 # ---------- settle ----------
@@ -387,11 +455,80 @@ def settle(budget_seconds=240):
 # so plan20.fill(candles, m, side) is the forward fill too.
 CANDLE_AFTER = 120          # candles are fetched this long after a market closes (Kalshi's last candle is written)
 EMPTY_FINAL = 6 * 3600      # an empty candle answer is cached as final only for a market closed this long ago
-NEEDED = ("features", "decide", "chances", "fill", "bet_row", "parse_candles", "y_of", "wins", "lapaz_date", "T")
+NEEDED = ("features", "decide", "chances", "fill", "bet_row", "parse_candles", "y_of", "wins", "lapaz_date", "T",
+          "lapaz_start", "identity_problems", "model_hash_problem", "TESTED", "PLAN_SHA256")
+FLUSH_EVERY = 200           # candle bundles are written at least this often (markets fetched) during a paper run
 
 
 def candle_path(series, ticker):
+    """The old one-file-a-market cache (read only)."""
     return os.path.join(DATA, "candles", series, "%s.json" % ticker)
+
+
+def lapaz_day(ts):
+    return datetime.fromtimestamp(ts, LAPAZ).strftime("%Y-%m-%d")
+
+
+def bundle_path(series, close_ts):
+    """candles/SERIES/YYYY-MM-DD.json.gz: one bundle per series and La Paz day of the close."""
+    return os.path.join(DATA, "candles", series, "%s.json.gz" % lapaz_day(close_ts))
+
+
+class CandleStore(object):
+    """The candle cache: bundles read once, markets added in memory, written back by flush() (temp file, then
+    os.replace, so a reader never sees half a bundle). A damaged bundle reads as empty (its markets are fetched
+    again)."""
+
+    def __init__(self):
+        self.bundles, self.dirty, self.added = {}, set(), 0
+
+    def _bundle(self, series, close_ts):
+        p = bundle_path(series, close_ts)
+        if p not in self.bundles:
+            ms = {}
+            if os.path.exists(p):
+                try:
+                    with gzip.open(p, "rt", encoding="utf-8") as f:
+                        j = json.load(f)
+                    if isinstance(j, dict) and isinstance(j.get("markets"), dict):
+                        ms = j["markets"]
+                except (OSError, ValueError, EOFError):
+                    ms = {}
+            self.bundles[p] = ms
+        return p, self.bundles[p]
+
+    def get(self, series, ticker, close_ts):
+        _, ms = self._bundle(series, close_ts)
+        e = ms.get(ticker)
+        if isinstance(e, dict) and isinstance(e.get("candlesticks"), list):
+            return e["candlesticks"]
+        p = candle_path(series, ticker)
+        if os.path.exists(p):
+            try:
+                j = jsonio.load(p)
+                if isinstance(j, dict) and isinstance(j.get("candlesticks"), list):
+                    return j["candlesticks"]
+            except (OSError, ValueError):
+                pass
+        return None
+
+    def add(self, series, ticker, open_ts, close_ts, t_now, cs):
+        p, ms = self._bundle(series, close_ts)
+        ms[ticker] = dict(open=int(open_ts), close=int(close_ts), period_interval=1, fetched=round(t_now),
+                          candlesticks=cs)
+        self.dirty.add(p)
+        self.added += 1
+        if self.added % FLUSH_EVERY == 0:
+            self.flush()
+
+    def flush(self):
+        for p in sorted(self.dirty):
+            os.makedirs(os.path.dirname(p), exist_ok=True)
+            tmp = p + ".tmp"
+            with gzip.open(tmp, "wt", encoding="utf-8") as f:
+                json.dump(dict(markets=self.bundles[p]), f, sort_keys=True, separators=(",", ":"))
+            os.replace(tmp, p)
+        self.dirty = set()
 
 
 def fetch_candles(series, ticker, open_ts, close_ts):
@@ -405,23 +542,39 @@ def fetch_candles(series, ticker, open_ts, close_ts):
     return j.get("candlesticks") or []
 
 
-def candles_of(series, ticker, open_ts, close_ts, t_now):
-    """The market's raw candles from the cache, else fetched once and cached; None when not available yet."""
-    p = candle_path(series, ticker)
-    if os.path.exists(p):
-        try:
-            j = jsonio.load(p)
-            if isinstance(j, dict) and isinstance(j.get("candlesticks"), list):
-                return j["candlesticks"]
-        except (OSError, ValueError):
-            pass
+def candles_of(series, ticker, open_ts, close_ts, t_now, store):
+    """The market's raw candles from the cache (its series-day bundle, else the old per-market file), else fetched once
+    and added to the bundle; None when not available yet."""
+    cs = store.get(series, ticker, close_ts)
+    if cs is not None:
+        return cs
     cs = fetch_candles(series, ticker, open_ts, close_ts)
     if cs or t_now - close_ts >= EMPTY_FINAL:
-        os.makedirs(os.path.dirname(p), exist_ok=True)
-        jsonio.save(p, dict(ticker=ticker, series=series, open=int(open_ts), close=int(close_ts), period_interval=1,
-                            fetched=round(t_now), candlesticks=cs))
+        store.add(series, ticker, open_ts, close_ts, t_now, cs)
         return cs
     return None
+
+
+def stage_c_starts(Q, path=None):
+    """{group: epoch} for every group plan20's stored result (research/results/plan20_result.json, scored under this
+    plan's text) shows passed: the start (La Paz midnight) of the first full La Paz day after the result's timestamp.
+    {} when there is no readable result (fail closed: every row then stays descriptive)."""
+    path = path or RESULT_FILE
+    try:
+        j = jsonio.load(path)
+    except (OSError, ValueError):
+        return {}
+    if not isinstance(j, dict) or j.get("plan_sha256") != Q.PLAN_SHA256:
+        return {}
+    t = _epoch(j.get("scored"))
+    if t is None:
+        return {}
+    start = Q.lapaz_start(Q.lapaz_date(t) + timedelta(days=1))
+    out = {}
+    for x in j.get("tests") or []:
+        if isinstance(x, dict) and x.get("passed") is True and x.get("name") in Q.TESTED:
+            out[x["name"]] = start
+    return out
 
 
 def window_bet(Q, model, day, series, group, markets):
@@ -456,8 +609,10 @@ def logged_markets():
 def paper(budget_seconds=600):
     """Rebuild paper.jsonl: PLAN20's frozen rule replayed on Kalshi's one-minute candles of every logged window that
     opened at or after the model's freeze time, has closed, and whose logged markets all have a result. Returns the
-    number of bets, or None when nothing may be bet (no model, no plan20.py, a model from another plan, the kill
-    switch). Windows still waiting for candles or results are counted, not bet."""
+    number of bets, or None when nothing may be bet (no model, no plan20.py, plan20's identity check not clean, a model
+    whose SHA-256 differs from the fit-time record, a model from another plan, the kill switch). Windows still waiting
+    for candles or results are counted, not bet. Each row's stage_c says whether it belongs to a stage C test
+    (stage_c_starts); otherwise it is descriptive only."""
     try:
         model, sha, frozen = model_info()
         Q = importlib.import_module("plan20")
@@ -466,6 +621,12 @@ def paper(budget_seconds=600):
             raise ValueError("research/plan20.py lacks %s" % ", ".join(missing))
         if model.get("plan_sha256") != getattr(Q, "PLAN_SHA256", None):
             raise ValueError("the model was not fitted under research/PLAN20.md's frozen text")
+        bad = Q.identity_problems()
+        if bad != []:
+            raise ValueError("plan20's identity check is not clean (%s)" % (", ".join(map(str, bad or ["no answer"]))))
+        mh = Q.model_hash_problem(MODEL_FILE, MODEL_SHA_FILE)
+        if mh:
+            raise ValueError(mh)
     except Exception as ex:
         print("live20 paper: nothing is bet yet (%s)" % ex)
         return None
@@ -480,6 +641,32 @@ def paper(budget_seconds=600):
     for t, (s, c) in logged_markets().items():
         if c - 60 * Q.T >= frozen and c + CANDLE_AFTER <= t0:
             windows.setdefault((c, s), []).append(t)
+    try:
+        stage_c = stage_c_starts(Q)
+    except Exception:   # fail closed: every row descriptive
+        stage_c = {}
+    store = CandleStore()
+    try:
+        bets, waiting, out_of_time, failed = _replay(Q, model, sha, windows, res, groups, t0, budget_seconds, store,
+                                                     stage_c)
+    finally:
+        store.flush()
+    bets.sort(key=lambda b: (b["open"], b["series"]))
+    tmp = _p("paper.jsonl.tmp")
+    os.makedirs(DATA, exist_ok=True)
+    with open(tmp, "w", encoding="utf-8") as f:
+        for b in bets:
+            f.write(json.dumps(b, sort_keys=True, separators=(",", ":")) + "\n")
+    os.replace(tmp, _p("paper.jsonl"))
+    nc = sum(1 for b in bets if b["stage_c"])
+    print("live20 paper: %d paper bets (%d in a stage C test, the rest descriptive), %d windows waiting for candles or "
+          "results%s%s (counts only; the verdict is PLAN20 section 5's, at day 42)" % (
+              len(bets), nc, waiting, ", %d candle requests failed" % failed if failed else "",
+              "; time budget used" if out_of_time else ""))
+    return len(bets)
+
+
+def _replay(Q, model, sha, windows, res, groups, t0, budget_seconds, store, stage_c):
     bets, waiting, out_of_time, failed = [], 0, False, 0
     for (c, s) in sorted(windows):
         tickers = sorted(windows[(c, s)])
@@ -493,7 +680,7 @@ def paper(budget_seconds=600):
                 out_of_time, ok = True, False
                 break
             try:
-                cs = candles_of(s, t, o, c, t0)
+                cs = candles_of(s, t, o, c, t0, store)
             except Exception as ex:
                 failed += 1
                 log_row("error", where="candles", ticker=t, error=str(ex)[:200])
@@ -512,19 +699,10 @@ def paper(budget_seconds=600):
         if b is None:
             continue
         b = json.loads(json.dumps(b, default=str))
-        b.update(open=o, close=c, fill_minute=b["m"] + 1, model_sha256=sha)
+        b.update(open=o, close=c, fill_minute=b["m"] + 1, model_sha256=sha,
+                 stage_c=bool(g in stage_c and o >= stage_c[g]))
         bets.append(b)
-    bets.sort(key=lambda b: (b["open"], b["series"]))
-    tmp = _p("paper.jsonl.tmp")
-    os.makedirs(DATA, exist_ok=True)
-    with open(tmp, "w", encoding="utf-8") as f:
-        for b in bets:
-            f.write(json.dumps(b, sort_keys=True, separators=(",", ":")) + "\n")
-    os.replace(tmp, _p("paper.jsonl"))
-    print("live20 paper: %d paper bets, %d windows waiting for candles or results%s%s (counts only; the verdict is "
-          "PLAN20 section 5's, at day 42)" % (len(bets), waiting, ", %d candle requests failed" % failed if failed else "",
-                                             "; time budget used" if out_of_time else ""))
-    return len(bets)
+    return bets, waiting, out_of_time, failed
 
 
 def model_info():

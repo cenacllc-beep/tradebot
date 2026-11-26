@@ -5,18 +5,25 @@ never reads a market closing on or after 2026-11-01 (La Paz).
 
 Stages (each refuses to run out of turn):
 - series: every Kalshi series whose ticker ends in 15M (GET /series, metadata only), each with its asset group;
-  written once to research/results/plan20_series.json.
+  written once to research/results/plan20_series.json; prints the group counts and the full "other" list.
 - freeze: identity record (SHA-256 of research/PLAN20.md, research/plan20.py, research/plan15.py (shared helpers) and
   the series table, plus PLAN7's pinned statistics functions through PLAN15); stored once in
-  research/results/plan20_identity.json. Every later stage checks it.
+  research/results/plan20_identity.json. It first re-derives every stored series row's group with group_of() and
+  refuses on any difference. Every later stage checks the record.
 - download [--max-days N] [--budget-minutes M]: settled yes/no markets of every series in the table closing
   2026-06-01..2026-10-31 La Paz, with their one-minute candles, saved as whole La Paz-day files
   research/data/plan20/days/SERIES/YYYY-MM-DD.json.gz (a day = the La Paz date of the market's close). June-July
-  first; August-October only after the model exists. Resumable (a saved day is final). Ends with a format and count
-  check (research/results/plan20_counts.json) that reads no outcome.
+  first; August-October only after the model exists and matches its fit-time SHA-256. Resumable (a saved day is
+  final, except that a day the format check flagged as short is downloaded again once, before any stage has used it).
+  A market whose candle request fails in 3 runs (research/data/plan20/candle_failures.json) is saved marked
+  candles_error (no candles, never a chance) so its day is not blocked for good. Ends with a format and count check
+  (research/results/plan20_counts.json: markets per series-day, short days, candles_error markets) that reads no
+  outcome.
 - map: stage A on June-July (descriptive): research/results/plan20_map.md and .json, their SHA-256 in
   research/results/plan20_map_sha256.json. Once.
-- fit: stage B's ridge logistic on every June-July chance; research/results/plan20_model.json. Once.
+- fit: stage B's ridge logistic on every June-July chance; research/results/plan20_model.json, and its SHA-256 written
+  once to research/results/plan20_model_sha256.json. Once. The score, the August-October download and
+  research/live20.py's paper bets refuse a model file whose SHA-256 differs from that record.
 - score: once, on August-October; research/results/plan20_result.md, then plan20_result.json.
 - status: counts only.
 
@@ -113,6 +120,18 @@ def map_paths():
 
 def model_path():
     return _r("plan20_model.json")
+
+
+def model_hash_path():
+    return _r("plan20_model_sha256.json")
+
+
+def candle_failures_path():
+    return os.path.join(DATA, "candle_failures.json")
+
+
+def refetched_path():
+    return os.path.join(DATA, "refetched.json")
 
 
 def result_paths():
@@ -253,7 +272,31 @@ def make_series(path=None, now=None, root=ROOT):
                series=rows, groups={g: by.get(g, []) for g in GROUPS},
                note="fee_type and fee_multiplier are recorded only; the plan's fee is 0.07 x C x P x (1-P) (section 2)")
     jsonio.save(path, rec)
-    return rec, "series table written (%s): %s" % (path, {g: len(v) for g, v in rec["groups"].items()})
+    return rec, "series table written (%s)\n%s" % (path, group_report(rec))
+
+
+def group_report(rec):
+    """Group counts and the full list of series placed in "other" (never tested), for the series stage's output."""
+    counts = {g: len(rec["groups"].get(g) or []) for g in GROUPS}
+    other = ["%s (%s)" % (s["ticker"], s.get("title") or "") for s in rec["series"] if s.get("group") == "other"]
+    return "group counts: %s\n\"other\" (%d, never tested): %s" % (counts, len(other), "; ".join(other) or "none")
+
+
+def group_mismatches(srec):
+    """Series rows whose stored group differs from the frozen grouping code's group_of(ticker, title), and group lists
+    that differ from the rows: [] when every row agrees."""
+    bad, by = [], {}
+    for s in srec.get("series") or []:
+        t = s.get("ticker")
+        g = group_of(t, s.get("title") or "")[0] if isinstance(t, str) else None
+        if g is None or s.get("group") != g:
+            bad.append("%s: stored %s, group_of gives %s" % (t, s.get("group"), g))
+        if g is not None:
+            by.setdefault(g, []).append(t)
+    for g in GROUPS:
+        if sorted((srec.get("groups") or {}).get(g) or []) != sorted(by.get(g, [])):
+            bad.append("group list %s differs from the rows" % g)
+    return bad
 
 
 def load_series(path=None):
@@ -289,8 +332,12 @@ def freeze(root=ROOT, path=None, spath=None, now=None):
         return None, "already frozen (%s); stored once" % path
     if P.bytes_hash(os.path.join(root, *PLAN.split("/"))) != PLAN_SHA256:
         return None, "research/PLAN20.md differs from its frozen SHA-256; nothing saved"
-    if load_series(spath) is None:
+    srec = load_series(spath)
+    if srec is None:
         return None, "no series table (run series first); nothing saved"
+    gm = group_mismatches(srec)
+    if gm:
+        return None, "the series table's groups differ from group_of (%s); nothing saved" % "; ".join(gm)
     p7 = P.plan7_problems(root)
     if p7:
         return None, "PLAN7's pinned functions differ (%s); nothing saved" % ", ".join(p7)
@@ -309,8 +356,11 @@ def market_list(series, first, last):
     lo = lapaz_start(first)
     hi = min(lapaz_start(last + timedelta(days=1)), lapaz_start(HARD_END))
     out, skipped = {}, dict(not_yes_no=0)
-    q = dict(series_ticker=series, limit=KALSHI_PAGE_LIMIT, min_close_ts=int(lo), max_close_ts=int(hi) - 1)
-    for path in ("/historical/markets", "/markets"):
+    # The archive gets no time filter (as research/plan15.py asks it); the live listing is bounded. Both are filtered
+    # here by the close time, so nothing outside first..last or past 2026-10-31 is kept.
+    base = dict(series_ticker=series, limit=KALSHI_PAGE_LIMIT)
+    for path, q in (("/historical/markets", base),
+                    ("/markets", dict(base, min_close_ts=int(lo), max_close_ts=int(hi) - 1))):
         for m in kalshi_pages(path, q, "markets"):
             c = P.ts_of(m.get("close_time"))
             if c is None or not (lo <= c < hi) or not allowed_close(c) or m.get("ticker") in out:
@@ -358,13 +408,74 @@ def fetch_candles(m):
     return j.get("candlesticks") or []
 
 
-def build_day(series, d, recs):
-    ms = []
+CANDLE_TRIES = 3            # runs a market's candle request may fail before its day is saved without its candles
+NET_ERRORS = (RuntimeError, ValueError, OSError, KeyError, TypeError, http.client.HTTPException)
+MARKETS_PER_DAY = 96        # format check only: a full day of a 15-minute series
+
+
+def build_day(series, d, recs, failures=None):
+    """The day file. A market whose candle request fails holds its day back (RuntimeError: nothing saved, the next run
+    tries again) and adds one to its count in `failures` ({ticker: failed runs}); once it has failed CANDLE_TRIES runs
+    it is saved marked candles_error (no candles, so never a chance) and the day is no longer blocked."""
+    failures = {} if failures is None else failures
+    ms, waiting = [], []
     for m in sorted(recs, key=lambda x: (x["close"], x["ticker"])):
-        cs = fetch_candles(m)
+        try:
+            cs = fetch_candles(m)
+        except NET_ERRORS as ex:
+            n = int(failures.get(m["ticker"], 0)) + 1
+            failures[m["ticker"]] = n
+            if n < CANDLE_TRIES:
+                waiting.append("%s (%s; failed run %d of %d)" % (m["ticker"], ex, n, CANDLE_TRIES))
+                continue
+            ms.append(dict(ticker=m["ticker"], close=m["close"], open=m["open"], open_listed=m["open_listed"],
+                           result=m["result"], c={}, n_candles=0, candles_error=True, candle_error=str(ex)[:200]))
+            continue
         ms.append(dict(ticker=m["ticker"], close=m["close"], open=m["open"], open_listed=m["open_listed"],
                        result=m["result"], c=parse_candles(cs, m["open"]), n_candles=len(cs)))
+    if waiting:
+        raise RuntimeError("candles not read: %s" % "; ".join(waiting))
     return dict(series=series, day=d.isoformat(), day_rule="La Paz date of the close", markets=ms, complete=True)
+
+
+def _load_state(path):
+    obj, ok = P._read_json(path)
+    return obj if ok and isinstance(obj, dict) else {}
+
+
+def refetch_short_days(log=print):
+    """Series-days the last format check flagged as short (see format_check) are downloaded again, once each: the first
+    copy is moved to research/data/plan20/refetched/ and the day is marked in refetched.json before it is moved, so no
+    day is re-read twice. Only days whose data no stage has used yet: June-July before the map exists, August-October
+    before the result exists. Returns the moved (series, day) pairs."""
+    chk, ok = P._read_json(counts_path())
+    if not ok or not isinstance(chk, dict):
+        return []
+    done = _load_state(refetched_path())
+    map_made = any(os.path.exists(f) for f in map_paths())
+    scored = any(os.path.exists(f) for f in result_paths())
+    moved = []
+    for e in chk.get("short_days") or []:
+        try:
+            s, d = e["series"], date.fromisoformat(e["day"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if d.isoformat() in (done.get(s) or []):
+            continue
+        if (FIT_PERIOD[0] <= d <= FIT_PERIOD[1] and map_made) or (SCORE_PERIOD[0] <= d <= SCORE_PERIOD[1] and scored) \
+                or not (FIT_PERIOD[0] <= d <= SCORE_PERIOD[1]):
+            continue
+        src = day_path(s, d)
+        if not os.path.exists(src):
+            continue
+        done.setdefault(s, []).append(d.isoformat())
+        jsonio.save(refetched_path(), done)
+        dst = os.path.join(DATA, "refetched", s, os.path.basename(src))
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        os.replace(src, dst)
+        moved.append((s, d))
+        log("PLAN20 %s %s: %s markets saved; downloading it again (once)" % (s, d, e.get("markets")))
+    return moved
 
 
 def all_series(srec):
@@ -379,7 +490,13 @@ def download(max_days=None, budget_minutes=None, log=print, now=None, root=ROOT)
     start = time.time()
     now = time.time() if now is None else now
     fitted = os.path.exists(model_path())
+    if fitted:   # August-October only for the model written at fit time
+        mh = model_hash_problem()
+        if mh:
+            return False, "%s; no download" % mh
     last = SCORE_PERIOD[1] if fitted else FIT_PERIOD[1]
+    refetch_short_days(log)
+    failures = _load_state(candle_failures_path())
     done = waiting = 0
     for s in all_series(srec):
         want = [d for d in P.days_of(FIT_PERIOD[0], last) if not os.path.exists(day_path(s, d))
@@ -404,18 +521,29 @@ def download(max_days=None, budget_minutes=None, log=print, now=None, root=ROOT)
                     (budget_minutes is not None and time.time() - start > 60 * budget_minutes):
                 waiting += 1
                 continue
+            n_fail = dict(failures)
             try:
-                obj = build_day(s, d, by_day.get(d, []))
-            except (RuntimeError, ValueError, OSError, KeyError, TypeError, http.client.HTTPException) as ex:
+                obj = build_day(s, d, by_day.get(d, []), failures)
+            except NET_ERRORS as ex:
+                if failures != n_fail:
+                    jsonio.save(candle_failures_path(), failures)
                 log("PLAN20 %s %s: not saved (%s); run again to retry" % (s, d, ex))
                 waiting += 1
                 continue
+            if failures != n_fail:
+                jsonio.save(candle_failures_path(), failures)
             obj["listing_skipped"] = skipped
+            obj["n_markets"] = len(obj["markets"])
             P.save_gz(day_path(s, d), obj)
             done += 1
-            log("PLAN20 %s %s: %d markets saved" % (s, d, len(obj["markets"])))
+            nerr = sum(1 for m in obj["markets"] if m.get("candles_error"))
+            log("PLAN20 %s %s: %d markets saved%s" % (s, d, len(obj["markets"]), (
+                ", %d marked candles_error after %d failed runs" % (nerr, CANDLE_TRIES)) if nerr else ""))
     chk = format_check(srec)
     jsonio.save(counts_path(), chk)
+    for e in chk["short_days"]:
+        log("PLAN20 format check: %s %s has %d markets (the days before and after have markets)%s" % (
+            e["series"], e["day"], e["markets"], "; already downloaded again once" if e["refetched"] else ""))
     note = "" if fitted else " (August-October waits for the fit)"
     return True, "download: %d series-days saved this run, %d waiting%s; format check: %s" % (
         done, waiting, note, chk["summary"])
@@ -424,11 +552,13 @@ def download(max_days=None, budget_minutes=None, log=print, now=None, root=ROOT)
 def format_check(srec=None):
     """Counts and a format check of the saved day files. Reads no outcome (never the result field)."""
     srec = srec or load_series()
-    out = dict(checked=now_iso(), series={}, summary={})
-    tot = dict(days=0, markets=0, candles=0, crossed=0, out_of_range=0, open_differs=0, late=0, damaged=0)
+    out = dict(checked=now_iso(), series={}, summary={}, short_days=[])
+    tot = dict(days=0, markets=0, candles=0, crossed=0, out_of_range=0, open_differs=0, late=0, damaged=0,
+               candles_error=0)
+    refetched = _load_state(refetched_path())
     for s in all_series(srec):
         e = dict(fit_days=0, score_days=0, markets=0, candles=0, crossed=0, out_of_range=0, open_differs=0, late=0,
-                 damaged=0, keys_ok=True)
+                 damaged=0, candles_error=0, keys_ok=True, day_markets={})
         for d in P.days_of(FIT_PERIOD[0], SCORE_PERIOD[1]):
             p = day_path(s, d)
             if not os.path.exists(p):
@@ -438,8 +568,10 @@ def format_check(srec=None):
                 e["damaged"] += 1
                 continue
             e["fit_days" if d <= FIT_PERIOD[1] else "score_days"] += 1
+            e["day_markets"][d.isoformat()] = len(obj.get("markets") or [])
             for m in obj.get("markets") or []:
                 e["markets"] += 1
+                e["candles_error"] += int(bool(m.get("candles_error")))
                 e["keys_ok"] = e["keys_ok"] and all(k in m for k in ("ticker", "close", "open", "c"))
                 e["late"] += int(not allowed_close(m.get("close")))
                 if m.get("open_listed") is not None and abs(m["open_listed"] - m["open"]) > 0.5:
@@ -451,8 +583,17 @@ def format_check(srec=None):
                     e["crossed"] += int(c[YB] is not None and c[YA] is not None and c[YB] > c[YA])
         out["series"][s] = e
         tot["days"] += e["fit_days"] + e["score_days"]
-        for k in ("markets", "candles", "crossed", "out_of_range", "open_differs", "late", "damaged"):
+        for k in ("markets", "candles", "crossed", "out_of_range", "open_differs", "late", "damaged", "candles_error"):
             tot[k] += e[k]
+        # a saved day with 0 or fewer than 96 markets while the saved days before and after both have markets
+        dm = e["day_markets"]
+        for k, n in sorted(dm.items()):
+            d = date.fromisoformat(k)
+            before, after = dm.get((d - timedelta(days=1)).isoformat()), dm.get((d + timedelta(days=1)).isoformat())
+            if n < MARKETS_PER_DAY and before and after:
+                out["short_days"].append(dict(series=s, day=k, markets=n, before=before, after=after,
+                                              refetched=k in (refetched.get(s) or [])))
+    tot["short_days"] = len(out["short_days"])
     tot["candles_per_market"] = (tot["candles"] / float(tot["markets"])) if tot["markets"] else None
     out["summary"] = tot
     return out
@@ -717,9 +858,12 @@ def move3(d3):
 
 def chances(markets, meta):
     """Every chance of one window in the rule's order: minutes in order, then markets by ticker, YES before NO.
-    Yields (m, market, side, features)."""
+    Yields (m, market, side, features). A market saved as candles_error (its candles could not be read) is never a
+    chance."""
     for m in MINUTES:
         for mk in markets:
+            if mk.get("candles_error"):
+                continue
             cs = mk.get("c") or {}
             for side in ("yes", "no"):
                 f = features(cs, side, m, dict(meta, open=mk["open"]))
@@ -1209,6 +1353,8 @@ def fit(data=None, srec=None, root=ROOT, backend=None, now=None, log=print):
     path = model_path()
     if os.path.exists(path):
         return None, "already fitted (%s); fitted once" % path
+    if os.path.exists(model_hash_path()):
+        return None, "a model hash record exists without a model (%s); no fit" % model_hash_path()
     if data is None:
         bad = identity_problems(root)
         if bad:
@@ -1258,13 +1404,42 @@ def fit(data=None, srec=None, root=ROOT, backend=None, now=None, log=print):
                       "C = floor(1.00 / P)", fitted=now_iso(now))
     model["frozen"] = model["fitted"]   # the model is frozen when it is written (read by research/live20.py)
     jsonio.save(path, model)
-    return model, "fitted on %d June-July chances (%d days, strength %.4g, %s); saved %s" % (
-        len(Y), model["days"], best["strength"], used, path)
+    err = record_model_hash(path, now=now)
+    return model, "fitted on %d June-July chances (%d days, strength %.4g, %s); saved %s; model SHA-256 %s%s" % (
+        len(Y), model["days"], best["strength"], used, path, file_sha(path), ("; " + err) if err else "")
 
 
 def load_model():
     m, ok = P._read_json(model_path())
     return m if ok and isinstance(m, dict) and m.get("coef") is not None else None
+
+
+def record_model_hash(model_file=None, hash_file=None, now=None):
+    """Write the model file's SHA-256 once, at fit time, to its own file (research/results/plan20_model_sha256.json).
+    Returns None, or why it was not written."""
+    model_file, hash_file = model_file or model_path(), hash_file or model_hash_path()
+    if os.path.exists(hash_file):
+        return "the model hash record exists (%s); it is written once" % hash_file
+    sha = file_sha(model_file)
+    if sha is None:
+        return "the model file could not be read"
+    jsonio.save(hash_file, dict(model="research/results/plan20_model.json", sha256=sha, recorded=now_iso(now)))
+    return None
+
+
+def model_hash_problem(model_file=None, hash_file=None):
+    """None when the model file's SHA-256 equals the one recorded at fit time; else the reason (fails closed: no record,
+    a damaged record or an unreadable model is a problem)."""
+    model_file, hash_file = model_file or model_path(), hash_file or model_hash_path()
+    rec, ok = P._read_json(hash_file)
+    if not ok or not isinstance(rec, dict) or not isinstance(rec.get("sha256"), str):
+        return "no readable model hash record (%s)" % os.path.basename(hash_file)
+    sha = file_sha(model_file)
+    if sha is None:
+        return "the model file could not be read"
+    if sha != rec["sha256"]:
+        return "the model file differs from the SHA-256 recorded at fit time"
+    return None
 
 
 # ---------- score (section 4) ----------
@@ -1327,6 +1502,10 @@ def score(data=None, srec=None, model=None, root=ROOT, now=None):
         bad = identity_problems(root)
         if bad:
             return None, "not frozen or changed (%s); no score" % ", ".join(bad)
+    if model is None:   # the stored model must be the one written at fit time
+        mh = model_hash_problem()
+        if mh:
+            return None, "%s; no score" % mh
     model = model or load_model()
     if model is None:
         return None, "no model yet (run fit first)"

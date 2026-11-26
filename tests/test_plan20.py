@@ -280,16 +280,32 @@ Q.http_kalshi = fake_series
 rec, msg = Q.make_series()
 assert rec and [s["ticker"] for s in rec["series"]] == ["KXBTC15M", "KXGOLD15M", "KXOLD15M", "KXSOL15M"], msg
 assert rec["groups"]["btceth"] == ["KXBTC15M"] and rec["groups"]["other"] == ["KXOLD15M"]
+assert '"other" (1, never tested): KXOLD15M (old)' in msg and "group counts:" in msg and "'crypto': 1" in msg, msg
 assert Q.make_series()[0] is None, "the series table is written once"
 assert Q.download()[0] is False, "no download before the freeze"
 assert Q.make_map()[0] is None and Q.fit()[0] is None and Q.score()[0] is None, "nothing before the freeze"
 idp = Q.identity_path()
+# freeze re-derives every stored row's group with group_of() and refuses on any difference
+spath = Q.series_path()
+keep = open(spath, encoding="utf-8").read()
+tampered = json.loads(keep)
+tampered["series"][[x["ticker"] for x in tampered["series"]].index("KXOLD15M")]["group"] = "crypto"
+tampered["groups"]["crypto"].append("KXOLD15M"); tampered["groups"]["other"] = []
+json.dump(tampered, open(spath, "w", encoding="utf-8"))
+rec, msg = Q.freeze(root=WORK)
+assert rec is None and "KXOLD15M" in msg and not os.path.exists(idp), msg
+tampered = json.loads(keep)
+tampered["groups"]["metals"] = []                  # the rows agree, a group list does not
+json.dump(tampered, open(spath, "w", encoding="utf-8"))
+rec, msg = Q.freeze(root=WORK)
+assert rec is None and "group list metals" in msg and not os.path.exists(idp), msg
+assert Q.group_mismatches(json.loads(keep)) == []
+with open(spath, "w", encoding="utf-8") as fh:
+    fh.write(keep)
 rec, msg = Q.freeze(root=WORK)
 assert rec and os.path.exists(idp), msg
 assert Q.freeze(root=WORK)[0] is None, "frozen once"
 assert Q.identity_problems(WORK) == []
-spath = Q.series_path()
-keep = open(spath, encoding="utf-8").read()
 with open(spath, "a", encoding="utf-8") as fh:
     fh.write(" ")
 assert Q.identity_problems(WORK), "a changed series table is caught"
@@ -333,8 +349,14 @@ def fake_kalshi(path, params=None):
 
 
 Q.http_kalshi = fake_kalshi
+del CALLS[:]
 recs, skipped = Q.market_list("KXSOL15M", date(2026, 6, 1), date(2026, 12, 31))
 assert sorted(recs) == ["KXSOL15M-A1", "KXSOL15M-J1", "KXSOL15M-J2", "KXSOL15M-O31"] and skipped["not_yes_no"] == 1
+hist_q = [c[1] for c in CALLS if c[0] == "/historical/markets"]
+live_q = [c[1] for c in CALLS if c[0] == "/markets"]
+assert hist_q and all("min_close_ts" not in q and "max_close_ts" not in q for q in hist_q), \
+    "no time filter on /historical/markets (as PLAN15 asks it); the close time is filtered here"
+assert live_q and all("min_close_ts" in q and "max_close_ts" in q for q in live_q), "the live listing stays bounded"
 try:
     Q.fetch_candles(dict(ticker="KXSOL15M-N1", close=NOV1, open=NOV1 - 900, hist=True))
     raise AssertionError("a November market must be refused")
@@ -387,16 +409,117 @@ assert chk["summary"]["crossed"] == 0 and chk["series"]["KXSOL15M"]["fit_days"] 
 bad = {("KXSOL15M", date(2026, 10, 31)): dict(markets=[mk("KXSOL15M-N1", NOV1, "yes", {1: (0.02, 0.04)}),
                                                         mk("KXSOL15M-O31", NOV1 - 900, "yes", {1: (0.02, 0.04)})])}
 assert [w[4][0]["ticker"] for w in Q.windows_of(bad, groups)] == ["KXSOL15M-O31"]
-# after the fit exists, August-October downloads (still nothing from November)
+
+# a market whose candle request keeps failing: its day waits for 3 failed runs, then is saved marked candles_error
+NOW = Q.lapaz_start(date(2026, 11, 25))
+J2_FAILS = [True]
+
+
+def flaky(path, params=None):
+    if path.endswith("/candlesticks") and path.split("/")[-2] == "KXSOL15M-J2" and J2_FAILS[0]:
+        CALLS.append((path, dict(params or {})))
+        raise RuntimeError("HTTP 500 on candles")
+    return fake_kalshi(path, params)
+
+
+Q.http_kalshi = flaky
+jun2 = Q.day_path("KXSOL15M", date(2026, 6, 2))
+os.remove(jun2)
+for run in (1, 2):
+    ok, msg = Q.download(now=NOW, log=QUIET)
+    assert ok and not os.path.exists(jun2), (run, msg)
+    assert P._read_json(Q.candle_failures_path())[0] == {"KXSOL15M-J2": run}
+    assert "1 waiting" in msg, msg
+ok, msg = Q.download(now=NOW, log=QUIET)
+dj = P._read_json(jun2)[0]
+assert ok and dj and [m["ticker"] for m in dj["markets"]] == ["KXSOL15M-J1", "KXSOL15M-J2"], msg
+j1, j2 = dj["markets"]
+assert j2["candles_error"] is True and j2["c"] == {} and j2["n_candles"] == 0 and "HTTP 500" in j2["candle_error"]
+assert not j1.get("candles_error") and len(j1["c"]) == 14 and dj["n_markets"] == 2
+assert P._read_json(Q.candle_failures_path())[0] == {"KXSOL15M-J2": 3}
+assert list(Q.chances([j2], dict(series="KXSOL15M", group="crypto"))) == [], "a candles_error market is never a chance"
+j2_fake = dict(j2, c={str(m): [0.02, 0.04, 0.02, 0.02, 0.04, 0.04, 0.04, 1.0, 1.0] for m in range(1, 15)})
+assert list(Q.chances([j2_fake], dict(series="KXSOL15M", group="crypto"))) == [], "even with candles in the record"
+assert Q.build_day("S", date(2026, 6, 2), [])["markets"] == []
+chk = Q.format_check()
+assert chk["summary"]["candles_error"] == 1 and chk["series"]["KXSOL15M"]["candles_error"] == 1
+assert chk["series"]["KXSOL15M"]["day_markets"]["2026-06-02"] == 2 and chk["summary"]["markets"] == 2
+assert P._read_json(Q.counts_path())[0]["summary"]["candles_error"] == 1
+J2_FAILS[0] = False
+Q.http_kalshi = fake_kalshi
+
+# a series-day the format check flagged as short is downloaded again, once (the first copy kept aside)
+fake_chk = dict(P._read_json(Q.counts_path())[0])
+fake_chk["short_days"] = [dict(series="KXSOL15M", day="2026-06-02", markets=2, before=96, after=96, refetched=False)]
+jsonio = Q.jsonio
+jsonio.save(Q.counts_path(), fake_chk)
+del CALLS[:]
+ok, msg = Q.download(now=NOW, log=QUIET)
+assert ok and sorted(c[0].split("/")[-2] for c in CALLS if c[0].endswith("/candlesticks")) == ["KXSOL15M-J1", "KXSOL15M-J2"]
+assert os.path.exists(os.path.join(Q.DATA, "refetched", "KXSOL15M", "2026-06-02.json.gz"))
+assert P._read_json(Q.refetched_path())[0] == {"KXSOL15M": ["2026-06-02"]}
+assert not P._read_json(jun2)[0]["markets"][1].get("candles_error"), "the new copy has J2's candles"
+jsonio.save(Q.counts_path(), fake_chk)
+del CALLS[:]
+ok, msg = Q.download(now=NOW, log=QUIET)
+assert ok and not [c for c in CALLS if c[0].endswith("/candlesticks")], "never downloaded again a second time"
+
+# after the fit exists, August-October downloads (still nothing from November), only for the model of the fit
 with open(Q.model_path(), "w") as fh:
     fh.write("{}")
 del CALLS[:]
-ok, msg = Q.download(now=Q.lapaz_start(date(2026, 11, 25)), log=QUIET)
+ok, msg = Q.download(now=NOW, log=QUIET)
+assert ok is False and "model hash" in msg and not CALLS, msg
+assert Q.record_model_hash() is None and Q.record_model_hash() is not None, "the hash record is written once"
+with open(Q.model_path(), "w") as fh:
+    fh.write("{ }")
+ok, msg = Q.download(now=NOW, log=QUIET)
+assert ok is False and "differs" in msg and not CALLS, msg
+with open(Q.model_path(), "w") as fh:
+    fh.write("{}")
+assert Q.model_hash_problem() is None
+ok, msg = Q.download(now=NOW, log=QUIET)
 cpaths = [c[0].split("/")[-2] for c in CALLS if c[0].endswith("/candlesticks")]
 assert sorted(cpaths) == ["KXSOL15M-A1", "KXSOL15M-O31"], cpaths
 assert all(int(c[1]["max_close_ts"]) < NOV1 for c in CALLS if "max_close_ts" in c[1])
-os.remove(Q.model_path())
+os.remove(Q.model_path()); os.remove(Q.model_hash_path())
 print("download ok")
+
+# ---------- 9b. format check: markets per series-day and short days (reads no outcome) ----------
+SH = "KXSHORT15M"
+
+
+def put_day(d, n):
+    P.save_gz(Q.day_path(SH, d), dict(series=SH, day=d.isoformat(), complete=True, markets=[
+        dict(ticker="%s-%s-%03d" % (SH, d, i), close=Q.lapaz_start(d) + 900 * (i + 1), open=Q.lapaz_start(d) + 900 * i,
+             open_listed=None, result="yes", c={}) for i in range(n)]))
+
+
+for dd, n in ((10, 96), (11, 50), (12, 96), (13, 0), (14, 96), (16, 10), (17, 96), (20, 0), (21, 0), (22, 96)):
+    put_day(date(2026, 6, dd), n)
+SH_REC = dict(series=[dict(ticker=SH, group="other")], groups={})
+P._read_json = guarded_read
+chk = Q.format_check(SH_REC)
+P._read_json = real_read
+assert [(e["day"], e["markets"]) for e in chk["short_days"]] == [("2026-06-11", 50), ("2026-06-13", 0)], chk["short_days"]
+assert chk["summary"]["short_days"] == 2 and chk["series"][SH]["day_markets"]["2026-06-16"] == 10
+jsonio.save(Q.counts_path(), chk)
+md0 = Q.map_paths()[0]
+open(md0, "w").write("x")                           # a map exists: June-July days are never re-read
+assert Q.refetch_short_days(log=QUIET) == [] and os.path.exists(Q.day_path(SH, date(2026, 6, 11)))
+os.remove(md0)
+moved = Q.refetch_short_days(log=QUIET)
+assert moved == [(SH, date(2026, 6, 11)), (SH, date(2026, 6, 13))], moved
+assert not os.path.exists(Q.day_path(SH, date(2026, 6, 11))) and P._read_json(Q.refetched_path())[0][SH] == ["2026-06-11", "2026-06-13"]
+put_day(date(2026, 6, 11), 50)
+put_day(date(2026, 6, 13), 0)
+chk = Q.format_check(SH_REC)
+assert all(e["refetched"] for e in chk["short_days"]) and len(chk["short_days"]) == 2, "still reported"
+jsonio.save(Q.counts_path(), chk)
+assert Q.refetch_short_days(log=QUIET) == [], "at most once"
+import shutil as _sh
+_sh.rmtree(os.path.join(Q.DATA, "days", SH)); os.remove(Q.counts_path())
+print("format check ok")
 
 # ---------- 10. map, fit, score on synthetic data (stages in order, each once) ----------
 assert Q.fit(data={}, srec=P._read_json(spath)[0])[0] is None, "the fit waits for the map"
@@ -485,6 +608,26 @@ assert model["series"] == ["KXBTC15M", "KXGOLD15M", "KXSOL15M"] and model["stren
 assert len(model["coef"]) == len(model["inputs"]) and model["map_sha256"] == Q.file_sha(md_p)
 assert model["plan_sha256"] == Q.PLAN_SHA256 and model["frozen"] == model["fitted"]
 assert Q.fit(data=fitdata, srec=SREC)[0] is None, "fitted once"
+# the model's SHA-256 is written once at fit time; the score refuses a model file changed after that
+hrec = P._read_json(Q.model_hash_path())[0]
+assert hrec["sha256"] == Q.file_sha(Q.model_path()) and hrec["sha256"] in msg and Q.model_hash_problem() is None
+assert Q.record_model_hash() is not None, "written once"
+mkeep = open(Q.model_path(), "rb").read()
+with open(Q.model_path(), "ab") as fh:
+    fh.write(b"\n")
+r_, m_ = Q.score(data={}, srec=SREC)
+assert r_ is None and "differs" in m_ and not os.path.exists(Q.result_paths()[1]), m_
+open(Q.model_path(), "wb").write(mkeep)
+hkeep = open(Q.model_hash_path(), "rb").read()
+os.remove(Q.model_hash_path())
+r_, m_ = Q.score(data={}, srec=SREC)
+assert r_ is None and "model hash record" in m_, m_
+os.rename(Q.model_path(), Q.model_path() + ".aside")
+open(Q.model_hash_path(), "wb").write(hkeep)
+r_, m_ = Q.fit(data=fitdata, srec=SREC)
+assert r_ is None and "hash record exists" in m_, "no second fit next to a hash record"
+os.rename(Q.model_path() + ".aside", Q.model_path())
+assert Q.model_hash_problem() is None
 # an unseen series keeps its group indicator only
 fx = Q.features({"5": [0.03, 0.04, 0.04, 0.03, 0.04, 0.04, 0, 0, 0]}, "yes", 5, dict(open=O, series="KXNEW15M", group="crypto"))
 row = Q.design_row(fx, model["series"])
@@ -522,4 +665,15 @@ assert Q.score(data=only_btc, srec=SREC, model=bad_model)[0] is None, "a model f
 print("map, fit, score ok")
 
 assert "PLAN20:" in Q.status()
+
+# the workflow (cloud/workflows is the only copy): once-only guards by commit history, a blobless full clone
+wf = open(os.path.join(WORK, "cloud", "workflows", "plan20.yml"), encoding="utf-8").read()
+assert not os.path.exists(os.path.join(WORK, ".github", "workflows", "plan20.yml"))
+assert "git log --oneline -- research/results/plan20_identity.json | grep -q ." in wf, "freeze guard by history"
+assert "ls-files --error-unmatch research/results/plan20_identity.json" not in wf.split("Refuse every later stage")[0]
+assert "fetch-depth: 0" in wf and "filter: blob:none" in wf
+fit_part = wf.split("Refuse a second fit")[1].split("- name:")[0]
+score_part = wf.split("Refuse a second score")[1].split("- name:")[0]
+assert "plan20_model_sha256.json" in fit_part and "git log --oneline" in fit_part
+assert "plan20_model_sha256.json" in score_part and "git diff --quiet HEAD" in score_part
 print("PLAN20 tests passed")

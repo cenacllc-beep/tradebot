@@ -6,6 +6,8 @@ DATA = os.path.join(OUT, "live20")
 os.environ["LIVE20_DATA"] = DATA
 os.environ["LIVE20_SERIES"] = os.path.join(OUT, "plan20_series.json")
 os.environ["LIVE20_MODEL"] = os.path.join(OUT, "plan20_model.json")
+os.environ["LIVE20_MODEL_SHA"] = os.path.join(OUT, "plan20_model_sha256.json")
+os.environ["LIVE20_RESULT"] = os.path.join(OUT, "plan20_result.json")
 sys.path.insert(0, os.path.join(WORK, "research")); sys.path.insert(0, WORK)
 sys.modules.pop("plan20", None)
 import live20 as L
@@ -98,7 +100,14 @@ assert [g["minute"] for g in gaps] == [T0 + 240] and "late" in gaps[0]["why"], g
 assert len(errs) == 1 and errs[0]["series"] == "KXGOLD15M" and errs[0]["minute"] == T0 + 120, errs
 assert all(abs(x["ts"] - x["minute"] - L.OFFSET) < 105 for x in snaps)
 assert all(p in ("/series", "/markets") for p, _ in calls) and not any(p.startswith("/portfolio") for p, _ in calls)
-assert os.path.exists(os.path.join(DATA, "snap-%s.jsonl" % L.day_of(T0 + 60)))
+# snapshots: one small gzip file per 30-minute UTC chunk; nothing left plain after the run, no whole-day file
+assert os.path.exists(os.path.join(DATA, "snap-%s.jsonl.gz" % L.chunk_of(T0 + 60)))
+assert not os.path.exists(os.path.join(DATA, "snap-%s.jsonl" % L.chunk_of(T0 + 60)))
+assert not [f for f in os.listdir(DATA) if f.startswith("snap-") and not f.endswith(".gz")], os.listdir(DATA)
+assert not os.path.exists(os.path.join(DATA, "snap-%s.jsonl" % L.day_of(T0 + 60)))
+assert L.chunk_of(1795000500 - 1795000500 % 1800) == L.chunk_of(1795000500 - 1795000500 % 1800 + 1799)
+assert L.chunk_of(1795000500 - 1795000500 % 1800 + 1800) != L.chunk_of(1795000500 - 1795000500 % 1800)
+assert L.chunk_of(datetime(2026, 12, 1, 10, 47, tzinfo=timezone.utc).timestamp()) == "20261201-1030"
 print("run ok: minutes", [(x - T0) // 60 for x in mins], "gap at minute 4, one failed request logged")
 
 # every request failing: the minute is a gap row, the loop goes on and ends on time
@@ -115,6 +124,68 @@ st = L.status()
 assert st["minutes_logged"] == 5 and st["gap_rows"] == 3 and st["markets"] == 4 and st["series"] == 2 and st["paper_bets"] is None
 assert not any(k for k in st if "pnl" in k or "profit" in k or "net" in k)
 print("resilience ok")
+
+# ---- torn-line appends: a line torn by a crash never swallows the next row
+MAIN_DATA = L.DATA
+L.DATA = os.path.join(OUT, "live20_side"); os.makedirs(L.DATA)
+tp = os.path.join(L.DATA, "log.jsonl")
+with open(tp, "w", encoding="utf-8") as fh:
+    fh.write('{"kind":"run_start","ts":1}\n{"kind":"gap","mi')          # crash mid-line
+L.log_row("gap", minute=5)
+got = [json.loads(x) for x in open(tp, encoding="utf-8").read().splitlines() if x.startswith("{") and x.endswith("}")]
+assert [g["kind"] for g in got] == ["run_start", "gap"] and got[1]["minute"] == 5, open(tp).read()
+from tbcommon import jsonio as _jio
+assert len(_jio.lines(tp)) == 2, "the torn line alone is skipped, both whole rows are read"
+L.append_rows(tp, [dict(kind="x")]); L.append_rows(tp, [])
+assert open(tp, "rb").read().endswith(b'{"kind":"x"}\n') and b"\n\n" not in open(tp, "rb").read()
+L.append_rows(os.path.join(L.DATA, "new.jsonl"), [dict(a=1)])
+assert open(os.path.join(L.DATA, "new.jsonl"), "rb").read() == b'{"a":1}\n', "an empty file gets no leading newline"
+tsnap = os.path.join(L.DATA, "snap-%s.jsonl" % L.chunk_of(T0))
+with open(tsnap, "w", encoding="utf-8") as fh:
+    fh.write('{"minute":%d,"ticker":"A","series":"S"}\n{"minute":%d,"tick' % (T0, T0 + 60))
+L.append_rows(tsnap, [dict(minute=T0 + 60, ticker="B", series="S")])
+assert [(r["minute"], r["ticker"]) for r in L.snapshots()] == [(T0, "A"), (T0 + 60, "B")]
+
+# a chunk written by two runs: the .gz is merged, a (minute, ticker) kept once
+L.compact()
+assert os.path.exists(tsnap + ".gz") and not os.path.exists(tsnap)
+L.append_rows(tsnap, [dict(minute=T0 + 60, ticker="B", series="S"), dict(minute=T0 + 120, ticker="C", series="S")])
+L.compact(keep=L.chunk_of(T0))
+assert os.path.exists(tsnap), "the chunk being written is not compacted"
+L.compact()
+assert [(r["minute"], r["ticker"]) for r in L.snapshots()] == [(T0, "A"), (T0 + 60, "B"), (T0 + 120, "C")]
+# old formats are still read: a whole-day plain file and a whole-day gz, next to the chunks
+old_day = L.day_of(T0 - 86400)
+with gzip.open(os.path.join(L.DATA, "snap-%s.jsonl.gz" % old_day), "wt", encoding="utf-8") as fh:
+    fh.write(json.dumps(dict(minute=T0 - 86400, ticker="OLDGZ", series="S")) + "\n")
+with open(os.path.join(L.DATA, "snap-%s.jsonl" % L.day_of(T0)), "w", encoding="utf-8") as fh:
+    fh.write(json.dumps(dict(minute=T0 - 60, ticker="OLDPLAIN", series="S")) + "\n")
+assert {r["ticker"] for r in L.snapshots()} == {"OLDGZ", "OLDPLAIN", "A", "B", "C"}
+assert L.compact(today=L.day_of(T0)) is None and os.path.exists(os.path.join(L.DATA, "snap-%s.jsonl" % L.day_of(T0))), \
+    "an old-format plain file of today is not compacted"
+
+# a run crossing a 30-minute boundary closes the first chunk while it runs
+shutil.rmtree(L.DATA); os.makedirs(L.DATA)
+L.http = kalshi
+FAIL.clear(); SLOW.clear()
+b0 = (int(clock[0] // 1800) + 1) * 1800
+clock[0] = b0 - 3 * 60 - 10
+seen_files = []
+real_snapshot = L.snapshot
+def spy_snapshot(series, minute):
+    seen_files.append(sorted(os.listdir(L.DATA)))
+    return real_snapshot(series, minute)
+L.snapshot = spy_snapshot
+assert L.run(6) == 0
+L.snapshot = real_snapshot
+first, second = L.chunk_of(b0 - 60), L.chunk_of(b0)
+assert first != second
+assert any(("snap-%s.jsonl.gz" % first) in fs and ("snap-%s.jsonl" % first) not in fs for fs in seen_files), \
+    "the finished chunk is gzipped during the run"
+assert sorted(f for f in os.listdir(L.DATA) if f.startswith("snap-")) == \
+    ["snap-%s.jsonl.gz" % first, "snap-%s.jsonl.gz" % second]
+L.DATA = MAIN_DATA
+print("torn lines and 30-minute chunks ok")
 
 # ---- settle: closed markets only, strategy.payout's rules, undecided ones asked again later
 asked = []
@@ -148,6 +219,24 @@ import random, importlib
 sys.modules.pop("plan20", None)
 Q = importlib.import_module("plan20")
 assert L.NEEDED and all(hasattr(Q, k) for k in L.NEEDED)
+IDENT = [[]]                                    # plan20's identity check, as the test sets it (the real one needs a freeze)
+real_identity = Q.identity_problems
+def fake_identity(*a, **k):
+    if IDENT[0] == "raise":
+        raise RuntimeError("identity check crashed")
+    return IDENT[0]
+Q.identity_problems = fake_identity
+MF, MSHA = os.environ["LIVE20_MODEL"], os.environ["LIVE20_MODEL_SHA"]
+assert L.MODEL_SHA_FILE == MSHA and L.RESULT_FILE == os.environ["LIVE20_RESULT"]
+
+
+def put_model(m):
+    """Write the model file and its fit-time SHA-256 record (as plan20's fit does)."""
+    json.dump(m, open(MF, "w"))
+    if os.path.exists(MSHA):
+        os.remove(MSHA)
+    assert Q.record_model_hash(MF, MSHA) is None
+    assert Q.record_model_hash(MF, MSHA) is not None, "the hash record is written once"
 shutil.rmtree(DATA); os.makedirs(DATA)
 SERIES = {"KXSOL15M": "crypto", "KXGOLD15M": "metals"}
 json.dump({"series": [{"ticker": k, "group": v} for k, v in SERIES.items()]}, open(os.environ["LIVE20_SERIES"], "w"))
@@ -162,7 +251,7 @@ coef[k] = 2.5                                    # hhhl: the candle highs and lo
 FREEZE = Q.lapaz_start(Q.date(2026, 10, 1))
 model = dict(plan_sha256=Q.PLAN_SHA256, series=slist, mean=[0.0] * k, sd=[1.0] * k, intercept=-4.5, coef=coef,
              fitted=iso(FREEZE), frozen=iso(FREEZE))
-json.dump(model, open(os.environ["LIVE20_MODEL"], "w"))
+put_model(model)
 
 def raw_candle(end, yb, ya, rnd):
     """One Kalshi candlestick (dollar strings), with highs and lows around the closes."""
@@ -278,11 +367,11 @@ cnt = same_as_collect(model, bets)
 assert cnt["windows"] // 2 > len(bets) > 5, (cnt, len(bets))
 # a looser model: passes that cannot fill (the window goes on to a later chance) must match too
 loose = dict(model, intercept=-3.0)
-json.dump(loose, open(os.environ["LIVE20_MODEL"], "w"))
+put_model(loose)
 L.paper()
 cnt2 = same_as_collect(loose, [json.loads(l) for l in open(os.path.join(DATA, "paper.jsonl"))])
 assert sum(cnt2["passed_unfilled"].values()) > 0 and cnt2["windows_with_bet"] > len(bets), cnt2
-json.dump(model, open(os.environ["LIVE20_MODEL"], "w"))
+put_model(model)
 L.paper()
 # the candle highs and lows reach the features: some chance has hhhl = 1 (snapshots alone would give 0 everywhere)
 hh = [f["hhhl"] for s in slist for c in closes for t in RAW if t.startswith("%s-%d-" % (s, c))
@@ -296,7 +385,23 @@ print("paper ok: %d bets in %d windows equal plan20.collect's" % (len(bets), cnt
 first = open(os.path.join(DATA, "paper.jsonl"), "rb").read()
 got_calls.clear()
 assert L.paper() == n and not got_calls and open(os.path.join(DATA, "paper.jsonl"), "rb").read() == first
-assert os.path.exists(L.candle_path("KXSOL15M", "KXSOL15M-%d-00" % closes[0]))
+# candles: one gzip bundle per series and La Paz day of the close; no file per market
+b_path = L.bundle_path("KXSOL15M", closes[0])
+assert os.path.exists(b_path) and b_path.endswith("%s.json.gz" % L.lapaz_day(closes[0]))
+assert not os.path.exists(L.candle_path("KXSOL15M", "KXSOL15M-%d-00" % closes[0]))
+assert not [f for f in os.listdir(os.path.join(DATA, "candles", "KXSOL15M")) if not f.endswith(".json.gz")]
+bundle = json.load(gzip.open(b_path, "rt", encoding="utf-8"))
+t_old = "KXSOL15M-%d-00" % closes[0]
+assert bundle["markets"][t_old]["candlesticks"] == RAW[t_old] and bundle["markets"][t_old]["close"] == closes[0]
+# the old one-file-a-market cache is still read: move one market out of its bundle into the old format
+old_entry = bundle["markets"].pop(t_old)
+with gzip.open(b_path, "wt", encoding="utf-8") as fh:
+    json.dump(bundle, fh)
+os.makedirs(os.path.dirname(L.candle_path("KXSOL15M", t_old)), exist_ok=True)
+json.dump(dict(ticker=t_old, series="KXSOL15M", candlesticks=old_entry["candlesticks"]),
+          open(L.candle_path("KXSOL15M", t_old), "w"))
+got_calls.clear()
+assert L.paper() == n and not got_calls and open(os.path.join(DATA, "paper.jsonl"), "rb").read() == first
 # the pending window's result arrives: it is now decided (one more candle fetch, nothing else)
 RESULTS[pending] = dict(result="no")
 json.dump(RESULTS, open(os.path.join(DATA, "results.json"), "w"))
@@ -304,12 +409,82 @@ n2 = L.paper()
 assert {p.split("/")[-2] for p, _ in got_calls} <= {t for t in RAW if t.startswith("KXGOLD15M-%d-" % pend_c)}, got_calls
 assert n2 in (n, n + 1)
 # no model plan match: fail closed
-json.dump(dict(model, plan_sha256="0" * 64), open(os.environ["LIVE20_MODEL"], "w"))
+put_model(dict(model, plan_sha256="0" * 64))
 assert L.paper() is None
-json.dump(model, open(os.environ["LIVE20_MODEL"], "w"))
+put_model(model)
+assert L.paper() is not None
+
+# the model file changed after its fit-time SHA-256 was recorded: fail closed (and with no record, or a damaged one)
+keep_bytes = open(MF, "rb").read()
+with open(MF, "ab") as fh:
+    fh.write(b" ")
+assert L.paper() is None
+open(MF, "wb").write(keep_bytes)
+assert L.paper() is not None
+os.remove(MSHA)
+assert L.paper() is None
+open(MSHA, "w").write("{damaged")
+assert L.paper() is None
+put_model(model)
+assert L.paper() is not None
+
+# plan20's identity check must be clean ([]); anything else, or a crash, fails closed
+for bad in (["research/plan20.py"], None, "raise", ["no identity record (run freeze first)"]):
+    IDENT[0] = bad
+    assert L.paper() is None, bad
+IDENT[0] = []
+assert real_identity is not fake_identity and real_identity(WORK) != [], "the real check is not clean without a freeze"
+print("identity and model hash ok")
+
+# stage C: a row counts only for a group the stored result shows passed, from the first full La Paz day after it
+def rows_now():
+    assert L.paper() is not None
+    return [json.loads(l) for l in open(os.path.join(DATA, "paper.jsonl"))]
+rows = rows_now()
+assert rows and all(r["stage_c"] is False for r in rows), "no result: every row is descriptive"
+RF = os.environ["LIVE20_RESULT"]
+first_open = closes[0] - 900          # La Paz midnight (FREEZE + 3 days)
+assert first_open == Q.lapaz_start(Q.lapaz_date(first_open))
+def put_result(scored_ts, tests, plan=Q.PLAN_SHA256):
+    json.dump(dict(plan_sha256=plan, scored=datetime.fromtimestamp(scored_ts, timezone.utc).isoformat(), tests=tests),
+              open(RF, "w"))
+PASS_CRYPTO = [dict(name="crypto", passed=True), dict(name="metals", passed=False), dict(name="energy", passed=False),
+               dict(name="fx", passed=False)]
+put_result(first_open - 1, PASS_CRYPTO)          # scored one second before the windows' La Paz day begins
+rows = rows_now()
+assert any(r["group"] == "crypto" for r in rows) and any(r["group"] == "metals" for r in rows)
+assert all(r["stage_c"] == (r["group"] == "crypto") for r in rows), "crypto rows from the next La Paz midnight on"
+assert min(r["open"] for r in rows if r["group"] == "crypto") >= first_open
+put_result(first_open, PASS_CRYPTO)              # scored at that midnight: the first full day after is the next one
+assert all(r["stage_c"] is False for r in rows_now())
+put_result(first_open - 86400 + 3600 * 20, PASS_CRYPTO)   # 8 PM the evening before: same first day
+assert all(r["stage_c"] == (r["group"] == "crypto") for r in rows_now())
+put_result(first_open - 1, [dict(name="metals", passed=True), dict(name="btceth", passed=True)])
+assert all(r["stage_c"] == (r["group"] == "metals") for r in rows_now()), "only tested groups can pass"
+put_result(first_open - 1, PASS_CRYPTO, plan="0" * 64)
+assert all(r["stage_c"] is False for r in rows_now()), "a result under another plan text counts for nothing"
+put_result(first_open - 1, [dict(name="crypto", passed="yes")])
+assert all(r["stage_c"] is False for r in rows_now()), "passed must be True itself"
+open(RF, "w").write("{damaged")
+assert all(r["stage_c"] is False for r in rows_now()), "a damaged result: every row descriptive"
+os.remove(RF)
+print("stage C flags ok")
 
 # the kill switch stops paper bets (fails closed)
 import core
 core.kill_file = lambda: "KILL"
 assert L.paper() is None
+# the workflow: about 325 minutes of sampling, a 300-second paper budget, every step limited inside the job's 355
+import re as _re
+wf = open(os.path.join(WORK, "cloud", "workflows", "live20.yml"), encoding="utf-8").read()
+assert not os.path.exists(os.path.join(WORK, ".github", "workflows", "live20.yml"))
+assert "+ 325 * 60" in wf and "345" not in wf.split("jobs:")[1]
+assert "live20.py paper --budget-seconds 300" in wf
+job_limit = int(_re.search(r"\n    timeout-minutes: (\d+)", wf).group(1))
+steps = wf.split("    steps:\n")[1].split("\n      - ")
+step_limits = [int(_re.search(r"\n        timeout-minutes: (\d+)", "\n" + st).group(1)) for st in steps if st.strip()]
+assert len(step_limits) == len([st for st in steps if st.strip()]) == 6, step_limits
+assert job_limit == 355 and sum(step_limits) <= job_limit, (step_limits, job_limit)
+_doc = " ".join(open(os.path.join(WORK, "research", "live20.py"), encoding="utf-8").read().split('"""')[1].split())
+assert "The KILL file lives on the PC only" in _doc and "the switch is not seen" in _doc and "harmless" in _doc
 print("all live20 tests passed")
