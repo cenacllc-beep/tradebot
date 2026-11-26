@@ -50,7 +50,7 @@ assert got == [base | L.CREATE_BREAKAWAY_FROM_JOB, base], got
 # run.bat's hourly job runs the launcher before anything long, and nothing else starts PLAN4
 bat = open(os.path.join(WORK, "run.bat"), encoding="utf-8").read()
 code = re.sub(r"(?m)^rem .*$", "", bat); hourly = code[code.index(":hourly"):code.index("exit /b 0", code.index(":hourly"))]
-assert hourly.index("research\\plan4_launch.py") < hourly.index("research\\lip.py sample"), hourly
+assert hourly.index("research\\plan4_launch.py") < hourly.index("research\\structure.py"), hourly   # first step (lip.py left in r94)
 assert "plan4.py" not in code and "plan4_run.ps1" not in code
 # a started process does not hold its parent's output pipe: the reader sees the end at once (the hourly job's case)
 import subprocess, time, textwrap

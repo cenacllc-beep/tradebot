@@ -412,7 +412,8 @@ def _lip_rows(root, now):
     if second:   # since 2026-10-29 this PC samples alongside GitHub: an hour missed here can be taken there, so only a
         # sampler that has stopped altogether (nothing for a day inside the window) is flagged
         detail = ("this PC samples alongside GitHub Actions; the two copies are merged before the single score, so an hour"
-                  " missed here (laptop asleep) can still be taken there")
+                  " missed here (laptop asleep) can still be taken there") if (end is None or now < end) else \
+                 "sampling ended when the window closed; the merged copy was scored once in the repository (r94)"
         last, note = _lip_seen(lip_dir)
         detail = "; ".join(x for x in (detail, note) if x)
         base = last if (last and start and last >= start) else start   # inside the window, age counts from its start

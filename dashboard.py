@@ -589,8 +589,12 @@ def read_research():
                 with open(f,encoding="utf-8") as fh: lip_n=(lip_n or 0)+sum(1 for _ in fh)
             except OSError: pass
         if lip_n is not None and os.path.exists(os.path.join("research","data","lip","SECONDARY.txt")):   # two samplers (2026-10-29)
-            lip_n=("%d market-hours sampled on this PC so far; GitHub samples too, and the two copies are merged before"
-                   " the single score (interim, not actionable)."%lip_n)
+            if datetime.now(timezone.utc).timestamp()>=1795233600:   # 2026-11-21 00:00 La Paz: PLAN5 L's window closed; scored once on Nov 25 (r94)
+                lip_n=("%d market-hours sampled on this PC; sampling ended Nov 20 and the test was scored once from the"
+                       " merged copy in the repository (not testable)."%lip_n)
+            else:
+                lip_n=("%d market-hours sampled on this PC so far; GitHub samples too, and the two copies are merged before"
+                       " the single score (interim, not actionable)."%lip_n)
     return sr,notes,lip_n
 def last_scan_line(obs,tr):
     last=max([r["ts"] or 0 for r in obs] or [0])

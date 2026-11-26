@@ -2229,3 +2229,7 @@ unfamiliar codebase ... do not change functionality. only upgrade the code quali
 - tests/test_moves.py: asserts lip.py is gone from :hourly; a time-dependent check (merged.json stamped by the real
   clock, now after the window) is backdated in the test so it reads the same after the window ended.
 - Deployed to the PC after 1 AM La Paz (outside the scan window), with the old run.bat kept in backups\code_pre_r94.
+- r94 review (agents/code-reviewer.md): no MUST; applied: the dashboard's and freshness.py's PLAN5 L notes say the
+  sampling ended and the test was scored once (after Nov 21); tasks\hourly.cmd's header no longer lists PLAN5 L;
+  CLAUDE.md section 10 updated. tests/test_plan4launch.py checked the launcher ran before lip.py; it now checks it runs
+  before the structure scan. Full suite: all 47 tests pass.
