@@ -2394,3 +2394,19 @@ unfamiliar codebase ... do not change functionality. only upgrade the code quali
     run was working); a finished run's age is counted from its end (updatedAt). All tests pass.
 - 15:33 (r95b): dashboard.py with the Backup AI panel at the end of the page copied to the PC (the PC copy matched
   r95; the afternoon settle had finished at 14:52). The 16:20 hourly run rebuilds dashboard.html.
+
+## 2026-11-26 15:55 (La Paz) - r96: dashboard settings for the NVIDIA key (`.\run settings`)
+- User: "Need to add the key directly in the dashboard settings", then chose "Settings box + GitHub's tool" (asked in so
+  many words; recorded in CLAUDE.md section 3). dashboard.html is a static file that cannot save or reach GitHub, so
+  settings.py serves a settings page on 127.0.0.1 only (random port, random one-time path, exact Host and Origin
+  checks, no request logging, stops after a save or 10 minutes) whose key box sends the key to GitHub's encrypted
+  secret NVIDIA_API_KEY with `gh secret set` (key on standard input only; never written to disk, a log or a page).
+- Code review (agents/code-reviewer.md) applied: Referrer-Policy same-origin (no-referrer made browsers send
+  Origin: null, so every save would have failed); a threaded server with a 15 s read timeout (an idle browser
+  connection could hang it); an exclusive port (SO_EXCLUSIVEADDRUSE on Windows); a text box masked by CSS so browsers
+  do not offer to save it as a password; exact Host match and constant-time token check; UTF-8 decoding of gh's
+  output; malformed Content-Length answered 400; gh checked once per session; "open a new terminal" after installing.
+- run.bat gains `settings` (CRLF kept); the dashboard's Backup AI panel points to it (GitHub's own form stays as an
+  alternative). tests/test_settings.py (fake gh; skipped on Windows). All tests pass.
+- Deployed to the PC 15:54: settings.py, run.bat, dashboard.py, tests\test_settings.py (originals of the changed files
+  in backups\code_pre_r96\). The user installs gh (`winget install --id GitHub.cli`) and runs `gh auth login` himself.

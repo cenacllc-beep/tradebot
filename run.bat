@@ -25,6 +25,7 @@ rem   run test       run the automated tests (fake data in a temporary folder; n
 rem   run learn      learning report: wins and losses by pattern (read-only; add --past for the past rain data)
 rem   run kill       kill switch ON: scans stop trading (no paper trades, no shadow orders, no Kalshi orders)
 rem   run unkill     kill switch off (typed by you); "run kill status" shows it
+rem   run settings   settings page on this PC: save the backup AI's NVIDIA key to GitHub's encrypted secret (needs gh)
 rem   run live ...   Kalshi account: setup, test, status, demo-order, use demo, use prod, unlock, lock, resume, sync, snapshot
 rem                  (live.py; real money stays locked until Nov 11 and then needs "run live unlock" typed by you)
 rem The shadow tests (shadow.py) are research only and never count toward the gate. If they or the
@@ -57,7 +58,8 @@ if /i "%~1"=="live" goto live
 if /i "%~1"=="learn" goto learn
 if /i "%~1"=="kill" goto kill
 if /i "%~1"=="unkill" goto unkill
-echo Usage: run scan ^| run settle ^| run report ^| run dashboard ^| run watch ^| run marks ^| run hourly ^| run structure ^| run discover ^| run freshness ^| run ohlc ^| run micro ^| run combo ^| run backup ^| run check ^| run export ^| run test ^| run live ^| run learn ^| run kill ^| run unkill
+if /i "%~1"=="settings" goto settings
+echo Usage: run scan ^| run settle ^| run report ^| run dashboard ^| run watch ^| run marks ^| run hourly ^| run structure ^| run discover ^| run freshness ^| run ohlc ^| run micro ^| run combo ^| run backup ^| run check ^| run export ^| run test ^| run live ^| run learn ^| run kill ^| run unkill ^| run settings
 exit /b 1
 
 :scan
@@ -216,6 +218,10 @@ exit /b %errorlevel%
 
 :live
 "%PY%" live.py %2 %3 %4
+exit /b %errorlevel%
+
+:settings
+"%PY%" settings.py
 exit /b %errorlevel%
 
 :learn
