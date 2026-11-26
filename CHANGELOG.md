@@ -2384,3 +2384,11 @@ unfamiliar codebase ... do not change functionality. only upgrade the code quali
   -p1 trick refused); the test job's file check documented as advisory; publish labels separately and only reuses a
   branch from the same run and diff. All tests pass. Switched on (.github/workflows/backup-ai.yml) after a manual
   check-only run; fixes can only start after 24 hours without a Claude commit.
+- 15:55: the backup AI's first check (no key yet) found three stale jobs. Acted on:
+  - plan19.yml: GitHub started 1 of about 48 scheduled 20-minute runs in 16 hours. Each run now loops for about
+    5.5 hours (every 20 minutes: sample, fill checks, results, score, save), with an hourly schedule so a queued run
+    takes over. Logistics only: PLAN19's rules and code are unchanged; sampling starts Nov 28 as planned.
+  - plan5-lip.yml was already switched off on GitHub (PLAN5 L ended Nov 20, scored once Nov 25); the backup AI now
+    lists switched-off workflows as "disabled" instead of flagging them.
+  - ops/backup_ai.py: a run in progress under 6 hours counts as running (live20 was reported stale while its 5.5-hour
+    run was working); a finished run's age is counted from its end (updatedAt). All tests pass.

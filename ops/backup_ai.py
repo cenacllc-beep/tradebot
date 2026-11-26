@@ -652,7 +652,17 @@ def check():
               repository=os.environ.get("GITHUB_REPOSITORY") or os.environ.get("GH_REPO") or "",
               key_present=bool(os.environ.get("NVIDIA_API_KEY")), workflows=[], data=[], problems=[], errors=[],
               ai=dict(used=False, task=None, model=None, note=None), note="Reads GitHub only; the PC is not reachable from here.")
+    try:   # a workflow switched off on GitHub (e.g. plan5-lip after its single score) is listed, never flagged
+        off = set(os.path.basename(w.get("path") or "") for w in (gh_json(["workflow", "list", "--all", "--json", "path,state"], []) or [])
+                  if (w.get("state") or "").startswith("disabled"))
+    except RuntimeError:
+        off = set()
     for wf in read_workflows():
+        if os.path.basename(wf["file"]) in off:
+            st["workflows"].append(dict(file=wf["file"], name=wf["name"], schedule=wf["crons"], expected_max_gap_minutes=None,
+                                        limit_minutes=None, latest=None, latest_completed=None, age_minutes=None,
+                                        state="disabled", problem=None))
+            continue
         try:
             runs = gh_json(["run", "list", "--workflow", wf["file"], "--branch", "main", "--limit", "5", "--json",
                             "databaseId,status,conclusion,createdAt,updatedAt,event,attempt,url,headBranch,displayTitle"], [])
