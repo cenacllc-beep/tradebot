@@ -2438,3 +2438,13 @@ unfamiliar codebase ... do not change functionality. only upgrade the code quali
   in the fit, as PLAN20 section 4 says); for metals, energy and FX it applies those shared chart features with a
   group indicator that has little or no data (section 4's rule for unseen series). No rule changes: this is how the
   frozen plan reads; whether those groups reach their floors is known only after the August-October download.
+- 20:00 (00:00 UTC): PLAN20 stage A map written (research/results/plan20_map.md, SHA-256 f9237632...): June-July
+  cheap sides (1-10c, 135,586 chances, 61 days) won 3.3% where their asks averaged 4.7% (-1.4c a contract before
+  fees, day-clustered 95% interval -1.7c to -1.1c); every group, series, ask band, minutes-left band, recent move and
+  hour band lost; the near-zero cells (10-14 minutes left; flat last 3 minutes) are small. Descriptive only.
+- Stage B fit (numpy 2.3.4 on the runner): ridge strength 0.003162 chosen from the 13-value grid by 5-fold day-grouped
+  log-loss; 43 inputs, 135,586 rows; frozen in research/results/plan20_model.json, model SHA-256
+  8e351ab15297d48c2f511aa15316851fd7e2067ef2fc48b9d870c1ae9240aa1a (also in plan20_model_sha256.json). It records
+  the map's hash and the series table's. August-October download starts now; the score runs once after it.
+- From the freeze on, live20's paper replay writes forward paper bets with this model (stage_c false: descriptive
+  until a group passes).
