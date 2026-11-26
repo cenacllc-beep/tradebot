@@ -2255,3 +2255,11 @@ unfamiliar codebase ... do not change functionality. only upgrade the code quali
 - Waiting on the user before the freeze: whether his Kalshi account is eligible for liquidity rewards (US member, not
   an IB/FCM customer, SSN on file); it must be on record before 2026-11-28 00:00 La Paz or the rewards figures are
   reported only. No rule, threshold, lock or limit changed.
+
+## 2026-11-25 22:39 (La Paz) - PLAN19 eligibility on record; PLAN19.md frozen
+- The user answered "Yes, eligible" to the question, asked in so many words, of whether his Kalshi account is
+  eligible for Kalshi's liquidity rewards (US member, not opened through a broker or FCM, SSN on file). This is before
+  the first sample (2026-11-28 00:00 La Paz), so PLAN19's "with rewards" verdict applies (section 5). His word is
+  taken as given; Kalshi's own reward statement remains the real check.
+- research/PLAN19.md frozen, SHA-256 ff25310ad62f9af77b9e2f330b907777b0098cf17aa37757c7d66b08e79144cf. Next: research/plan19.py, its tests and workflow, a code review,
+  then the code is frozen before the first sample. Research and paper only; no rule, threshold, lock or limit changed.
