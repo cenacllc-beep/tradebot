@@ -1,0 +1,8093 @@
+{
+ "probe": "PROBE19",
+ "run": "2026-11-26T02:07:22.854676+00:00",
+ "programs": 6446,
+ "keys": [
+  "discount_factor_bps",
+  "end_date",
+  "event_ticker",
+  "id",
+  "incentive_description",
+  "incentive_type",
+  "market_id",
+  "market_ticker",
+  "paid_out",
+  "period_reward",
+  "series_ticker",
+  "start_date",
+  "target_size_fp"
+ ],
+ "note": "counts only; period_reward read as 1/10,000 of a dollar (PLAN5's unit check)",
+ "series": {
+  "KXYTVIEWSHIGH": {
+   "programs": 257,
+   "reward_usd": 15580.0,
+   "types": {
+    "liquidity": 257
+   },
+   "targets": {
+    "1000.00": 257
+   },
+   "discounts": {
+    "5000": 257
+   },
+   "first_start": "2026-11-22T16:00:00Z",
+   "last_end": "2026-12-02T05:00:00Z",
+   "fee_type": "quadratic",
+   "fee_multiplier": 1,
+   "category": "Entertainment",
+   "title": "highest daily views in time period"
+  },
+  "KXRPRESPRIMARY": {
+   "programs": 255,
+   "reward_usd": 12750.0,
+   "types": {
+    "liquidity": 255
+   },
+   "targets": {
+    "1000.00": 255
+   },
+   "discounts": {
+    "5000": 255
+   },
+   "first_start": "2026-11-25T05:00:00Z",
+   "last_end": "2026-12-02T05:00:00Z",
+   "fee_type": "quadratic",
+   "fee_multiplier": 1,
+   "category": "Elections",
+   "title": "Republican presidential primaries"
+  },
+  "KXYTVIEWSW": {
+   "programs": 244,
+   "reward_usd": 21960.0,
+   "types": {
+    "liquidity": 244
+   },
+   "targets": {
+    "1000.00": 244
+   },
+   "discounts": {
+    "5000": 244
+   },
+   "first_start": "2026-11-24T16:11:05Z",
+   "last_end": "2026-12-01T15:00:00Z",
+   "fee_type": "quadratic",
+   "fee_multiplier": 1,
+   "category": "Entertainment",
+   "title": "Highest daily view count this week"
+  },
+  "KXFEATURE": {
+   "programs": 197,
+   "reward_usd": 17730.0,
+   "types": {
+    "liquidity": 197
+   },
+   "targets": {
+    "1000.00": 197
+   },
+   "discounts": {
+    "5000": 197
+   },
+   "first_start": "2026-11-22T19:10:52Z",
+   "last_end": "2026-11-29T05:00:00Z",
+   "fee_type": "quadratic",
+   "fee_multiplier": 1,
+   "category": "Entertainment",
+   "title": "who will be featured on album"
+  },
+  "KXGRAMMY": {
+   "programs": 178,
+   "reward_usd": 17780.42,
+   "types": {
+    "liquidity": 178
+   },
+   "targets": {
+    "1000.00": 178
+   },
+   "discounts": {
+    "5000": 178
+   },
+   "first_start": "2026-11-25T05:11:08Z",
+   "last_end": "2026-12-02T05:00:00Z",
+   "fee_type": "quadratic",
+   "fee_multiplier": 1,
+   "category": "Entertainment",
+   "title": "who will win grammy"
+  },
+  "KXRT": {
+   "programs": 128,
+   "reward_usd": 13140.0,
+   "types": {
+    "liquidity": 128
+   },
+   "targets": {
+    "1000.00": 128
+   },
+   "discounts": {
+    "5000": 128
+   },
+   "first_start": "2026-11-25T05:00:00Z",
+   "last_end": "2026-11-27T05:00:00Z",
+   "fee_type": "quadratic",
+   "fee_multiplier": 1,
+   "category": "Entertainment",
+   "title": "Rotten Tomatoes Scores"
+  },
+  "KXEURUSDEVENT": {
+   "programs": 126,
+   "reward_usd": 10080.0,
+   "types": {
+    "liquidity": 126
+   },
+   "targets": {
+    "1000.00": 126
+   },
+   "discounts": {
+    "5000": 126
+   },
+   "first_start": "2026-11-24T20:01:06Z",
+   "last_end": "2026-11-29T05:00:00Z",
+   "fee_type": "quadratic",
+   "fee_multiplier": 1,
+   "category": "Financials",
+   "title": "EUR/USD after economic events"
+  },
+  "KXUSDJPYEVENT": {
+   "programs": 126,
+   "reward_usd": 10080.0,
+   "types": {
+    "liquidity": 126
+   },
+   "targets": {
+    "1000.00": 126
+   },
+   "discounts": {
+    "5000": 126
+   },
+   "first_start": "2026-11-24T20:01:06Z",
+   "last_end": "2026-11-29T05:00:00Z",
+   "fee_type": "quadratic",
+   "fee_multiplier": 1,
+   "category": "Financials",
+   "title": "USD/JPY after economic events"
+  },
+  "KXGBPUSDEVENT": {
+   "programs": 105,
+   "reward_usd": 8400.0,
+   "types": {
+    "liquidity": 105
+   },
+   "targets": {
+    "1000.00": 105
+   },
+   "discounts": {
+    "5000": 105
+   },
+   "first_start": "2026-11-24T18:01:47Z",
+   "last_end": "2026-11-29T05:00:00Z",
+   "fee_type": "quadratic",
+   "fee_multiplier": 1,
+   "category": "Financials",
+   "title": "GBP/USD after economic events"
+  },
+  "KXHEADLINE": {
+   "programs": 75,
+   "reward_usd": 7500.0,
+   "types": {
+    "liquidity": 75
+   },
+   "targets": {
+    "1000.00": 75
+   },
+   "discounts": {
+    "5000": 75
+   },
+   "first_start": "2026-11-22T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z",
+   "fee_type": "quadratic",
+   "fee_multiplier": 1,
+   "category": "Entertainment",
+   "title": "who will headline event"
+  },
+  "KXVOICERANK": {
+   "programs": 64,
+   "reward_usd": 5440.0,
+   "types": {
+    "liquidity": 64
+   },
+   "targets": {
+    "1000.00": 64
+   },
+   "discounts": {
+    "5000": 64
+   },
+   "first_start": "2026-11-25T05:00:00Z",
+   "last_end": "2026-12-01T05:00:00Z",
+   "fee_type": "quadratic",
+   "fee_multiplier": 1,
+   "category": "Entertainment",
+   "title": "where will contestant rank on the voice"
+  },
+  "KXUSDCADEVENT": {
+   "programs": 63,
+   "reward_usd": 5040.0,
+   "types": {
+    "liquidity": 63
+   },
+   "targets": {
+    "1000.00": 63
+   },
+   "discounts": {
+    "5000": 63
+   },
+   "first_start": "2026-11-24T20:01:06Z",
+   "last_end": "2026-11-29T05:00:00Z",
+   "fee_type": "quadratic",
+   "fee_multiplier": 1,
+   "category": "Financials",
+   "title": "USD/CAD after economic events"
+  },
+  "KXAUDUSDEVENT": {
+   "programs": 63,
+   "reward_usd": 5040.0,
+   "types": {
+    "liquidity": 63
+   },
+   "targets": {
+    "1000.00": 63
+   },
+   "discounts": {
+    "5000": 63
+   },
+   "first_start": "2026-11-24T18:01:47Z",
+   "last_end": "2026-11-29T05:00:00Z",
+   "fee_type": "quadratic",
+   "fee_multiplier": 1,
+   "category": "Financials",
+   "title": "AUD/USD after economic events"
+  },
+  "KXGRAMMYCOUNT": {
+   "programs": 59,
+   "reward_usd": 4830.0,
+   "types": {
+    "liquidity": 59
+   },
+   "targets": {
+    "1000.00": 59
+   },
+   "discounts": {
+    "5000": 59
+   },
+   "first_start": "2026-11-25T21:01:38Z",
+   "last_end": "2026-11-29T05:00:00Z",
+   "fee_type": "quadratic",
+   "fee_multiplier": 1,
+   "category": "Entertainment",
+   "title": "Grammy wins"
+  },
+  "KXNFLNEXTTEAM": {
+   "programs": 57,
+   "reward_usd": 5480.0,
+   "types": {
+    "liquidity": 57
+   },
+   "targets": {
+    "1000.00": 57
+   },
+   "discounts": {
+    "5000": 57
+   },
+   "first_start": "2026-11-21T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z",
+   "fee_type": "quadratic",
+   "fee_multiplier": 1,
+   "category": "Sports",
+   "title": "Player Next Team"
+  },
+  "KXNCAAFTOPSEED": {
+   "programs": 52,
+   "reward_usd": 5200.0,
+   "types": {
+    "liquidity": 52
+   },
+   "targets": {
+    "1000.00": 52
+   },
+   "discounts": {
+    "5000": 52
+   },
+   "first_start": "2026-11-24T05:00:00Z",
+   "last_end": "2026-12-01T05:00:00Z",
+   "fee_type": "quadratic",
+   "fee_multiplier": 1,
+   "category": "Sports",
+   "title": "College Football Playoff Top Seed"
+  },
+  "KXRAINTHANKSGIVING": {
+   "programs": 51,
+   "reward_usd": 4275.0,
+   "types": {
+    "liquidity": 51
+   },
+   "targets": {
+    "1000.00": 51
+   },
+   "discounts": {
+    "5000": 51
+   },
+   "first_start": "2026-11-21T05:00:00Z",
+   "last_end": "2026-11-27T09:59:00Z",
+   "fee_type": "quadratic",
+   "fee_multiplier": 1,
+   "category": "Climate and Weather",
+   "title": "Rain on Thanksgiving"
+  },
+  "KXFEDERALCHARGE": {
+   "programs": 48,
+   "reward_usd": 2400.0,
+   "types": {
+    "liquidity": 48
+   },
+   "targets": {
+    "1000.00": 48
+   },
+   "discounts": {
+    "5000": 48
+   },
+   "first_start": "2026-11-20T05:00:00Z",
+   "last_end": "2026-11-27T05:00:00Z",
+   "fee_type": "quadratic",
+   "fee_multiplier": 1,
+   "category": "Politics",
+   "title": "Who will be charged with a federal crime"
+  },
+  "KXSBSETLISTS": {
+   "programs": 46,
+   "reward_usd": 2300.0,
+   "types": {
+    "liquidity": 46
+   },
+   "targets": {
+    "1000.00": 46
+   },
+   "discounts": {
+    "5000": 46
+   },
+   "first_start": "2026-11-21T05:00:00Z",
+   "last_end": "2026-12-02T05:00:00Z",
+   "fee_type": "quadratic",
+   "fee_multiplier": 1,
+   "category": "Entertainment",
+   "title": "Super Bowl setlist"
+  },
+  "KXUSDMXNEVENT": {
+   "programs": 42,
+   "reward_usd": 3360.0,
+   "types": {
+    "liquidity": 42
+   },
+   "targets": {
+    "1000.00": 42
+   },
+   "discounts": {
+    "5000": 42
+   },
+   "first_start": "2026-11-24T20:01:06Z",
+   "last_end": "2026-11-29T05:00:00Z",
+   "fee_type": "quadratic",
+   "fee_multiplier": 1,
+   "category": "Financials",
+   "title": "USD/MXN after economic events"
+  },
+  "KXTRUMPADMINLEAVE": {
+   "programs": 42,
+   "reward_usd": 3780.0,
+   "types": {
+    "liquidity": 42
+   },
+   "targets": {
+    "1000.00": 42
+   },
+   "discounts": {
+    "5000": 42
+   },
+   "first_start": "2026-11-21T19:10:44Z",
+   "last_end": "2026-11-28T05:00:00Z",
+   "fee_type": "quadratic",
+   "fee_multiplier": 1,
+   "category": "Politics",
+   "title": "Who will leave the Trump administration"
+  },
+  "KXCPIYOY": {
+   "programs": 42,
+   "reward_usd": 4200.0,
+   "types": {
+    "liquidity": 42
+   },
+   "targets": {
+    "1000.00": 42
+   },
+   "discounts": {
+    "5000": 42
+   },
+   "first_start": "2026-11-19T05:00:00Z",
+   "last_end": "2026-11-30T05:00:00Z",
+   "fee_type": "quadratic_with_maker_fees",
+   "fee_multiplier": 1,
+   "category": "Economics",
+   "title": "Inflation"
+  },
+  "KXNHLSEASONGOALS": {
+   "programs": 41,
+   "reward_usd": 4100.0,
+   "types": {
+    "liquidity": 41
+   },
+   "targets": {
+    "1000.00": 41
+   },
+   "discounts": {
+    "5000": 41
+   },
+   "first_start": "2026-11-24T05:00:00Z",
+   "last_end": "2026-12-02T05:00:00Z",
+   "fee_type": "quadratic",
+   "fee_multiplier": 1,
+   "category": "Sports",
+   "title": "Player to score X Goals in Season"
+  },
+  "KXALBUMSTREAMS": {
+   "programs": 38,
+   "reward_usd": 2155.0,
+   "types": {
+    "liquidity": 38
+   },
+   "targets": {
+    "1000.00": 38
+   },
+   "discounts": {
+    "5000": 38
+   },
+   "first_start": "2026-11-25T20:11:06Z",
+   "last_end": "2026-11-29T15:00:00Z",
+   "fee_type": "quadratic",
+   "fee_multiplier": 1,
+   "category": "Entertainment",
+   "title": "how many streams will album have"
+  },
+  "KXPERFORMROLE007": {
+   "programs": 38,
+   "reward_usd": 7470.0,
+   "types": {
+    "liquidity": 38
+   },
+   "targets": {
+    "1000.00": 38
+   },
+   "discounts": {
+    "5000": 38
+   },
+   "first_start": "2026-11-19T18:10:55Z",
+   "last_end": "2026-12-01T05:00:00Z",
+   "fee_type": "quadratic",
+   "fee_multiplier": 1,
+   "category": "Entertainment",
+   "title": "WHO WILL BE CHARACTER IN JAMES BOND"
+  },
+  "KXOPENSOURCESHARE": {
+   "programs": 36,
+   "reward_usd": 2880.0,
+   "types": {
+    "liquidity": 36
+   },
+   "targets": {
+    "1000.00": 36
+   },
+   "discounts": {
+    "5000": 36
+   },
+   "first_start": "2026-11-22T17:55:51Z",
+   "last_end": "2026-11-29T15:00:00Z",
+   "fee_type": "quadratic",
+   "fee_multiplier": 1,
+   "category": "Science and Technology",
+   "title": "Open weights AI market share"
+  },
+  "KXHEISMANFINALIST": {
+   "programs": 36,
+   "reward_usd": 3600.0,
+   "types": {
+    "liquidity": 36
+   },
+   "targets": {
+    "1000.00": 36
+   },
+   "discounts": {
+    "5000": 36
+   },
+   "first_start": "2026-11-19T05:00:00Z",
+   "last_end": "2026-12-01T05:00:00Z",
+   "fee_type": "quadratic",
+   "fee_multiplier": 1,
+   "category": "Sports",
+   "title": "Heisman Finalists"
+  },
+  "KXNVDACEO": {
+   "programs": 36,
+   "reward_usd": 18000.0,
+   "types": {
+    "liquidity": 36
+   },
+   "targets": {
+    "1000.00": 36
+   },
+   "discounts": {
+    "5000": 36
+   },
+   "first_start": "2026-11-19T05:00:00Z",
+   "last_end": "2026-11-30T05:00:00Z",
+   "fee_type": "quadratic",
+   "fee_multiplier": 1,
+   "category": "Financials",
+   "title": "Next NVIDIA CEO"
+  },
+  "KXVENUEPERFORM": {
+   "programs": 35,
+   "reward_usd": 3500.0,
+   "types": {
+    "liquidity": 35
+   },
+   "targets": {
+    "1000.00": 35
+   },
+   "discounts": {
+    "5000": 35
+   },
+   "first_start": "2026-11-19T05:00:00Z",
+   "last_end": "2026-11-26T05:00:00Z",
+   "fee_type": "quadratic",
+   "fee_multiplier": 1,
+   "category": "Entertainment",
+   "title": "who will perform at venue"
+  },
+  "KXUCLLEADER": {
+   "programs": 32,
+   "reward_usd": 3200.0,
+   "types": {
+    "liquidity": 32
+   },
+   "targets": {
+    "1000.00": 32
+   },
+   "discounts": {
+    "5000": 32
+   },
+   "first_start": "2026-11-25T05:00:00Z",
+   "last_end": "2026-12-02T05:00:00Z",
+   "fee_type": "quadratic",
+   "fee_multiplier": 1,
+   "category": "Sports",
+   "title": "Champions League Leader"
+  },
+  "KXNEXTTEAMMLB": {
+   "programs": 31,
+   "reward_usd": 2790.0,
+   "types": {
+    "liquidity": 31
+   },
+   "targets": {
+    "1000.00": 31
+   },
+   "discounts": {
+    "5000": 31
+   },
+   "first_start": "2026-11-25T21:11:56Z",
+   "last_end": "2026-12-02T05:00:00Z",
+   "fee_type": "quadratic",
+   "fee_multiplier": 1,
+   "category": "Sports",
+   "title": "MLB Player Next Team"
+  },
+  "KXFRENCHPRES": {
+   "programs": 31,
+   "reward_usd": 3100.0,
+   "types": {
+    "liquidity": 31
+   },
+   "targets": {
+    "1000.00": 31
+   },
+   "discounts": {
+    "5000": 31
+   },
+   "first_start": "2026-11-19T05:00:00Z",
+   "last_end": "2026-12-01T05:00:00Z",
+   "fee_type": "quadratic",
+   "fee_multiplier": 1,
+   "category": "Elections",
+   "title": "French presidential election"
+  },
+  "KXCPICOREYOY": {
+   "programs": 31,
+   "reward_usd": 3100.0,
+   "types": {
+    "liquidity": 31
+   },
+   "targets": {
+    "1000.00": 31
+   },
+   "discounts": {
+    "5000": 31
+   },
+   "first_start": "2026-11-19T05:00:00Z",
+   "last_end": "2026-11-30T05:00:00Z",
+   "fee_type": "quadratic",
+   "fee_multiplier": 1,
+   "category": "Economics",
+   "title": "Core inflation"
+  },
+  "KXMLBNEXTTEAM": {
+   "programs": 30,
+   "reward_usd": 3000.0,
+   "types": {
+    "liquidity": 30
+   },
+   "targets": {
+    "1000.00": 30
+   },
+   "discounts": {
+    "5000": 30
+   },
+   "first_start": "2026-11-25T05:00:00Z",
+   "last_end": "2026-12-02T05:00:00Z",
+   "fee_type": "quadratic",
+   "fee_multiplier": 1,
+   "category": "Sports",
+   "title": "Pro Baseball Next Team"
+  },
+  "KXNHLSEASONPPTS": {
+   "programs": 30,
+   "reward_usd": 3000.0,
+   "types": {
+    "liquidity": 30
+   },
+   "targets": {
+    "1000.00": 30
+   },
+   "discounts": {
+    "5000": 30
+   },
+   "first_start": "2026-11-24T05:00:00Z",
+   "last_end": "2026-12-01T05:00:00Z",
+   "fee_type": "quadratic",
+   "fee_multiplier": 1,
+   "category": "Sports",
+   "title": "Season Player Points"
+  },
+  "KXAAAGASM": {
+   "programs": 29,
+   "reward_usd": 8625.0,
+   "types": {
+    "liquidity": 29
+   },
+   "targets": {
+    "1000.00": 29
+   },
+   "discounts": {
+    "5000": 29
+   },
+   "first_start": "2026-11-21T05:00:00Z",
+   "last_end": "2026-11-30T04:59:00Z",
+   "fee_type": "quadratic_with_maker_fees",
+   "fee_multiplier": 1,
+   "category": "Economics",
+   "title": "US gas price"
+  },
+  "KXWENCC": {
+   "programs": 28,
+   "reward_usd": 2085.0,
+   "types": {
+    "liquidity": 28
+   },
+   "targets": {
+    "1000.00": 28
+   },
+   "discounts": {
+    "5000": 28
+   },
+   "first_start": "2026-11-19T06:10:51Z",
+   "last_end": "2026-12-01T05:00:00Z",
+   "fee_type": "quadratic",
+   "fee_multiplier": 1,
+   "category": "Financials",
+   "title": "Wendy's Credit Card Spend"
+  },
+  "KXSBUXCC": {
+   "programs": 28,
+   "reward_usd": 2070.0,
+   "types": {
+    "liquidity": 28
+   },
+   "targets": {
+    "1000.00": 28
+   },
+   "discounts": {
+    "5000": 28
+   },
+   "first_start": "2026-11-19T13:10:47Z",
+   "last_end": "2026-12-01T05:00:00Z",
+   "fee_type": "quadratic",
+   "fee_multiplier": 1,
+   "category": "Financials",
+   "title": "Starbucks Credit Card Spend"
+  },
+  "KXTHEVOICE": {
+   "programs": 28,
+   "reward_usd": 5040.0,
+   "types": {
+    "liquidity": 28
+   },
+   "targets": {
+    "1000.00": 28
+   },
+   "discounts": {
+    "5000": 28
+   },
+   "first_start": "2026-11-21T05:00:00Z",
+   "last_end": "2026-11-28T05:00:00Z",
+   "fee_type": "quadratic",
+   "fee_multiplier": 1,
+   "category": "Entertainment",
+   "title": "WHO WILL WIN THE VOICE?"
+  },
+  "KXSNOWDAYS": {
+   "programs": 23,
+   "reward_usd": 4580.0,
+   "types": {
+    "liquidity": 23
+   },
+   "targets": {
+    "1000.00": 23
+   },
+   "discounts": {
+    "5000": 23
+   },
+   "first_start": "2026-11-21T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z",
+   "fee_type": "quadratic",
+   "fee_multiplier": 1,
+   "category": "Climate and Weather",
+   "title": "Cumulative snow days in cities"
+  },
+  "KXGTA6UNITS": {
+   "programs": 23,
+   "reward_usd": 4210.0,
+   "types": {
+    "liquidity": 23
+   },
+   "targets": {
+    "1000.00": 23
+   },
+   "discounts": {
+    "5000": 23
+   },
+   "first_start": "2026-11-19T19:41:05Z",
+   "last_end": "2026-11-26T05:00:00Z",
+   "fee_type": "quadratic",
+   "fee_multiplier": 1,
+   "category": "Entertainment",
+   "title": "GTA VI reported units sold-in"
+  },
+  "KXCPICORE": {
+   "programs": 22,
+   "reward_usd": 2145.0,
+   "types": {
+    "liquidity": 22
+   },
+   "targets": {
+    "1000.00": 22
+   },
+   "discounts": {
+    "5000": 22
+   },
+   "first_start": "2026-11-23T05:00:00Z",
+   "last_end": "2026-12-02T05:00:00Z",
+   "fee_type": "quadratic",
+   "fee_multiplier": 1,
+   "category": "Economics",
+   "title": "CPI core"
+  },
+  "KXCMGCC": {
+   "programs": 22,
+   "reward_usd": 1650.0,
+   "types": {
+    "liquidity": 22
+   },
+   "targets": {
+    "1000.00": 22
+   },
+   "discounts": {
+    "5000": 22
+   },
+   "first_start": "2026-11-21T05:00:00Z",
+   "last_end": "2026-11-30T05:00:00Z",
+   "fee_type": "quadratic",
+   "fee_multiplier": 1,
+   "category": "Financials",
+   "title": "Chipotle Credit Card Spend"
+  },
+  "KXFIRSTSUPERBOWLSONG": {
+   "programs": 22,
+   "reward_usd": 1100.0,
+   "types": {
+    "liquidity": 22
+   },
+   "targets": {
+    "1000.00": 22
+   },
+   "discounts": {
+    "5000": 22
+   },
+   "first_start": "2026-11-21T05:00:00Z",
+   "last_end": "2026-11-28T05:00:00Z",
+   "fee_type": "quadratic",
+   "fee_multiplier": 1,
+   "category": "Entertainment",
+   "title": "What will be the first Super Bowl Song played during halfitme?"
+  },
+  "KXAAAGASW": {
+   "programs": 21,
+   "reward_usd": 1785.0,
+   "types": {
+    "liquidity": 21
+   },
+   "targets": {
+    "1000.00": 21
+   },
+   "discounts": {
+    "5000": 21
+   },
+   "first_start": "2026-11-24T16:10:56Z",
+   "last_end": "2026-11-30T04:59:00Z",
+   "fee_type": "quadratic",
+   "fee_multiplier": 1,
+   "category": "Economics",
+   "title": "US gas price up"
+  },
+  "KXSNOWTHANKSGIVING": {
+   "programs": 21,
+   "reward_usd": 1890.0,
+   "types": {
+    "liquidity": 21
+   },
+   "targets": {
+    "1000.00": 21
+   },
+   "discounts": {
+    "5000": 21
+   },
+   "first_start": "2026-11-20T23:10:57Z",
+   "last_end": "2026-11-27T07:59:00Z",
+   "fee_type": "quadratic",
+   "fee_multiplier": 1,
+   "category": "Climate and Weather",
+   "title": "Snow on Thanksgiving"
+  },
+  "KXSTEAMTOPSELLER": {
+   "programs": 20,
+   "reward_usd": 1200.0,
+   "types": {
+    "liquidity": 20
+   },
+   "targets": {
+    "1000.00": 20
+   },
+   "discounts": {
+    "5000": 20
+   },
+   "first_start": "2026-11-25T18:00:52Z",
+   "last_end": "2026-11-29T05:00:00Z",
+   "fee_type": "quadratic",
+   "fee_multiplier": 1,
+   "category": "Entertainment",
+   "title": "STEAM Top Sellers"
+  },
+  "KXFEAR": {
+   "programs": 20,
+   "reward_usd": 1675.0,
+   "types": {
+    "liquidity": 20
+   },
+   "targets": {
+    "1000.00": 20
+   },
+   "discounts": {
+    "5000": 20
+   },
+   "first_start": "2026-11-22T05:00:00Z",
+   "last_end": "2026-12-02T05:00:00Z",
+   "fee_type": "quadratic",
+   "fee_multiplier": 1,
+   "category": "Financials",
+   "title": "Fear and Greed index"
+  },
+  "POPVOTEMOV": {
+   "programs": 20,
+   "reward_usd": 2000.0,
+   "types": {
+    "liquidity": 20
+   },
+   "targets": {
+    "1000.00": 20
+   },
+   "discounts": {
+    "5000": 20
+   },
+   "first_start": "2026-11-25T05:00:00Z",
+   "last_end": "2026-12-02T05:00:00Z",
+   "fee_type": "quadratic",
+   "fee_multiplier": 1,
+   "category": "Elections",
+   "title": "Popular vote margin of victory"
+  },
+  "KXSENATESEATSD": {
+   "programs": 20,
+   "reward_usd": 2000.0,
+   "types": {
+    "liquidity": 20
+   },
+   "targets": {
+    "1000.00": 20
+   },
+   "discounts": {
+    "5000": 20
+   },
+   "first_start": "2026-11-25T05:00:00Z",
+   "last_end": "2026-12-02T05:00:00Z",
+   "fee_type": "quadratic",
+   "fee_multiplier": 1,
+   "category": "Elections",
+   "title": "Democratic Senate seat count"
+  },
+  "KXCPI": {
+   "programs": 20,
+   "reward_usd": 2000.0,
+   "types": {
+    "liquidity": 20
+   },
+   "targets": {
+    "1000.00": 20
+   },
+   "discounts": {
+    "5000": 20
+   },
+   "first_start": "2026-11-19T05:00:00Z",
+   "last_end": "2026-11-30T05:00:00Z",
+   "fee_type": "quadratic_with_maker_fees",
+   "fee_multiplier": 1,
+   "category": "Economics",
+   "title": "CPI"
+  },
+  "KXHOUSESEATSR": {
+   "programs": 20,
+   "reward_usd": 1800.0,
+   "types": {
+    "liquidity": 20
+   },
+   "targets": {
+    "1000.00": 20
+   },
+   "discounts": {
+    "5000": 20
+   },
+   "first_start": "2026-11-20T18:10:34Z",
+   "last_end": "2026-11-27T05:00:00Z",
+   "fee_type": "quadratic",
+   "fee_multiplier": 1,
+   "category": "Elections",
+   "title": "Republican House seat count"
+  },
+  "KXMANAGERSOUT": {
+   "programs": 19,
+   "reward_usd": 1900.0,
+   "types": {
+    "liquidity": 19
+   },
+   "targets": {
+    "1000.00": 19
+   },
+   "discounts": {
+    "5000": 19
+   },
+   "first_start": "2026-11-25T05:00:00Z",
+   "last_end": "2026-12-02T05:00:00Z",
+   "fee_type": "quadratic",
+   "fee_multiplier": 1,
+   "category": "Sports",
+   "title": "Managers Out"
+  },
+  "KXWAYMOCITY": {
+   "programs": 19,
+   "reward_usd": 1900.0,
+   "types": {
+    "liquidity": 19
+   },
+   "targets": {
+    "1000.00": 19
+   },
+   "discounts": {
+    "5000": 19
+   },
+   "first_start": "2026-11-23T05:00:00Z",
+   "last_end": "2026-11-30T05:00:00Z",
+   "fee_type": "quadratic",
+   "fee_multiplier": 1,
+   "category": "Science and Technology",
+   "title": "Waymo new city"
+  },
+  "KXDIESELYE": {
+   "programs": 19,
+   "reward_usd": 1900.0,
+   "types": {
+    "liquidity": 19
+   },
+   "targets": {
+    "1000.00": 19
+   },
+   "discounts": {
+    "5000": 19
+   },
+   "first_start": "2026-11-23T05:00:00Z",
+   "last_end": "2026-11-30T05:00:00Z",
+   "fee_type": "quadratic",
+   "fee_multiplier": 1,
+   "category": "Economics",
+   "title": "Diesel prices at year end"
+  },
+  "KXCOLCABOUT": {
+   "programs": 18,
+   "reward_usd": 1080.0,
+   "types": {
+    "liquidity": 18
+   },
+   "targets": {
+    "1000.00": 18
+   },
+   "discounts": {
+    "5000": 18
+   },
+   "first_start": "2026-11-26T00:01:16Z",
+   "last_end": "2026-11-29T05:00:00Z",
+   "fee_type": "quadratic",
+   "fee_multiplier": 1,
+   "category": "Politics",
+   "title": "Colombian cabinet ministers out?"
+  },
+  "KXZAIVREQ": {
+   "programs": 18,
+   "reward_usd": 1575.0,
+   "types": {
+    "liquidity": 18
+   },
+   "targets": {
+    "1000.00": 18
+   },
+   "discounts": {
+    "5000": 18
+   },
+   "first_start": "2026-11-23T18:00:53Z",
+   "last_end": "2026-11-29T04:59:00Z",
+   "fee_type": "quadratic",
+   "fee_multiplier": 1,
+   "category": "Science and Technology",
+   "title": "Z.AI Vercel requests share"
+  },
+  "KXOSSPEND": {
+   "programs": 18,
+   "reward_usd": 1575.0,
+   "types": {
+    "liquidity": 18
+   },
+   "targets": {
+    "1000.00": 18
+   },
+   "discounts": {
+    "5000": 18
+   },
+   "first_start": "2026-11-23T18:00:53Z",
+   "last_end": "2026-11-29T04:59:00Z",
+   "fee_type": "quadratic",
+   "fee_multiplier": 1,
+   "category": "Science and Technology",
+   "title": "Open source share of spend"
+  },
+  "KXZAIVSPEND": {
+   "programs": 18,
+   "reward_usd": 1575.0,
+   "types": {
+    "liquidity": 18
+   },
+   "targets": {
+    "1000.00": 18
+   },
+   "discounts": {
+    "5000": 18
+   },
+   "first_start": "2026-11-23T18:00:53Z",
+   "last_end": "2026-11-29T04:59:00Z",
+   "fee_type": "quadratic",
+   "fee_multiplier": 1,
+   "category": "Science and Technology",
+   "title": "Z.AI Vercel spend share"
+  },
+  "KXGOOGVSPEND": {
+   "programs": 18,
+   "reward_usd": 1575.0,
+   "types": {
+    "liquidity": 18
+   },
+   "targets": {
+    "1000.00": 18
+   },
+   "discounts": {
+    "5000": 18
+   },
+   "first_start": "2026-11-23T18:00:53Z",
+   "last_end": "2026-11-29T04:59:00Z",
+   "fee_type": "quadratic",
+   "fee_multiplier": 1,
+   "category": "Science and Technology",
+   "title": "Google Vercel spend share"
+  },
+  "KXOPENVSPEND": {
+   "programs": 18,
+   "reward_usd": 720.0,
+   "types": {
+    "liquidity": 18
+   },
+   "targets": {
+    "1000.00": 18
+   },
+   "discounts": {
+    "5000": 18
+   },
+   "first_start": "2026-11-23T17:55:51Z",
+   "last_end": "2026-11-29T04:59:00Z"
+  },
+  "KXOPENVREQ": {
+   "programs": 18,
+   "reward_usd": 720.0,
+   "types": {
+    "liquidity": 18
+   },
+   "targets": {
+    "1000.00": 18
+   },
+   "discounts": {
+    "5000": 18
+   },
+   "first_start": "2026-11-23T17:55:50Z",
+   "last_end": "2026-11-29T04:59:00Z"
+  },
+  "KXMOONVSPEND": {
+   "programs": 18,
+   "reward_usd": 720.0,
+   "types": {
+    "liquidity": 18
+   },
+   "targets": {
+    "1000.00": 18
+   },
+   "discounts": {
+    "5000": 18
+   },
+   "first_start": "2026-11-23T17:55:50Z",
+   "last_end": "2026-11-29T04:59:00Z"
+  },
+  "KXGOOGVREQ": {
+   "programs": 18,
+   "reward_usd": 720.0,
+   "types": {
+    "liquidity": 18
+   },
+   "targets": {
+    "1000.00": 18
+   },
+   "discounts": {
+    "5000": 18
+   },
+   "first_start": "2026-11-23T17:55:49Z",
+   "last_end": "2026-11-29T04:59:00Z"
+  },
+  "KXDEEPVREQ": {
+   "programs": 18,
+   "reward_usd": 720.0,
+   "types": {
+    "liquidity": 18
+   },
+   "targets": {
+    "1000.00": 18
+   },
+   "discounts": {
+    "5000": 18
+   },
+   "first_start": "2026-11-23T17:55:47Z",
+   "last_end": "2026-11-29T04:59:00Z"
+  },
+  "KXANTHVSPEND": {
+   "programs": 18,
+   "reward_usd": 720.0,
+   "types": {
+    "liquidity": 18
+   },
+   "targets": {
+    "1000.00": 18
+   },
+   "discounts": {
+    "5000": 18
+   },
+   "first_start": "2026-11-23T17:55:45Z",
+   "last_end": "2026-11-29T04:59:00Z"
+  },
+  "KXANTHVREQ": {
+   "programs": 18,
+   "reward_usd": 720.0,
+   "types": {
+    "liquidity": 18
+   },
+   "targets": {
+    "1000.00": 18
+   },
+   "discounts": {
+    "5000": 18
+   },
+   "first_start": "2026-11-23T17:55:45Z",
+   "last_end": "2026-11-29T04:59:00Z"
+  },
+  "KXNEXTPRESSECPERM": {
+   "programs": 18,
+   "reward_usd": 1745.0,
+   "types": {
+    "liquidity": 18
+   },
+   "targets": {
+    "1000.00": 18
+   },
+   "discounts": {
+    "5000": 18
+   },
+   "first_start": "2026-11-19T05:00:00Z",
+   "last_end": "2026-12-02T05:00:00Z"
+  },
+  "KXHOUSESEATSD": {
+   "programs": 18,
+   "reward_usd": 1800.0,
+   "types": {
+    "liquidity": 18
+   },
+   "targets": {
+    "1000.00": 18
+   },
+   "discounts": {
+    "5000": 18
+   },
+   "first_start": "2026-11-25T05:00:00Z",
+   "last_end": "2026-12-02T05:00:00Z"
+  },
+  "KXURBNCC": {
+   "programs": 18,
+   "reward_usd": 1350.0,
+   "types": {
+    "liquidity": 18
+   },
+   "targets": {
+    "1000.00": 18
+   },
+   "discounts": {
+    "5000": 18
+   },
+   "first_start": "2026-11-19T06:10:51Z",
+   "last_end": "2026-12-01T05:00:00Z"
+  },
+  "KXCNKFT": {
+   "programs": 17,
+   "reward_usd": 1275.0,
+   "types": {
+    "liquidity": 17
+   },
+   "targets": {
+    "1000.00": 17
+   },
+   "discounts": {
+    "5000": 17
+   },
+   "first_start": "2026-11-22T05:00:00Z",
+   "last_end": "2026-12-02T05:00:00Z"
+  },
+  "KXEBOLACOUNTRY": {
+   "programs": 17,
+   "reward_usd": 1700.0,
+   "types": {
+    "liquidity": 17
+   },
+   "targets": {
+    "1000.00": 17
+   },
+   "discounts": {
+    "5000": 17
+   },
+   "first_start": "2026-11-23T05:00:00Z",
+   "last_end": "2026-11-30T05:00:00Z"
+  },
+  "KXJOINCLUB": {
+   "programs": 16,
+   "reward_usd": 1600.0,
+   "types": {
+    "liquidity": 16
+   },
+   "targets": {
+    "1000.00": 16
+   },
+   "discounts": {
+    "5000": 16
+   },
+   "first_start": "2026-11-25T05:00:00Z",
+   "last_end": "2026-12-02T05:00:00Z"
+  },
+  "KXCOFFEEARRAY": {
+   "programs": 16,
+   "reward_usd": 1200.0,
+   "types": {
+    "liquidity": 16
+   },
+   "targets": {
+    "1000.00": 16
+   },
+   "discounts": {
+    "5000": 16
+   },
+   "first_start": "2026-11-23T05:00:00Z",
+   "last_end": "2026-12-01T05:00:00Z"
+  },
+  "KXCFILCC": {
+   "programs": 16,
+   "reward_usd": 1190.0,
+   "types": {
+    "liquidity": 16
+   },
+   "targets": {
+    "1000.00": 16
+   },
+   "discounts": {
+    "5000": 16
+   },
+   "first_start": "2026-11-19T15:55:28Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXACA": {
+   "programs": 15,
+   "reward_usd": 1500.0,
+   "types": {
+    "liquidity": 15
+   },
+   "targets": {
+    "1000.00": 15
+   },
+   "discounts": {
+    "5000": 15
+   },
+   "first_start": "2026-11-19T05:00:00Z",
+   "last_end": "2026-12-02T05:00:00Z"
+  },
+  "KXWEEKSNUM1": {
+   "programs": 15,
+   "reward_usd": 1500.0,
+   "types": {
+    "liquidity": 15
+   },
+   "targets": {
+    "1000.00": 15
+   },
+   "discounts": {
+    "5000": 15
+   },
+   "first_start": "2026-11-21T05:00:00Z",
+   "last_end": "2026-12-02T05:00:00Z"
+  },
+  "KXFASTARRAY": {
+   "programs": 15,
+   "reward_usd": 1125.0,
+   "types": {
+    "liquidity": 15
+   },
+   "targets": {
+    "1000.00": 15
+   },
+   "discounts": {
+    "5000": 15
+   },
+   "first_start": "2026-11-23T05:00:00Z",
+   "last_end": "2026-11-30T05:00:00Z"
+  },
+  "KXLLM1": {
+   "programs": 15,
+   "reward_usd": 3035.0,
+   "types": {
+    "liquidity": 15
+   },
+   "targets": {
+    "1000.00": 15
+   },
+   "discounts": {
+    "5000": 15
+   },
+   "first_start": "2026-11-20T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXMELIA": {
+   "programs": 15,
+   "reward_usd": 1500.0,
+   "types": {
+    "liquidity": 15
+   },
+   "targets": {
+    "1000.00": 15
+   },
+   "discounts": {
+    "5000": 15
+   },
+   "first_start": "2026-11-22T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXWMTFT": {
+   "programs": 15,
+   "reward_usd": 1120.0,
+   "types": {
+    "liquidity": 15
+   },
+   "targets": {
+    "1000.00": 15
+   },
+   "discounts": {
+    "5000": 15
+   },
+   "first_start": "2026-11-19T16:11:14Z",
+   "last_end": "2026-11-27T05:00:00Z"
+  },
+  "KXTOURCANCEL": {
+   "programs": 15,
+   "reward_usd": 1500.0,
+   "types": {
+    "liquidity": 15
+   },
+   "targets": {
+    "1000.00": 15
+   },
+   "discounts": {
+    "5000": 15
+   },
+   "first_start": "2026-11-19T05:00:00Z",
+   "last_end": "2026-11-26T05:00:00Z"
+  },
+  "KXEOWEEK": {
+   "programs": 14,
+   "reward_usd": 1400.0,
+   "types": {
+    "liquidity": 14
+   },
+   "targets": {
+    "1000.00": 14
+   },
+   "discounts": {
+    "5000": 14
+   },
+   "first_start": "2026-11-25T05:00:00Z",
+   "last_end": "2026-11-26T05:00:00Z"
+  },
+  "KXDSENATESEATS": {
+   "programs": 14,
+   "reward_usd": 1400.0,
+   "types": {
+    "liquidity": 14
+   },
+   "targets": {
+    "1000.00": 14
+   },
+   "discounts": {
+    "5000": 14
+   },
+   "first_start": "2026-11-25T05:00:00Z",
+   "last_end": "2026-12-02T05:00:00Z"
+  },
+  "KXHORMUZWEEKLY": {
+   "programs": 14,
+   "reward_usd": 1400.0,
+   "types": {
+    "liquidity": 14
+   },
+   "targets": {
+    "1000.00": 14
+   },
+   "discounts": {
+    "5000": 14
+   },
+   "first_start": "2026-11-25T05:00:00Z",
+   "last_end": "2026-11-26T05:00:00Z"
+  },
+  "KXPUBLIXCC": {
+   "programs": 14,
+   "reward_usd": 1050.0,
+   "types": {
+    "liquidity": 14
+   },
+   "targets": {
+    "1000.00": 14
+   },
+   "discounts": {
+    "5000": 14
+   },
+   "first_start": "2026-11-19T06:10:51Z",
+   "last_end": "2026-12-02T05:00:00Z"
+  },
+  "KXZYNPOS": {
+   "programs": 14,
+   "reward_usd": 1440.0,
+   "types": {
+    "liquidity": 14
+   },
+   "targets": {
+    "1000.00": 14
+   },
+   "discounts": {
+    "5000": 14
+   },
+   "first_start": "2026-11-24T05:00:00Z",
+   "last_end": "2026-12-01T05:00:00Z"
+  },
+  "KXDASHAPP": {
+   "programs": 14,
+   "reward_usd": 1400.0,
+   "types": {
+    "liquidity": 14
+   },
+   "targets": {
+    "1000.00": 14
+   },
+   "discounts": {
+    "5000": 14
+   },
+   "first_start": "2026-11-19T05:00:00Z",
+   "last_end": "2026-12-01T05:00:00Z"
+  },
+  "KXPEPSIPOS": {
+   "programs": 14,
+   "reward_usd": 1440.0,
+   "types": {
+    "liquidity": 14
+   },
+   "targets": {
+    "1000.00": 14
+   },
+   "discounts": {
+    "5000": 14
+   },
+   "first_start": "2026-11-20T05:00:00Z",
+   "last_end": "2026-12-01T05:00:00Z"
+  },
+  "KXMILLERLITEPOS": {
+   "programs": 14,
+   "reward_usd": 1470.0,
+   "types": {
+    "liquidity": 14
+   },
+   "targets": {
+    "1000.00": 14
+   },
+   "discounts": {
+    "5000": 14
+   },
+   "first_start": "2026-11-21T05:00:00Z",
+   "last_end": "2026-12-01T05:00:00Z"
+  },
+  "KXMOUNTAINDEWPOS": {
+   "programs": 14,
+   "reward_usd": 1440.0,
+   "types": {
+    "liquidity": 14
+   },
+   "targets": {
+    "1000.00": 14
+   },
+   "discounts": {
+    "5000": 14
+   },
+   "first_start": "2026-11-19T05:00:00Z",
+   "last_end": "2026-12-01T05:00:00Z"
+  },
+  "KXJEFFRIESVOTES": {
+   "programs": 14,
+   "reward_usd": 1400.0,
+   "types": {
+    "liquidity": 14
+   },
+   "targets": {
+    "1000.00": 14
+   },
+   "discounts": {
+    "5000": 14
+   },
+   "first_start": "2026-11-23T05:00:00Z",
+   "last_end": "2026-11-30T05:00:00Z"
+  },
+  "KXLUV": {
+   "programs": 14,
+   "reward_usd": 1400.0,
+   "types": {
+    "liquidity": 14
+   },
+   "targets": {
+    "1000.00": 14
+   },
+   "discounts": {
+    "5000": 14
+   },
+   "first_start": "2026-11-23T05:00:00Z",
+   "last_end": "2026-11-30T05:00:00Z"
+  },
+  "KXTEMUCC": {
+   "programs": 14,
+   "reward_usd": 1050.0,
+   "types": {
+    "liquidity": 14
+   },
+   "targets": {
+    "1000.00": 14
+   },
+   "discounts": {
+    "5000": 14
+   },
+   "first_start": "2026-11-23T05:00:00Z",
+   "last_end": "2026-11-30T05:00:00Z"
+  },
+  "KXHDCC": {
+   "programs": 14,
+   "reward_usd": 1050.0,
+   "types": {
+    "liquidity": 14
+   },
+   "targets": {
+    "1000.00": 14
+   },
+   "discounts": {
+    "5000": 14
+   },
+   "first_start": "2026-11-21T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXWMTCC": {
+   "programs": 14,
+   "reward_usd": 1050.0,
+   "types": {
+    "liquidity": 14
+   },
+   "targets": {
+    "1000.00": 14
+   },
+   "discounts": {
+    "5000": 14
+   },
+   "first_start": "2026-11-21T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXSHELCC": {
+   "programs": 14,
+   "reward_usd": 1050.0,
+   "types": {
+    "liquidity": 14
+   },
+   "targets": {
+    "1000.00": 14
+   },
+   "discounts": {
+    "5000": 14
+   },
+   "first_start": "2026-11-21T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXDPZFT": {
+   "programs": 14,
+   "reward_usd": 1050.0,
+   "types": {
+    "liquidity": 14
+   },
+   "targets": {
+    "1000.00": 14
+   },
+   "discounts": {
+    "5000": 14
+   },
+   "first_start": "2026-11-20T05:00:00Z",
+   "last_end": "2026-11-28T05:00:00Z"
+  },
+  "KXAMZNCC": {
+   "programs": 14,
+   "reward_usd": 1050.0,
+   "types": {
+    "liquidity": 14
+   },
+   "targets": {
+    "1000.00": 14
+   },
+   "discounts": {
+    "5000": 14
+   },
+   "first_start": "2026-11-20T05:00:00Z",
+   "last_end": "2026-11-28T05:00:00Z"
+  },
+  "KXTGTFT": {
+   "programs": 14,
+   "reward_usd": 1050.0,
+   "types": {
+    "liquidity": 14
+   },
+   "targets": {
+    "1000.00": 14
+   },
+   "discounts": {
+    "5000": 14
+   },
+   "first_start": "2026-11-19T05:00:00Z",
+   "last_end": "2026-11-27T05:00:00Z"
+  },
+  "ECMOV": {
+   "programs": 14,
+   "reward_usd": 1400.0,
+   "types": {
+    "liquidity": 14
+   },
+   "targets": {
+    "1000.00": 14
+   },
+   "discounts": {
+    "5000": 14
+   },
+   "first_start": "2026-11-19T05:00:00Z",
+   "last_end": "2026-11-26T05:00:00Z"
+  },
+  "KXSPACEXCOUNT": {
+   "programs": 13,
+   "reward_usd": 780.0,
+   "types": {
+    "liquidity": 13
+   },
+   "targets": {
+    "1000.00": 13
+   },
+   "discounts": {
+    "5000": 13
+   },
+   "first_start": "2026-11-25T18:00:52Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXIHOPCC": {
+   "programs": 13,
+   "reward_usd": 945.0,
+   "types": {
+    "liquidity": 13
+   },
+   "targets": {
+    "1000.00": 13
+   },
+   "discounts": {
+    "5000": 13
+   },
+   "first_start": "2026-11-23T00:10:23Z",
+   "last_end": "2026-12-02T05:00:00Z"
+  },
+  "KXVIDEOGAMESADS": {
+   "programs": 13,
+   "reward_usd": 1315.0,
+   "types": {
+    "liquidity": 13
+   },
+   "targets": {
+    "1000.00": 13
+   },
+   "discounts": {
+    "5000": 13
+   },
+   "first_start": "2026-11-21T05:00:00Z",
+   "last_end": "2026-12-02T05:00:00Z"
+  },
+  "KXGPT": {
+   "programs": 13,
+   "reward_usd": 2600.0,
+   "types": {
+    "liquidity": 13
+   },
+   "targets": {
+    "1000.00": 13
+   },
+   "discounts": {
+    "5000": 13
+   },
+   "first_start": "2026-11-24T05:00:00Z",
+   "last_end": "2026-12-02T05:00:00Z"
+  },
+  "KXDISNEYAPP": {
+   "programs": 13,
+   "reward_usd": 1280.0,
+   "types": {
+    "liquidity": 13
+   },
+   "targets": {
+    "1000.00": 13
+   },
+   "discounts": {
+    "5000": 13
+   },
+   "first_start": "2026-11-21T01:41:15Z",
+   "last_end": "2026-12-01T05:00:00Z"
+  },
+  "KXDIESELMAXY": {
+   "programs": 13,
+   "reward_usd": 1300.0,
+   "types": {
+    "liquidity": 13
+   },
+   "targets": {
+    "1000.00": 13
+   },
+   "discounts": {
+    "5000": 13
+   },
+   "first_start": "2026-11-20T05:00:00Z",
+   "last_end": "2026-11-30T05:00:00Z"
+  },
+  "KXLUVA": {
+   "programs": 13,
+   "reward_usd": 1300.0,
+   "types": {
+    "liquidity": 13
+   },
+   "targets": {
+    "1000.00": 13
+   },
+   "discounts": {
+    "5000": 13
+   },
+   "first_start": "2026-11-19T06:11:19Z",
+   "last_end": "2026-11-30T05:00:00Z"
+  },
+  "KXVTPERMITS": {
+   "programs": 13,
+   "reward_usd": 1300.0,
+   "types": {
+    "liquidity": 13
+   },
+   "targets": {
+    "1000.00": 13
+   },
+   "discounts": {
+    "5000": 13
+   },
+   "first_start": "2026-11-19T05:00:00Z",
+   "last_end": "2026-11-30T05:00:00Z"
+  },
+  "KXCCLA": {
+   "programs": 13,
+   "reward_usd": 1300.0,
+   "types": {
+    "liquidity": 13
+   },
+   "targets": {
+    "1000.00": 13
+   },
+   "discounts": {
+    "5000": 13
+   },
+   "first_start": "2026-11-22T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXWAAEROEMP": {
+   "programs": 13,
+   "reward_usd": 3250.0,
+   "types": {
+    "liquidity": 13
+   },
+   "targets": {
+    "1000.00": 13
+   },
+   "discounts": {
+    "5000": 13
+   },
+   "first_start": "2026-11-20T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXDASH": {
+   "programs": 13,
+   "reward_usd": 1105.0,
+   "types": {
+    "liquidity": 13
+   },
+   "targets": {
+    "1000.00": 13
+   },
+   "discounts": {
+    "5000": 13
+   },
+   "first_start": "2026-11-20T04:10:59Z",
+   "last_end": "2026-11-26T05:00:00Z"
+  },
+  "KXLOCALLAW": {
+   "programs": 12,
+   "reward_usd": 1350.0,
+   "types": {
+    "liquidity": 12
+   },
+   "targets": {
+    "1000.00": 12
+   },
+   "discounts": {
+    "5000": 12
+   },
+   "first_start": "2026-11-25T05:00:00Z",
+   "last_end": "2026-12-02T05:00:00Z"
+  },
+  "KXDLTRCC": {
+   "programs": 12,
+   "reward_usd": 900.0,
+   "types": {
+    "liquidity": 12
+   },
+   "targets": {
+    "1000.00": 12
+   },
+   "discounts": {
+    "5000": 12
+   },
+   "first_start": "2026-11-21T05:00:00Z",
+   "last_end": "2026-12-02T05:00:00Z"
+  },
+  "KXBABELMANDEBWEEKLY": {
+   "programs": 12,
+   "reward_usd": 1200.0,
+   "types": {
+    "liquidity": 12
+   },
+   "targets": {
+    "1000.00": 12
+   },
+   "discounts": {
+    "5000": 12
+   },
+   "first_start": "2026-11-25T05:00:00Z",
+   "last_end": "2026-11-26T05:00:00Z"
+  },
+  "KXCHILISCC": {
+   "programs": 12,
+   "reward_usd": 900.0,
+   "types": {
+    "liquidity": 12
+   },
+   "targets": {
+    "1000.00": 12
+   },
+   "discounts": {
+    "5000": 12
+   },
+   "first_start": "2026-11-25T05:00:00Z",
+   "last_end": "2026-12-02T05:00:00Z"
+  },
+  "KXGPTAPP": {
+   "programs": 12,
+   "reward_usd": 1200.0,
+   "types": {
+    "liquidity": 12
+   },
+   "targets": {
+    "1000.00": 12
+   },
+   "discounts": {
+    "5000": 12
+   },
+   "first_start": "2026-11-22T05:00:00Z",
+   "last_end": "2026-12-02T05:00:00Z"
+  },
+  "KXAEOCC": {
+   "programs": 12,
+   "reward_usd": 840.0,
+   "types": {
+    "liquidity": 12
+   },
+   "targets": {
+    "1000.00": 12
+   },
+   "discounts": {
+    "5000": 12
+   },
+   "first_start": "2026-11-22T17:11:06Z",
+   "last_end": "2026-11-30T05:00:00Z"
+  },
+  "KXDIESELMINY": {
+   "programs": 12,
+   "reward_usd": 1200.0,
+   "types": {
+    "liquidity": 12
+   },
+   "targets": {
+    "1000.00": 12
+   },
+   "discounts": {
+    "5000": 12
+   },
+   "first_start": "2026-11-23T05:00:00Z",
+   "last_end": "2026-11-30T05:00:00Z"
+  },
+  "KXRIDEARRAY": {
+   "programs": 12,
+   "reward_usd": 1170.0,
+   "types": {
+    "liquidity": 12
+   },
+   "targets": {
+    "1000.00": 12
+   },
+   "discounts": {
+    "5000": 12
+   },
+   "first_start": "2026-11-21T20:10:51Z",
+   "last_end": "2026-11-30T05:00:00Z"
+  },
+  "KXAGICO": {
+   "programs": 12,
+   "reward_usd": 1205.0,
+   "types": {
+    "liquidity": 12
+   },
+   "targets": {
+    "1000.00": 12
+   },
+   "discounts": {
+    "5000": 12
+   },
+   "first_start": "2026-11-23T05:00:00Z",
+   "last_end": "2026-11-30T05:00:00Z"
+  },
+  "KXAIAPPARRAY": {
+   "programs": 12,
+   "reward_usd": 1190.0,
+   "types": {
+    "liquidity": 12
+   },
+   "targets": {
+    "1000.00": 12
+   },
+   "discounts": {
+    "5000": 12
+   },
+   "first_start": "2026-11-21T01:40:54Z",
+   "last_end": "2026-11-30T05:00:00Z"
+  },
+  "KXSDCORNYIELD": {
+   "programs": 12,
+   "reward_usd": 1200.0,
+   "types": {
+    "liquidity": 12
+   },
+   "targets": {
+    "1000.00": 12
+   },
+   "discounts": {
+    "5000": 12
+   },
+   "first_start": "2026-11-20T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXMFT": {
+   "programs": 12,
+   "reward_usd": 900.0,
+   "types": {
+    "liquidity": 12
+   },
+   "targets": {
+    "1000.00": 12
+   },
+   "discounts": {
+    "5000": 12
+   },
+   "first_start": "2026-11-21T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXAFRMCC": {
+   "programs": 12,
+   "reward_usd": 885.0,
+   "types": {
+    "liquidity": 12
+   },
+   "targets": {
+    "1000.00": 12
+   },
+   "discounts": {
+    "5000": 12
+   },
+   "first_start": "2026-11-21T05:00:00Z",
+   "last_end": "2026-11-28T05:00:00Z"
+  },
+  "KXAAAGASMAXM": {
+   "programs": 12,
+   "reward_usd": 1200.0,
+   "types": {
+    "liquidity": 12
+   },
+   "targets": {
+    "1000.00": 12
+   },
+   "discounts": {
+    "5000": 12
+   },
+   "first_start": "2026-11-21T05:00:00Z",
+   "last_end": "2026-11-28T05:00:00Z"
+  },
+  "KXNETFLIXTOPVIEWSMOVIE": {
+   "programs": 11,
+   "reward_usd": 660.0,
+   "types": {
+    "liquidity": 11
+   },
+   "targets": {
+    "1000.00": 11
+   },
+   "discounts": {
+    "5000": 11
+   },
+   "first_start": "2026-11-26T00:01:16Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXNETFLIXTOPVIEWSTV": {
+   "programs": 11,
+   "reward_usd": 660.0,
+   "types": {
+    "liquidity": 11
+   },
+   "targets": {
+    "1000.00": 11
+   },
+   "discounts": {
+    "5000": 11
+   },
+   "first_start": "2026-11-26T00:01:16Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXJEFFRIESDEFECT": {
+   "programs": 11,
+   "reward_usd": 1060.0,
+   "types": {
+    "liquidity": 11
+   },
+   "targets": {
+    "1000.00": 11
+   },
+   "discounts": {
+    "5000": 11
+   },
+   "first_start": "2026-11-23T05:00:00Z",
+   "last_end": "2026-12-02T05:00:00Z"
+  },
+  "KXFOOTWEARADS": {
+   "programs": 11,
+   "reward_usd": 1140.0,
+   "types": {
+    "liquidity": 11
+   },
+   "targets": {
+    "1000.00": 11
+   },
+   "discounts": {
+    "5000": 11
+   },
+   "first_start": "2026-11-22T05:00:00Z",
+   "last_end": "2026-12-02T05:00:00Z"
+  },
+  "KXCAVAFT": {
+   "programs": 11,
+   "reward_usd": 825.0,
+   "types": {
+    "liquidity": 11
+   },
+   "targets": {
+    "1000.00": 11
+   },
+   "discounts": {
+    "5000": 11
+   },
+   "first_start": "2026-11-20T05:00:00Z",
+   "last_end": "2026-12-02T05:00:00Z"
+  },
+  "KXJOINJENSENHUANG": {
+   "programs": 11,
+   "reward_usd": 1045.0,
+   "types": {
+    "liquidity": 11
+   },
+   "targets": {
+    "1000.00": 11
+   },
+   "discounts": {
+    "5000": 11
+   },
+   "first_start": "2026-11-24T16:25:37Z",
+   "last_end": "2026-12-01T05:00:00Z"
+  },
+  "KXDRPEPPERPOS": {
+   "programs": 11,
+   "reward_usd": 1140.0,
+   "types": {
+    "liquidity": 11
+   },
+   "targets": {
+    "1000.00": 11
+   },
+   "discounts": {
+    "5000": 11
+   },
+   "first_start": "2026-11-19T05:00:00Z",
+   "last_end": "2026-12-01T05:00:00Z"
+  },
+  "KXPARAMOUNTAPP": {
+   "programs": 11,
+   "reward_usd": 1100.0,
+   "types": {
+    "liquidity": 11
+   },
+   "targets": {
+    "1000.00": 11
+   },
+   "discounts": {
+    "5000": 11
+   },
+   "first_start": "2026-11-20T05:00:00Z",
+   "last_end": "2026-12-01T05:00:00Z"
+  },
+  "KXDGCC": {
+   "programs": 11,
+   "reward_usd": 825.0,
+   "types": {
+    "liquidity": 11
+   },
+   "targets": {
+    "1000.00": 11
+   },
+   "discounts": {
+    "5000": 11
+   },
+   "first_start": "2026-11-24T05:00:00Z",
+   "last_end": "2026-12-01T05:00:00Z"
+  },
+  "KXUBERAPP": {
+   "programs": 11,
+   "reward_usd": 1100.0,
+   "types": {
+    "liquidity": 11
+   },
+   "targets": {
+    "1000.00": 11
+   },
+   "discounts": {
+    "5000": 11
+   },
+   "first_start": "2026-11-21T05:00:00Z",
+   "last_end": "2026-12-01T05:00:00Z"
+  },
+  "KXBROADLINEADS": {
+   "programs": 11,
+   "reward_usd": 1085.0,
+   "types": {
+    "liquidity": 11
+   },
+   "targets": {
+    "1000.00": 11
+   },
+   "discounts": {
+    "5000": 11
+   },
+   "first_start": "2026-11-22T10:10:57Z",
+   "last_end": "2026-12-01T05:00:00Z"
+  },
+  "KXC4POS": {
+   "programs": 11,
+   "reward_usd": 1170.0,
+   "types": {
+    "liquidity": 11
+   },
+   "targets": {
+    "1000.00": 11
+   },
+   "discounts": {
+    "5000": 11
+   },
+   "first_start": "2026-11-23T05:00:00Z",
+   "last_end": "2026-12-01T05:00:00Z"
+  },
+  "KXGRUBHUBAPP": {
+   "programs": 11,
+   "reward_usd": 1100.0,
+   "types": {
+    "liquidity": 11
+   },
+   "targets": {
+    "1000.00": 11
+   },
+   "discounts": {
+    "5000": 11
+   },
+   "first_start": "2026-11-21T05:00:00Z",
+   "last_end": "2026-12-01T05:00:00Z"
+  },
+  "KXCELSIUSPOS": {
+   "programs": 11,
+   "reward_usd": 1140.0,
+   "types": {
+    "liquidity": 11
+   },
+   "targets": {
+    "1000.00": 11
+   },
+   "discounts": {
+    "5000": 11
+   },
+   "first_start": "2026-11-19T05:00:00Z",
+   "last_end": "2026-12-01T05:00:00Z"
+  },
+  "KXDDSFT": {
+   "programs": 11,
+   "reward_usd": 825.0,
+   "types": {
+    "liquidity": 11
+   },
+   "targets": {
+    "1000.00": 11
+   },
+   "discounts": {
+    "5000": 11
+   },
+   "first_start": "2026-11-23T05:00:00Z",
+   "last_end": "2026-12-01T05:00:00Z"
+  },
+  "KXROCKSTARPOS": {
+   "programs": 11,
+   "reward_usd": 1140.0,
+   "types": {
+    "liquidity": 11
+   },
+   "targets": {
+    "1000.00": 11
+   },
+   "discounts": {
+    "5000": 11
+   },
+   "first_start": "2026-11-20T05:00:00Z",
+   "last_end": "2026-12-01T05:00:00Z"
+  },
+  "KXCOCACOLAPOS": {
+   "programs": 11,
+   "reward_usd": 1140.0,
+   "types": {
+    "liquidity": 11
+   },
+   "targets": {
+    "1000.00": 11
+   },
+   "discounts": {
+    "5000": 11
+   },
+   "first_start": "2026-11-20T05:00:00Z",
+   "last_end": "2026-12-01T05:00:00Z"
+  },
+  "KXBUDLIGHTPOS": {
+   "programs": 11,
+   "reward_usd": 1140.0,
+   "types": {
+    "liquidity": 11
+   },
+   "targets": {
+    "1000.00": 11
+   },
+   "discounts": {
+    "5000": 11
+   },
+   "first_start": "2026-11-20T05:00:00Z",
+   "last_end": "2026-12-01T05:00:00Z"
+  },
+  "KXSPRITEPOS": {
+   "programs": 11,
+   "reward_usd": 1155.0,
+   "types": {
+    "liquidity": 11
+   },
+   "targets": {
+    "1000.00": 11
+   },
+   "discounts": {
+    "5000": 11
+   },
+   "first_start": "2026-11-24T05:00:00Z",
+   "last_end": "2026-12-01T05:00:00Z"
+  },
+  "KXCARTAPP": {
+   "programs": 11,
+   "reward_usd": 1070.0,
+   "types": {
+    "liquidity": 11
+   },
+   "targets": {
+    "1000.00": 11
+   },
+   "discounts": {
+    "5000": 11
+   },
+   "first_start": "2026-11-21T00:11:03Z",
+   "last_end": "2026-12-01T05:00:00Z"
+  },
+  "KXFITNESSADS": {
+   "programs": 11,
+   "reward_usd": 1085.0,
+   "types": {
+    "liquidity": 11
+   },
+   "targets": {
+    "1000.00": 11
+   },
+   "discounts": {
+    "5000": 11
+   },
+   "first_start": "2026-11-22T17:11:29Z",
+   "last_end": "2026-12-01T05:00:00Z"
+  },
+  "KXULTACC": {
+   "programs": 11,
+   "reward_usd": 795.0,
+   "types": {
+    "liquidity": 11
+   },
+   "targets": {
+    "1000.00": 11
+   },
+   "discounts": {
+    "5000": 11
+   },
+   "first_start": "2026-11-20T02:10:23Z",
+   "last_end": "2026-12-01T05:00:00Z"
+  },
+  "KXAMUSEMENTADS": {
+   "programs": 11,
+   "reward_usd": 1100.0,
+   "types": {
+    "liquidity": 11
+   },
+   "targets": {
+    "1000.00": 11
+   },
+   "discounts": {
+    "5000": 11
+   },
+   "first_start": "2026-11-21T05:00:00Z",
+   "last_end": "2026-12-01T05:00:00Z"
+  },
+  "KXREDBULLPOS": {
+   "programs": 11,
+   "reward_usd": 1140.0,
+   "types": {
+    "liquidity": 11
+   },
+   "targets": {
+    "1000.00": 11
+   },
+   "discounts": {
+    "5000": 11
+   },
+   "first_start": "2026-11-21T05:00:00Z",
+   "last_end": "2026-12-01T05:00:00Z"
+  },
+  "KXVELOPOS": {
+   "programs": 11,
+   "reward_usd": 1140.0,
+   "types": {
+    "liquidity": 11
+   },
+   "targets": {
+    "1000.00": 11
+   },
+   "discounts": {
+    "5000": 11
+   },
+   "first_start": "2026-11-19T05:00:00Z",
+   "last_end": "2026-12-01T05:00:00Z"
+  },
+  "KXCOORSLIGHTPOS": {
+   "programs": 11,
+   "reward_usd": 1155.0,
+   "types": {
+    "liquidity": 11
+   },
+   "targets": {
+    "1000.00": 11
+   },
+   "discounts": {
+    "5000": 11
+   },
+   "first_start": "2026-11-23T05:00:00Z",
+   "last_end": "2026-12-01T05:00:00Z"
+  },
+  "KXMONSTERPOS": {
+   "programs": 11,
+   "reward_usd": 1140.0,
+   "types": {
+    "liquidity": 11
+   },
+   "targets": {
+    "1000.00": 11
+   },
+   "discounts": {
+    "5000": 11
+   },
+   "first_start": "2026-11-20T05:00:00Z",
+   "last_end": "2026-12-01T05:00:00Z"
+  },
+  "KXONPOS": {
+   "programs": 11,
+   "reward_usd": 1140.0,
+   "types": {
+    "liquidity": 11
+   },
+   "targets": {
+    "1000.00": 11
+   },
+   "discounts": {
+    "5000": 11
+   },
+   "first_start": "2026-11-20T05:00:00Z",
+   "last_end": "2026-12-01T05:00:00Z"
+  },
+  "KXSEPHORACC": {
+   "programs": 11,
+   "reward_usd": 825.0,
+   "types": {
+    "liquidity": 11
+   },
+   "targets": {
+    "1000.00": 11
+   },
+   "discounts": {
+    "5000": 11
+   },
+   "first_start": "2026-11-21T05:00:00Z",
+   "last_end": "2026-12-01T05:00:00Z"
+  },
+  "KXGTA7RELEASEDATE": {
+   "programs": 11,
+   "reward_usd": 2200.0,
+   "types": {
+    "liquidity": 11
+   },
+   "targets": {
+    "1000.00": 11
+   },
+   "discounts": {
+    "5000": 11
+   },
+   "first_start": "2026-11-24T04:59:00Z",
+   "last_end": "2026-12-01T04:59:00Z"
+  },
+  "KXSODAARRAY": {
+   "programs": 11,
+   "reward_usd": 1210.0,
+   "types": {
+    "liquidity": 11
+   },
+   "targets": {
+    "1000.00": 11
+   },
+   "discounts": {
+    "5000": 11
+   },
+   "first_start": "2026-11-23T05:00:00Z",
+   "last_end": "2026-11-30T05:00:00Z"
+  },
+  "KXDELIVARRAY": {
+   "programs": 11,
+   "reward_usd": 1100.0,
+   "types": {
+    "liquidity": 11
+   },
+   "targets": {
+    "1000.00": 11
+   },
+   "discounts": {
+    "5000": 11
+   },
+   "first_start": "2026-11-23T05:00:00Z",
+   "last_end": "2026-11-30T05:00:00Z"
+  },
+  "KXKRCC": {
+   "programs": 11,
+   "reward_usd": 825.0,
+   "types": {
+    "liquidity": 11
+   },
+   "targets": {
+    "1000.00": 11
+   },
+   "discounts": {
+    "5000": 11
+   },
+   "first_start": "2026-11-23T05:00:00Z",
+   "last_end": "2026-11-30T05:00:00Z"
+  },
+  "KXNICOTINEARRAY": {
+   "programs": 11,
+   "reward_usd": 1210.0,
+   "types": {
+    "liquidity": 11
+   },
+   "targets": {
+    "1000.00": 11
+   },
+   "discounts": {
+    "5000": 11
+   },
+   "first_start": "2026-11-23T05:00:00Z",
+   "last_end": "2026-11-30T05:00:00Z"
+  },
+  "KXHOODA": {
+   "programs": 11,
+   "reward_usd": 1100.0,
+   "types": {
+    "liquidity": 11
+   },
+   "targets": {
+    "1000.00": 11
+   },
+   "discounts": {
+    "5000": 11
+   },
+   "first_start": "2026-11-22T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXAALA": {
+   "programs": 11,
+   "reward_usd": 1100.0,
+   "types": {
+    "liquidity": 11
+   },
+   "targets": {
+    "1000.00": 11
+   },
+   "discounts": {
+    "5000": 11
+   },
+   "first_start": "2026-11-19T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXCVXCC": {
+   "programs": 11,
+   "reward_usd": 825.0,
+   "types": {
+    "liquidity": 11
+   },
+   "targets": {
+    "1000.00": 11
+   },
+   "discounts": {
+    "5000": 11
+   },
+   "first_start": "2026-11-22T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXNORDSTROMFT": {
+   "programs": 11,
+   "reward_usd": 825.0,
+   "types": {
+    "liquidity": 11
+   },
+   "targets": {
+    "1000.00": 11
+   },
+   "discounts": {
+    "5000": 11
+   },
+   "first_start": "2026-11-22T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXYUMTBFT": {
+   "programs": 11,
+   "reward_usd": 825.0,
+   "types": {
+    "liquidity": 11
+   },
+   "targets": {
+    "1000.00": 11
+   },
+   "discounts": {
+    "5000": 11
+   },
+   "first_start": "2026-11-20T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXMCDCC": {
+   "programs": 11,
+   "reward_usd": 825.0,
+   "types": {
+    "liquidity": 11
+   },
+   "targets": {
+    "1000.00": 11
+   },
+   "discounts": {
+    "5000": 11
+   },
+   "first_start": "2026-11-22T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXUALCC": {
+   "programs": 11,
+   "reward_usd": 825.0,
+   "types": {
+    "liquidity": 11
+   },
+   "targets": {
+    "1000.00": 11
+   },
+   "discounts": {
+    "5000": 11
+   },
+   "first_start": "2026-11-21T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXSHAKFT": {
+   "programs": 11,
+   "reward_usd": 825.0,
+   "types": {
+    "liquidity": 11
+   },
+   "targets": {
+    "1000.00": 11
+   },
+   "discounts": {
+    "5000": 11
+   },
+   "first_start": "2026-11-20T05:00:00Z",
+   "last_end": "2026-11-28T05:00:00Z"
+  },
+  "KXCOSTFT": {
+   "programs": 11,
+   "reward_usd": 825.0,
+   "types": {
+    "liquidity": 11
+   },
+   "targets": {
+    "1000.00": 11
+   },
+   "discounts": {
+    "5000": 11
+   },
+   "first_start": "2026-11-21T05:00:00Z",
+   "last_end": "2026-11-28T05:00:00Z"
+  },
+  "KXLUTNICKOUT": {
+   "programs": 11,
+   "reward_usd": 2145.0,
+   "types": {
+    "liquidity": 11
+   },
+   "targets": {
+    "1000.00": 11
+   },
+   "discounts": {
+    "5000": 11
+   },
+   "first_start": "2026-11-21T05:00:00Z",
+   "last_end": "2026-11-28T05:00:00Z"
+  },
+  "KXTGTCC": {
+   "programs": 11,
+   "reward_usd": 825.0,
+   "types": {
+    "liquidity": 11
+   },
+   "targets": {
+    "1000.00": 11
+   },
+   "discounts": {
+    "5000": 11
+   },
+   "first_start": "2026-11-21T05:00:00Z",
+   "last_end": "2026-11-28T05:00:00Z"
+  },
+  "KXDKSCC": {
+   "programs": 11,
+   "reward_usd": 770.0,
+   "types": {
+    "liquidity": 11
+   },
+   "targets": {
+    "1000.00": 11
+   },
+   "discounts": {
+    "5000": 11
+   },
+   "first_start": "2026-11-20T20:10:55Z",
+   "last_end": "2026-11-27T05:00:00Z"
+  },
+  "KXSBUXFT": {
+   "programs": 11,
+   "reward_usd": 825.0,
+   "types": {
+    "liquidity": 11
+   },
+   "targets": {
+    "1000.00": 11
+   },
+   "discounts": {
+    "5000": 11
+   },
+   "first_start": "2026-11-20T05:00:00Z",
+   "last_end": "2026-11-27T05:00:00Z"
+  },
+  "KXBKFT": {
+   "programs": 11,
+   "reward_usd": 825.0,
+   "types": {
+    "liquidity": 11
+   },
+   "targets": {
+    "1000.00": 11
+   },
+   "discounts": {
+    "5000": 11
+   },
+   "first_start": "2026-11-20T05:00:00Z",
+   "last_end": "2026-11-27T05:00:00Z"
+  },
+  "KXBROSFT": {
+   "programs": 11,
+   "reward_usd": 825.0,
+   "types": {
+    "liquidity": 11
+   },
+   "targets": {
+    "1000.00": 11
+   },
+   "discounts": {
+    "5000": 11
+   },
+   "first_start": "2026-11-20T05:00:00Z",
+   "last_end": "2026-11-27T05:00:00Z"
+  },
+  "KXCMGFT": {
+   "programs": 11,
+   "reward_usd": 825.0,
+   "types": {
+    "liquidity": 11
+   },
+   "targets": {
+    "1000.00": 11
+   },
+   "discounts": {
+    "5000": 11
+   },
+   "first_start": "2026-11-20T05:00:00Z",
+   "last_end": "2026-11-27T05:00:00Z"
+  },
+  "KXMCDFT": {
+   "programs": 11,
+   "reward_usd": 825.0,
+   "types": {
+    "liquidity": 11
+   },
+   "targets": {
+    "1000.00": 11
+   },
+   "discounts": {
+    "5000": 11
+   },
+   "first_start": "2026-11-20T05:00:00Z",
+   "last_end": "2026-11-27T05:00:00Z"
+  },
+  "KXBIGBOXARRAY": {
+   "programs": 11,
+   "reward_usd": 770.0,
+   "types": {
+    "liquidity": 11
+   },
+   "targets": {
+    "1000.00": 11
+   },
+   "discounts": {
+    "5000": 11
+   },
+   "first_start": "2026-11-19T20:10:44Z",
+   "last_end": "2026-11-26T05:00:00Z"
+  },
+  "KXDENNCC": {
+   "programs": 11,
+   "reward_usd": 770.0,
+   "types": {
+    "liquidity": 11
+   },
+   "targets": {
+    "1000.00": 11
+   },
+   "discounts": {
+    "5000": 11
+   },
+   "first_start": "2026-11-19T20:10:44Z",
+   "last_end": "2026-11-26T05:00:00Z"
+  },
+  "KXCOSTCC": {
+   "programs": 11,
+   "reward_usd": 810.0,
+   "types": {
+    "liquidity": 11
+   },
+   "targets": {
+    "1000.00": 11
+   },
+   "discounts": {
+    "5000": 11
+   },
+   "first_start": "2026-11-19T07:10:49Z",
+   "last_end": "2026-11-26T05:00:00Z"
+  },
+  "KXAALCC": {
+   "programs": 11,
+   "reward_usd": 825.0,
+   "types": {
+    "liquidity": 11
+   },
+   "targets": {
+    "1000.00": 11
+   },
+   "discounts": {
+    "5000": 11
+   },
+   "first_start": "2026-11-19T05:00:00Z",
+   "last_end": "2026-11-26T05:00:00Z"
+  },
+  "KXALDICC": {
+   "programs": 10,
+   "reward_usd": 750.0,
+   "types": {
+    "liquidity": 10
+   },
+   "targets": {
+    "1000.00": 10
+   },
+   "discounts": {
+    "5000": 10
+   },
+   "first_start": "2026-11-25T10:10:34Z",
+   "last_end": "2026-12-02T05:00:00Z"
+  },
+  "KXAPPLEBEESCC": {
+   "programs": 10,
+   "reward_usd": 750.0,
+   "types": {
+    "liquidity": 10
+   },
+   "targets": {
+    "1000.00": 10
+   },
+   "discounts": {
+    "5000": 10
+   },
+   "first_start": "2026-11-25T05:00:00Z",
+   "last_end": "2026-12-02T05:00:00Z"
+  },
+  "KXTRUMPACT": {
+   "programs": 10,
+   "reward_usd": 1000.0,
+   "types": {
+    "liquidity": 10
+   },
+   "targets": {
+    "1000.00": 10
+   },
+   "discounts": {
+    "5000": 10
+   },
+   "first_start": "2026-11-25T05:00:00Z",
+   "last_end": "2026-11-26T05:00:00Z"
+  },
+  "KXTRUTHSOCIAL": {
+   "programs": 10,
+   "reward_usd": 1000.0,
+   "types": {
+    "liquidity": 10
+   },
+   "targets": {
+    "1000.00": 10
+   },
+   "discounts": {
+    "5000": 10
+   },
+   "first_start": "2026-11-25T05:00:00Z",
+   "last_end": "2026-11-26T05:00:00Z"
+  },
+  "KXBAA": {
+   "programs": 10,
+   "reward_usd": 500.0,
+   "types": {
+    "liquidity": 10
+   },
+   "targets": {
+    "1000.00": 10
+   },
+   "discounts": {
+    "5000": 10
+   },
+   "first_start": "2026-11-19T05:00:00Z",
+   "last_end": "2026-12-02T05:00:00Z"
+  },
+  "KXBEERARRAY": {
+   "programs": 10,
+   "reward_usd": 720.0,
+   "types": {
+    "liquidity": 10
+   },
+   "targets": {
+    "1000.00": 10
+   },
+   "discounts": {
+    "5000": 10
+   },
+   "first_start": "2026-11-24T05:00:00Z",
+   "last_end": "2026-12-01T05:00:00Z"
+  },
+  "KXINDIATARIFF": {
+   "programs": 10,
+   "reward_usd": 1600.0,
+   "types": {
+    "liquidity": 10
+   },
+   "targets": {
+    "1000.00": 10
+   },
+   "discounts": {
+    "5000": 10
+   },
+   "first_start": "2026-11-24T17:01:12Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXGEMINIAPP": {
+   "programs": 10,
+   "reward_usd": 980.0,
+   "types": {
+    "liquidity": 10
+   },
+   "targets": {
+    "1000.00": 10
+   },
+   "discounts": {
+    "5000": 10
+   },
+   "first_start": "2026-11-21T01:41:16Z",
+   "last_end": "2026-12-01T05:00:00Z"
+  },
+  "KXCBRLCC": {
+   "programs": 10,
+   "reward_usd": 750.0,
+   "types": {
+    "liquidity": 10
+   },
+   "targets": {
+    "1000.00": 10
+   },
+   "discounts": {
+    "5000": 10
+   },
+   "first_start": "2026-11-22T05:00:00Z",
+   "last_end": "2026-12-01T05:00:00Z"
+  },
+  "KXOAIHARDWARE": {
+   "programs": 10,
+   "reward_usd": 1000.0,
+   "types": {
+    "liquidity": 10
+   },
+   "targets": {
+    "1000.00": 10
+   },
+   "discounts": {
+    "5000": 10
+   },
+   "first_start": "2026-11-23T05:00:00Z",
+   "last_end": "2026-11-30T05:00:00Z"
+  },
+  "KXPRIMEENGCONSUMPTION": {
+   "programs": 10,
+   "reward_usd": 1000.0,
+   "types": {
+    "liquidity": 10
+   },
+   "targets": {
+    "1000.00": 10
+   },
+   "discounts": {
+    "5000": 10
+   },
+   "first_start": "2026-11-23T05:00:00Z",
+   "last_end": "2026-11-30T05:00:00Z"
+  },
+  "KXBJFT": {
+   "programs": 10,
+   "reward_usd": 750.0,
+   "types": {
+    "liquidity": 10
+   },
+   "targets": {
+    "1000.00": 10
+   },
+   "discounts": {
+    "5000": 10
+   },
+   "first_start": "2026-11-22T05:00:00Z",
+   "last_end": "2026-11-30T05:00:00Z"
+  },
+  "KXOLIVEGARDENCC": {
+   "programs": 10,
+   "reward_usd": 650.0,
+   "types": {
+    "liquidity": 10
+   },
+   "targets": {
+    "1000.00": 10
+   },
+   "discounts": {
+    "5000": 10
+   },
+   "first_start": "2026-11-22T23:11:26Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXFIVEFT": {
+   "programs": 10,
+   "reward_usd": 750.0,
+   "types": {
+    "liquidity": 10
+   },
+   "targets": {
+    "1000.00": 10
+   },
+   "discounts": {
+    "5000": 10
+   },
+   "first_start": "2026-11-22T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXREGALFT": {
+   "programs": 10,
+   "reward_usd": 750.0,
+   "types": {
+    "liquidity": 10
+   },
+   "targets": {
+    "1000.00": 10
+   },
+   "discounts": {
+    "5000": 10
+   },
+   "first_start": "2026-11-22T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXWATECHEMP": {
+   "programs": 10,
+   "reward_usd": 2500.0,
+   "types": {
+    "liquidity": 10
+   },
+   "targets": {
+    "1000.00": 10
+   },
+   "discounts": {
+    "5000": 10
+   },
+   "first_start": "2026-11-20T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXBBYCC": {
+   "programs": 10,
+   "reward_usd": 750.0,
+   "types": {
+    "liquidity": 10
+   },
+   "targets": {
+    "1000.00": 10
+   },
+   "discounts": {
+    "5000": 10
+   },
+   "first_start": "2026-11-21T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXALKA": {
+   "programs": 10,
+   "reward_usd": 1000.0,
+   "types": {
+    "liquidity": 10
+   },
+   "targets": {
+    "1000.00": 10
+   },
+   "discounts": {
+    "5000": 10
+   },
+   "first_start": "2026-11-21T05:00:00Z",
+   "last_end": "2026-11-28T05:00:00Z"
+  },
+  "KXUALA": {
+   "programs": 10,
+   "reward_usd": 900.0,
+   "types": {
+    "liquidity": 10
+   },
+   "targets": {
+    "1000.00": 10
+   },
+   "discounts": {
+    "5000": 10
+   },
+   "first_start": "2026-11-20T21:11:39Z",
+   "last_end": "2026-11-27T05:00:00Z"
+  },
+  "KXLAMAYORMOV": {
+   "programs": 10,
+   "reward_usd": 1000.0,
+   "types": {
+    "liquidity": 10
+   },
+   "targets": {
+    "1000.00": 10
+   },
+   "discounts": {
+    "5000": 10
+   },
+   "first_start": "2026-11-20T05:00:00Z",
+   "last_end": "2026-11-27T05:00:00Z"
+  },
+  "KXTEENARRAY": {
+   "programs": 10,
+   "reward_usd": 700.0,
+   "types": {
+    "liquidity": 10
+   },
+   "targets": {
+    "1000.00": 10
+   },
+   "discounts": {
+    "5000": 10
+   },
+   "first_start": "2026-11-19T19:10:47Z",
+   "last_end": "2026-11-26T05:00:00Z"
+  },
+  "KXDLTRFT": {
+   "programs": 10,
+   "reward_usd": 750.0,
+   "types": {
+    "liquidity": 10
+   },
+   "targets": {
+    "1000.00": 10
+   },
+   "discounts": {
+    "5000": 10
+   },
+   "first_start": "2026-11-19T05:00:00Z",
+   "last_end": "2026-11-26T05:00:00Z"
+  },
+  "KXFAOFPI": {
+   "programs": 10,
+   "reward_usd": 2000.0,
+   "types": {
+    "liquidity": 10
+   },
+   "targets": {
+    "1000.00": 10
+   },
+   "discounts": {
+    "5000": 10
+   },
+   "first_start": "2026-11-19T05:00:00Z",
+   "last_end": "2026-11-26T05:00:00Z"
+  },
+  "KXGRAMBNA": {
+   "programs": 9,
+   "reward_usd": 893.61,
+   "types": {
+    "liquidity": 9
+   },
+   "targets": {
+    "1000.00": 9
+   },
+   "discounts": {
+    "5000": 9
+   },
+   "first_start": "2026-11-25T06:11:14Z",
+   "last_end": "2026-12-02T05:00:00Z"
+  },
+  "KXGRAMAOTY": {
+   "programs": 9,
+   "reward_usd": 899.12,
+   "types": {
+    "liquidity": 9
+   },
+   "targets": {
+    "1000.00": 9
+   },
+   "discounts": {
+    "5000": 9
+   },
+   "first_start": "2026-11-25T05:00:00Z",
+   "last_end": "2026-12-02T05:00:00Z"
+  },
+  "KXSUEZWEEKLY": {
+   "programs": 9,
+   "reward_usd": 900.0,
+   "types": {
+    "liquidity": 9
+   },
+   "targets": {
+    "1000.00": 9
+   },
+   "discounts": {
+    "5000": 9
+   },
+   "first_start": "2026-11-25T05:00:00Z",
+   "last_end": "2026-11-26T05:00:00Z"
+  },
+  "KXANFCC": {
+   "programs": 9,
+   "reward_usd": 675.0,
+   "types": {
+    "liquidity": 9
+   },
+   "targets": {
+    "1000.00": 9
+   },
+   "discounts": {
+    "5000": 9
+   },
+   "first_start": "2026-11-25T05:00:00Z",
+   "last_end": "2026-12-02T05:00:00Z"
+  },
+  "KXPANAMAWEEKLY": {
+   "programs": 9,
+   "reward_usd": 900.0,
+   "types": {
+    "liquidity": 9
+   },
+   "targets": {
+    "1000.00": 9
+   },
+   "discounts": {
+    "5000": 9
+   },
+   "first_start": "2026-11-25T05:00:00Z",
+   "last_end": "2026-11-26T05:00:00Z"
+  },
+  "KXCLAUDEAPP": {
+   "programs": 9,
+   "reward_usd": 900.0,
+   "types": {
+    "liquidity": 9
+   },
+   "targets": {
+    "1000.00": 9
+   },
+   "discounts": {
+    "5000": 9
+   },
+   "first_start": "2026-11-24T05:00:00Z",
+   "last_end": "2026-12-02T05:00:00Z"
+  },
+  "KXLULUCC": {
+   "programs": 9,
+   "reward_usd": 585.0,
+   "types": {
+    "liquidity": 9
+   },
+   "targets": {
+    "1000.00": 9
+   },
+   "discounts": {
+    "5000": 9
+   },
+   "first_start": "2026-11-24T23:10:36Z",
+   "last_end": "2026-12-01T05:00:00Z"
+  },
+  "KXDEEPSHARE": {
+   "programs": 9,
+   "reward_usd": 810.0,
+   "types": {
+    "liquidity": 9
+   },
+   "targets": {
+    "1000.00": 9
+   },
+   "discounts": {
+    "5000": 9
+   },
+   "first_start": "2026-11-24T18:01:47Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXOPENSHARE": {
+   "programs": 9,
+   "reward_usd": 810.0,
+   "types": {
+    "liquidity": 9
+   },
+   "targets": {
+    "1000.00": 9
+   },
+   "discounts": {
+    "5000": 9
+   },
+   "first_start": "2026-11-24T18:01:47Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXTOKENUSE": {
+   "programs": 9,
+   "reward_usd": 1530.0,
+   "types": {
+    "liquidity": 9
+   },
+   "targets": {
+    "1000.00": 9
+   },
+   "discounts": {
+    "5000": 9
+   },
+   "first_start": "2026-11-24T17:11:04Z",
+   "last_end": "2026-11-30T04:59:00Z"
+  },
+  "KXGOOGSHARE": {
+   "programs": 9,
+   "reward_usd": 1530.0,
+   "types": {
+    "liquidity": 9
+   },
+   "targets": {
+    "1000.00": 9
+   },
+   "discounts": {
+    "5000": 9
+   },
+   "first_start": "2026-11-24T17:11:01Z",
+   "last_end": "2026-11-30T04:59:00Z"
+  },
+  "KXANTHSHARE": {
+   "programs": 9,
+   "reward_usd": 1530.0,
+   "types": {
+    "liquidity": 9
+   },
+   "targets": {
+    "1000.00": 9
+   },
+   "discounts": {
+    "5000": 9
+   },
+   "first_start": "2026-11-24T17:10:58Z",
+   "last_end": "2026-11-30T04:59:00Z"
+  },
+  "KXPERFORMSUPERBOWL": {
+   "programs": 9,
+   "reward_usd": 900.0,
+   "types": {
+    "liquidity": 9
+   },
+   "targets": {
+    "1000.00": 9
+   },
+   "discounts": {
+    "5000": 9
+   },
+   "first_start": "2026-11-24T05:00:00Z",
+   "last_end": "2026-12-01T05:00:00Z"
+  },
+  "KXGROKAPP": {
+   "programs": 9,
+   "reward_usd": 890.0,
+   "types": {
+    "liquidity": 9
+   },
+   "targets": {
+    "1000.00": 9
+   },
+   "discounts": {
+    "5000": 9
+   },
+   "first_start": "2026-11-21T01:41:17Z",
+   "last_end": "2026-12-01T05:00:00Z"
+  },
+  "KXSPORTSBOOKADS": {
+   "programs": 9,
+   "reward_usd": 900.0,
+   "types": {
+    "liquidity": 9
+   },
+   "targets": {
+    "1000.00": 9
+   },
+   "discounts": {
+    "5000": 9
+   },
+   "first_start": "2026-11-19T05:00:00Z",
+   "last_end": "2026-12-01T05:00:00Z"
+  },
+  "KXNCAAFTRANSFER": {
+   "programs": 9,
+   "reward_usd": 890.0,
+   "types": {
+    "liquidity": 9
+   },
+   "targets": {
+    "1000.00": 9
+   },
+   "discounts": {
+    "5000": 9
+   },
+   "first_start": "2026-11-19T22:55:30Z",
+   "last_end": "2026-12-01T05:00:00Z"
+  },
+  "KXWICORNYIELD": {
+   "programs": 9,
+   "reward_usd": 900.0,
+   "types": {
+    "liquidity": 9
+   },
+   "targets": {
+    "1000.00": 9
+   },
+   "discounts": {
+    "5000": 9
+   },
+   "first_start": "2026-11-23T05:00:00Z",
+   "last_end": "2026-11-30T05:00:00Z"
+  },
+  "KXSPEAKER120": {
+   "programs": 9,
+   "reward_usd": 900.0,
+   "types": {
+    "liquidity": 9
+   },
+   "targets": {
+    "1000.00": 9
+   },
+   "discounts": {
+    "5000": 9
+   },
+   "first_start": "2026-11-23T05:00:00Z",
+   "last_end": "2026-11-30T05:00:00Z"
+  },
+  "KXLUVCC": {
+   "programs": 9,
+   "reward_usd": 670.0,
+   "types": {
+    "liquidity": 9
+   },
+   "targets": {
+    "1000.00": 9
+   },
+   "discounts": {
+    "5000": 9
+   },
+   "first_start": "2026-11-19T18:55:32Z",
+   "last_end": "2026-11-30T05:00:00Z"
+  },
+  "KXVSXY": {
+   "programs": 9,
+   "reward_usd": 900.0,
+   "types": {
+    "liquidity": 9
+   },
+   "targets": {
+    "1000.00": 9
+   },
+   "discounts": {
+    "5000": 9
+   },
+   "first_start": "2026-11-22T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXNYNJPORTTEU": {
+   "programs": 9,
+   "reward_usd": 2250.0,
+   "types": {
+    "liquidity": 9
+   },
+   "targets": {
+    "1000.00": 9
+   },
+   "discounts": {
+    "5000": 9
+   },
+   "first_start": "2026-11-20T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXCTCA": {
+   "programs": 9,
+   "reward_usd": 900.0,
+   "types": {
+    "liquidity": 9
+   },
+   "targets": {
+    "1000.00": 9
+   },
+   "discounts": {
+    "5000": 9
+   },
+   "first_start": "2026-11-22T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXFBUSTER": {
+   "programs": 9,
+   "reward_usd": 1800.0,
+   "types": {
+    "liquidity": 9
+   },
+   "targets": {
+    "1000.00": 9
+   },
+   "discounts": {
+    "5000": 9
+   },
+   "first_start": "2026-11-21T05:11:08Z",
+   "last_end": "2026-11-28T05:00:00Z"
+  },
+  "KXNEXTSPEAKER": {
+   "programs": 9,
+   "reward_usd": 900.0,
+   "types": {
+    "liquidity": 9
+   },
+   "targets": {
+    "1000.00": 9
+   },
+   "discounts": {
+    "5000": 9
+   },
+   "first_start": "2026-11-20T05:00:00Z",
+   "last_end": "2026-11-28T05:00:00Z"
+  },
+  "KXKLARCC": {
+   "programs": 9,
+   "reward_usd": 675.0,
+   "types": {
+    "liquidity": 9
+   },
+   "targets": {
+    "1000.00": 9
+   },
+   "discounts": {
+    "5000": 9
+   },
+   "first_start": "2026-11-20T05:00:00Z",
+   "last_end": "2026-11-27T05:00:00Z"
+  },
+  "KXAFTERPAYCC": {
+   "programs": 9,
+   "reward_usd": 675.0,
+   "types": {
+    "liquidity": 9
+   },
+   "targets": {
+    "1000.00": 9
+   },
+   "discounts": {
+    "5000": 9
+   },
+   "first_start": "2026-11-20T05:00:00Z",
+   "last_end": "2026-11-27T05:00:00Z"
+  },
+  "KXYUMPHFT": {
+   "programs": 9,
+   "reward_usd": 675.0,
+   "types": {
+    "liquidity": 9
+   },
+   "targets": {
+    "1000.00": 9
+   },
+   "discounts": {
+    "5000": 9
+   },
+   "first_start": "2026-11-19T05:00:00Z",
+   "last_end": "2026-11-26T05:00:00Z"
+  },
+  "KXVOICELIMINATION": {
+   "programs": 8,
+   "reward_usd": 600.0,
+   "types": {
+    "liquidity": 8
+   },
+   "targets": {
+    "1000.00": 8
+   },
+   "discounts": {
+    "5000": 8
+   },
+   "first_start": "2026-11-25T17:00:46Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXMACRONENDORSE27": {
+   "programs": 8,
+   "reward_usd": 800.0,
+   "types": {
+    "liquidity": 8
+   },
+   "targets": {
+    "1000.00": 8
+   },
+   "discounts": {
+    "5000": 8
+   },
+   "first_start": "2026-11-25T05:00:52Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXFIVECC": {
+   "programs": 8,
+   "reward_usd": 600.0,
+   "types": {
+    "liquidity": 8
+   },
+   "targets": {
+    "1000.00": 8
+   },
+   "discounts": {
+    "5000": 8
+   },
+   "first_start": "2026-11-25T05:00:00Z",
+   "last_end": "2026-12-02T05:00:00Z"
+  },
+  "KXVTMAPLE": {
+   "programs": 8,
+   "reward_usd": 800.0,
+   "types": {
+    "liquidity": 8
+   },
+   "targets": {
+    "1000.00": 8
+   },
+   "discounts": {
+    "5000": 8
+   },
+   "first_start": "2026-11-25T05:00:00Z",
+   "last_end": "2026-12-02T05:00:00Z"
+  },
+  "KXHORMUZPEAK": {
+   "programs": 8,
+   "reward_usd": 800.0,
+   "types": {
+    "liquidity": 8
+   },
+   "targets": {
+    "1000.00": 8
+   },
+   "discounts": {
+    "5000": 8
+   },
+   "first_start": "2026-11-25T05:00:00Z",
+   "last_end": "2026-11-26T05:00:00Z"
+  },
+  "KXAPRPOTUS": {
+   "programs": 8,
+   "reward_usd": 800.0,
+   "types": {
+    "liquidity": 8
+   },
+   "targets": {
+    "1000.00": 8
+   },
+   "discounts": {
+    "5000": 8
+   },
+   "first_start": "2026-11-25T05:00:00Z",
+   "last_end": "2026-11-26T05:00:00Z"
+  },
+  "KXMELOBSTER": {
+   "programs": 8,
+   "reward_usd": 800.0,
+   "types": {
+    "liquidity": 8
+   },
+   "targets": {
+    "1000.00": 8
+   },
+   "discounts": {
+    "5000": 8
+   },
+   "first_start": "2026-11-21T05:00:00Z",
+   "last_end": "2026-12-01T05:00:00Z"
+  },
+  "KXTEENCLOTHADS": {
+   "programs": 8,
+   "reward_usd": 800.0,
+   "types": {
+    "liquidity": 8
+   },
+   "targets": {
+    "1000.00": 8
+   },
+   "discounts": {
+    "5000": 8
+   },
+   "first_start": "2026-11-24T05:00:00Z",
+   "last_end": "2026-12-01T05:00:00Z"
+  },
+  "KXCASINOADS": {
+   "programs": 8,
+   "reward_usd": 800.0,
+   "types": {
+    "liquidity": 8
+   },
+   "targets": {
+    "1000.00": 8
+   },
+   "discounts": {
+    "5000": 8
+   },
+   "first_start": "2026-11-24T05:00:00Z",
+   "last_end": "2026-12-01T05:00:00Z"
+  },
+  "KXALANIPOS": {
+   "programs": 8,
+   "reward_usd": 840.0,
+   "types": {
+    "liquidity": 8
+   },
+   "targets": {
+    "1000.00": 8
+   },
+   "discounts": {
+    "5000": 8
+   },
+   "first_start": "2026-11-24T05:00:00Z",
+   "last_end": "2026-12-01T05:00:00Z"
+  },
+  "KXSPORTGOODSADS": {
+   "programs": 8,
+   "reward_usd": 800.0,
+   "types": {
+    "liquidity": 8
+   },
+   "targets": {
+    "1000.00": 8
+   },
+   "discounts": {
+    "5000": 8
+   },
+   "first_start": "2026-11-24T05:00:00Z",
+   "last_end": "2026-12-01T05:00:00Z"
+  },
+  "KXPEACOCKAPP": {
+   "programs": 8,
+   "reward_usd": 800.0,
+   "types": {
+    "liquidity": 8
+   },
+   "targets": {
+    "1000.00": 8
+   },
+   "discounts": {
+    "5000": 8
+   },
+   "first_start": "2026-11-24T05:00:00Z",
+   "last_end": "2026-12-01T05:00:00Z"
+  },
+  "KXFANDUELAPP": {
+   "programs": 8,
+   "reward_usd": 800.0,
+   "types": {
+    "liquidity": 8
+   },
+   "targets": {
+    "1000.00": 8
+   },
+   "discounts": {
+    "5000": 8
+   },
+   "first_start": "2026-11-24T05:00:00Z",
+   "last_end": "2026-12-01T05:00:00Z"
+  },
+  "KXESPNAPP": {
+   "programs": 8,
+   "reward_usd": 800.0,
+   "types": {
+    "liquidity": 8
+   },
+   "targets": {
+    "1000.00": 8
+   },
+   "discounts": {
+    "5000": 8
+   },
+   "first_start": "2026-11-24T05:00:00Z",
+   "last_end": "2026-12-01T05:00:00Z"
+  },
+  "KXLYFTAPP": {
+   "programs": 8,
+   "reward_usd": 800.0,
+   "types": {
+    "liquidity": 8
+   },
+   "targets": {
+    "1000.00": 8
+   },
+   "discounts": {
+    "5000": 8
+   },
+   "first_start": "2026-11-24T05:00:00Z",
+   "last_end": "2026-12-01T05:00:00Z"
+  },
+  "KXNFLXAPP": {
+   "programs": 8,
+   "reward_usd": 800.0,
+   "types": {
+    "liquidity": 8
+   },
+   "targets": {
+    "1000.00": 8
+   },
+   "discounts": {
+    "5000": 8
+   },
+   "first_start": "2026-11-24T05:00:00Z",
+   "last_end": "2026-12-01T05:00:00Z"
+  },
+  "KXHULUAPP": {
+   "programs": 8,
+   "reward_usd": 800.0,
+   "types": {
+    "liquidity": 8
+   },
+   "targets": {
+    "1000.00": 8
+   },
+   "discounts": {
+    "5000": 8
+   },
+   "first_start": "2026-11-24T05:00:00Z",
+   "last_end": "2026-12-01T05:00:00Z"
+  },
+  "KXUBEREAPP": {
+   "programs": 8,
+   "reward_usd": 800.0,
+   "types": {
+    "liquidity": 8
+   },
+   "targets": {
+    "1000.00": 8
+   },
+   "discounts": {
+    "5000": 8
+   },
+   "first_start": "2026-11-24T05:00:00Z",
+   "last_end": "2026-12-01T05:00:00Z"
+  },
+  "KXELECTRONICSADS": {
+   "programs": 8,
+   "reward_usd": 800.0,
+   "types": {
+    "liquidity": 8
+   },
+   "targets": {
+    "1000.00": 8
+   },
+   "discounts": {
+    "5000": 8
+   },
+   "first_start": "2026-11-24T05:00:00Z",
+   "last_end": "2026-12-01T05:00:00Z"
+  },
+  "KXDKNGAPP": {
+   "programs": 8,
+   "reward_usd": 800.0,
+   "types": {
+    "liquidity": 8
+   },
+   "targets": {
+    "1000.00": 8
+   },
+   "discounts": {
+    "5000": 8
+   },
+   "first_start": "2026-11-24T05:00:00Z",
+   "last_end": "2026-12-01T05:00:00Z"
+  },
+  "KXSTREAMINGADS": {
+   "programs": 8,
+   "reward_usd": 800.0,
+   "types": {
+    "liquidity": 8
+   },
+   "targets": {
+    "1000.00": 8
+   },
+   "discounts": {
+    "5000": 8
+   },
+   "first_start": "2026-11-24T05:00:00Z",
+   "last_end": "2026-12-01T05:00:00Z"
+  },
+  "KXMAXAPP": {
+   "programs": 8,
+   "reward_usd": 800.0,
+   "types": {
+    "liquidity": 8
+   },
+   "targets": {
+    "1000.00": 8
+   },
+   "discounts": {
+    "5000": 8
+   },
+   "first_start": "2026-11-24T05:00:00Z",
+   "last_end": "2026-12-01T05:00:00Z"
+  },
+  "KXREESESPOS": {
+   "programs": 8,
+   "reward_usd": 560.0,
+   "types": {
+    "liquidity": 8
+   },
+   "targets": {
+    "1000.00": 8
+   },
+   "discounts": {
+    "5000": 8
+   },
+   "first_start": "2026-11-23T18:11:27Z",
+   "last_end": "2026-11-30T05:00:00Z"
+  },
+  "KXSNICKERSPOS": {
+   "programs": 8,
+   "reward_usd": 560.0,
+   "types": {
+    "liquidity": 8
+   },
+   "targets": {
+    "1000.00": 8
+   },
+   "discounts": {
+    "5000": 8
+   },
+   "first_start": "2026-11-23T18:11:27Z",
+   "last_end": "2026-11-30T05:00:00Z"
+  },
+  "KXMODELHIGH": {
+   "programs": 8,
+   "reward_usd": 800.0,
+   "types": {
+    "liquidity": 8
+   },
+   "targets": {
+    "1000.00": 8
+   },
+   "discounts": {
+    "5000": 8
+   },
+   "first_start": "2026-11-23T05:00:00Z",
+   "last_end": "2026-11-30T05:00:00Z"
+  },
+  "KXTRUMPMEETM": {
+   "programs": 8,
+   "reward_usd": 475.0,
+   "types": {
+    "liquidity": 8
+   },
+   "targets": {
+    "1000.00": 8
+   },
+   "discounts": {
+    "5000": 8
+   },
+   "first_start": "2026-11-22T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXHIMSCC": {
+   "programs": 8,
+   "reward_usd": 560.0,
+   "types": {
+    "liquidity": 8
+   },
+   "targets": {
+    "1000.00": 8
+   },
+   "discounts": {
+    "5000": 8
+   },
+   "first_start": "2026-11-22T20:10:43Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXMOBILETEU": {
+   "programs": 8,
+   "reward_usd": 800.0,
+   "types": {
+    "liquidity": 8
+   },
+   "targets": {
+    "1000.00": 8
+   },
+   "discounts": {
+    "5000": 8
+   },
+   "first_start": "2026-11-22T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXDUFFYANNOUNCEOUT": {
+   "programs": 8,
+   "reward_usd": 1600.0,
+   "types": {
+    "liquidity": 8
+   },
+   "targets": {
+    "1000.00": 8
+   },
+   "discounts": {
+    "5000": 8
+   },
+   "first_start": "2026-11-22T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXCTMFPERMITS": {
+   "programs": 8,
+   "reward_usd": 800.0,
+   "types": {
+    "liquidity": 8
+   },
+   "targets": {
+    "1000.00": 8
+   },
+   "discounts": {
+    "5000": 8
+   },
+   "first_start": "2026-11-22T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXAMZNA": {
+   "programs": 8,
+   "reward_usd": 800.0,
+   "types": {
+    "liquidity": 8
+   },
+   "targets": {
+    "1000.00": 8
+   },
+   "discounts": {
+    "5000": 8
+   },
+   "first_start": "2026-11-19T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXASOCC": {
+   "programs": 8,
+   "reward_usd": 600.0,
+   "types": {
+    "liquidity": 8
+   },
+   "targets": {
+    "1000.00": 8
+   },
+   "discounts": {
+    "5000": 8
+   },
+   "first_start": "2026-11-22T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXNYCASKRENT": {
+   "programs": 8,
+   "reward_usd": 2000.0,
+   "types": {
+    "liquidity": 8
+   },
+   "targets": {
+    "1000.00": 8
+   },
+   "discounts": {
+    "5000": 8
+   },
+   "first_start": "2026-11-20T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXDGFT": {
+   "programs": 8,
+   "reward_usd": 600.0,
+   "types": {
+    "liquidity": 8
+   },
+   "targets": {
+    "1000.00": 8
+   },
+   "discounts": {
+    "5000": 8
+   },
+   "first_start": "2026-11-22T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXNERIVISITS": {
+   "programs": 8,
+   "reward_usd": 800.0,
+   "types": {
+    "liquidity": 8
+   },
+   "targets": {
+    "1000.00": 8
+   },
+   "discounts": {
+    "5000": 8
+   },
+   "first_start": "2026-11-22T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXNVVISIT": {
+   "programs": 8,
+   "reward_usd": 800.0,
+   "types": {
+    "liquidity": 8
+   },
+   "targets": {
+    "1000.00": 8
+   },
+   "discounts": {
+    "5000": 8
+   },
+   "first_start": "2026-11-21T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXIAETHANOL": {
+   "programs": 8,
+   "reward_usd": 800.0,
+   "types": {
+    "liquidity": 8
+   },
+   "targets": {
+    "1000.00": 8
+   },
+   "discounts": {
+    "5000": 8
+   },
+   "first_start": "2026-11-21T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXAMCFT": {
+   "programs": 8,
+   "reward_usd": 600.0,
+   "types": {
+    "liquidity": 8
+   },
+   "targets": {
+    "1000.00": 8
+   },
+   "discounts": {
+    "5000": 8
+   },
+   "first_start": "2026-11-22T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXWYCOAL": {
+   "programs": 8,
+   "reward_usd": 800.0,
+   "types": {
+    "liquidity": 8
+   },
+   "targets": {
+    "1000.00": 8
+   },
+   "discounts": {
+    "5000": 8
+   },
+   "first_start": "2026-11-20T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXROCC": {
+   "programs": 8,
+   "reward_usd": 560.0,
+   "types": {
+    "liquidity": 8
+   },
+   "targets": {
+    "1000.00": 8
+   },
+   "discounts": {
+    "5000": 8
+   },
+   "first_start": "2026-11-21T15:11:00Z",
+   "last_end": "2026-11-28T05:00:00Z"
+  },
+  "KXSCHUMERVOTES": {
+   "programs": 8,
+   "reward_usd": 1600.0,
+   "types": {
+    "liquidity": 8
+   },
+   "targets": {
+    "1000.00": 8
+   },
+   "discounts": {
+    "5000": 8
+   },
+   "first_start": "2026-11-21T05:00:00Z",
+   "last_end": "2026-11-28T05:00:00Z"
+  },
+  "KXVANHOLLENVOTES": {
+   "programs": 8,
+   "reward_usd": 1600.0,
+   "types": {
+    "liquidity": 8
+   },
+   "targets": {
+    "1000.00": 8
+   },
+   "discounts": {
+    "5000": 8
+   },
+   "first_start": "2026-11-21T05:00:00Z",
+   "last_end": "2026-11-28T05:00:00Z"
+  },
+  "KXHOBHOME": {
+   "programs": 8,
+   "reward_usd": 770.0,
+   "types": {
+    "liquidity": 8
+   },
+   "targets": {
+    "1000.00": 8
+   },
+   "discounts": {
+    "5000": 8
+   },
+   "first_start": "2026-11-19T05:00:00Z",
+   "last_end": "2026-11-27T05:00:00Z"
+  },
+  "KXSTATE51": {
+   "programs": 8,
+   "reward_usd": 800.0,
+   "types": {
+    "liquidity": 8
+   },
+   "targets": {
+    "1000.00": 8
+   },
+   "discounts": {
+    "5000": 8
+   },
+   "first_start": "2026-11-20T05:00:00Z",
+   "last_end": "2026-11-27T05:00:00Z"
+  },
+  "KXPOWERSLAPMATCH": {
+   "programs": 8,
+   "reward_usd": 795.0,
+   "types": {
+    "liquidity": 8
+   },
+   "targets": {
+    "1000.00": 8
+   },
+   "discounts": {
+    "5000": 8
+   },
+   "first_start": "2026-11-19T08:11:03Z",
+   "last_end": "2026-11-26T05:00:00Z"
+  },
+  "KXNCAAFTFUT": {
+   "programs": 8,
+   "reward_usd": 800.0,
+   "types": {
+    "liquidity": 8
+   },
+   "targets": {
+    "1000.00": 8
+   },
+   "discounts": {
+    "5000": 8
+   },
+   "first_start": "2026-11-19T05:00:00Z",
+   "last_end": "2026-11-26T05:00:00Z"
+  },
+  "KXDWTSRANK": {
+   "programs": 8,
+   "reward_usd": 400.0,
+   "types": {
+    "liquidity": 8
+   },
+   "targets": {
+    "1000.00": 8
+   },
+   "discounts": {
+    "5000": 8
+   },
+   "first_start": "2026-11-19T05:00:00Z",
+   "last_end": "2026-11-26T05:00:00Z"
+  },
+  "KXCITYCHAMPS": {
+   "programs": 8,
+   "reward_usd": 2000.0,
+   "types": {
+    "liquidity": 8
+   },
+   "targets": {
+    "1000.00": 8
+   },
+   "discounts": {
+    "5000": 8
+   },
+   "first_start": "2026-11-19T05:00:00Z",
+   "last_end": "2026-11-26T05:00:00Z"
+  },
+  "KXPRESDEBATECREATORD": {
+   "programs": 7,
+   "reward_usd": 595.0,
+   "types": {
+    "liquidity": 7
+   },
+   "targets": {
+    "1000.00": 7
+   },
+   "discounts": {
+    "5000": 7
+   },
+   "first_start": "2026-11-25T21:01:38Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXBULL": {
+   "programs": 7,
+   "reward_usd": 805.0,
+   "types": {
+    "liquidity": 7
+   },
+   "targets": {
+    "1000.00": 7
+   },
+   "discounts": {
+    "5000": 7
+   },
+   "first_start": "2026-11-25T16:01:20Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXICCWITHDRAW": {
+   "programs": 7,
+   "reward_usd": 805.0,
+   "types": {
+    "liquidity": 7
+   },
+   "targets": {
+    "1000.00": 7
+   },
+   "discounts": {
+    "5000": 7
+   },
+   "first_start": "2026-11-25T16:01:20Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXICCEXIT": {
+   "programs": 7,
+   "reward_usd": 805.0,
+   "types": {
+    "liquidity": 7
+   },
+   "targets": {
+    "1000.00": 7
+   },
+   "discounts": {
+    "5000": 7
+   },
+   "first_start": "2026-11-25T05:00:52Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXMUSICREPORT": {
+   "programs": 7,
+   "reward_usd": 700.0,
+   "types": {
+    "liquidity": 7
+   },
+   "targets": {
+    "1000.00": 7
+   },
+   "discounts": {
+    "5000": 7
+   },
+   "first_start": "2026-11-25T05:00:00Z",
+   "last_end": "2026-12-02T05:00:00Z"
+  },
+  "KXCFNAI": {
+   "programs": 7,
+   "reward_usd": 805.0,
+   "types": {
+    "liquidity": 7
+   },
+   "targets": {
+    "1000.00": 7
+   },
+   "discounts": {
+    "5000": 7
+   },
+   "first_start": "2026-11-24T22:01:34Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXHORMUZMAX": {
+   "programs": 7,
+   "reward_usd": 1225.0,
+   "types": {
+    "liquidity": 7
+   },
+   "targets": {
+    "1000.00": 7
+   },
+   "discounts": {
+    "5000": 7
+   },
+   "first_start": "2026-11-24T11:10:56Z",
+   "last_end": "2026-11-26T05:00:00Z"
+  },
+  "KXKITKATPOS": {
+   "programs": 7,
+   "reward_usd": 490.0,
+   "types": {
+    "liquidity": 7
+   },
+   "targets": {
+    "1000.00": 7
+   },
+   "discounts": {
+    "5000": 7
+   },
+   "first_start": "2026-11-23T18:11:28Z",
+   "last_end": "2026-11-30T05:00:00Z"
+  },
+  "KXWVCOAL": {
+   "programs": 7,
+   "reward_usd": 680.0,
+   "types": {
+    "liquidity": 7
+   },
+   "targets": {
+    "1000.00": 7
+   },
+   "discounts": {
+    "5000": 7
+   },
+   "first_start": "2026-11-20T05:00:00Z",
+   "last_end": "2026-11-30T05:00:00Z"
+  },
+  "KXENERGYARRAY": {
+   "programs": 7,
+   "reward_usd": 770.0,
+   "types": {
+    "liquidity": 7
+   },
+   "targets": {
+    "1000.00": 7
+   },
+   "discounts": {
+    "5000": 7
+   },
+   "first_start": "2026-11-23T05:00:00Z",
+   "last_end": "2026-11-30T05:00:00Z"
+  },
+  "KXHOUSEDEMLEADRUN": {
+   "programs": 7,
+   "reward_usd": 700.0,
+   "types": {
+    "liquidity": 7
+   },
+   "targets": {
+    "1000.00": 7
+   },
+   "discounts": {
+    "5000": 7
+   },
+   "first_start": "2026-11-23T05:00:00Z",
+   "last_end": "2026-11-30T05:00:00Z"
+  },
+  "KXSENMAJ": {
+   "programs": 7,
+   "reward_usd": 700.0,
+   "types": {
+    "liquidity": 7
+   },
+   "targets": {
+    "1000.00": 7
+   },
+   "discounts": {
+    "5000": 7
+   },
+   "first_start": "2026-11-23T05:00:00Z",
+   "last_end": "2026-11-30T05:00:00Z"
+  },
+  "KXMULLINANNOUNCEOUT": {
+   "programs": 7,
+   "reward_usd": 630.0,
+   "types": {
+    "liquidity": 7
+   },
+   "targets": {
+    "1000.00": 7
+   },
+   "discounts": {
+    "5000": 7
+   },
+   "first_start": "2026-11-22T19:55:31Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXRIRESPOWER": {
+   "programs": 7,
+   "reward_usd": 700.0,
+   "types": {
+    "liquidity": 7
+   },
+   "targets": {
+    "1000.00": 7
+   },
+   "discounts": {
+    "5000": 7
+   },
+   "first_start": "2026-11-21T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXWIMFGEMP": {
+   "programs": 7,
+   "reward_usd": 700.0,
+   "types": {
+    "liquidity": 7
+   },
+   "targets": {
+    "1000.00": 7
+   },
+   "discounts": {
+    "5000": 7
+   },
+   "first_start": "2026-11-20T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXILNUCLEAR": {
+   "programs": 7,
+   "reward_usd": 1750.0,
+   "types": {
+    "liquidity": 7
+   },
+   "targets": {
+    "1000.00": 7
+   },
+   "discounts": {
+    "5000": 7
+   },
+   "first_start": "2026-11-20T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXWALLSTBONUS": {
+   "programs": 7,
+   "reward_usd": 1750.0,
+   "types": {
+    "liquidity": 7
+   },
+   "targets": {
+    "1000.00": 7
+   },
+   "discounts": {
+    "5000": 7
+   },
+   "first_start": "2026-11-20T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXFLVISITORCOUNT": {
+   "programs": 7,
+   "reward_usd": 1750.0,
+   "types": {
+    "liquidity": 7
+   },
+   "targets": {
+    "1000.00": 7
+   },
+   "discounts": {
+    "5000": 7
+   },
+   "first_start": "2026-11-20T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXTXERCOTPEAK": {
+   "programs": 7,
+   "reward_usd": 1750.0,
+   "types": {
+    "liquidity": 7
+   },
+   "targets": {
+    "1000.00": 7
+   },
+   "discounts": {
+    "5000": 7
+   },
+   "first_start": "2026-11-20T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXAAAGASMINM": {
+   "programs": 7,
+   "reward_usd": 720.0,
+   "types": {
+    "liquidity": 7
+   },
+   "targets": {
+    "1000.00": 7
+   },
+   "discounts": {
+    "5000": 7
+   },
+   "first_start": "2026-11-21T15:55:56Z",
+   "last_end": "2026-11-28T05:00:00Z"
+  },
+  "KXHERSHEYSPOS": {
+   "programs": 7,
+   "reward_usd": 525.0,
+   "types": {
+    "liquidity": 7
+   },
+   "targets": {
+    "1000.00": 7
+   },
+   "discounts": {
+    "5000": 7
+   },
+   "first_start": "2026-11-21T06:10:52Z",
+   "last_end": "2026-11-28T05:00:00Z"
+  },
+  "KXPALISADESHOME": {
+   "programs": 7,
+   "reward_usd": 680.0,
+   "types": {
+    "liquidity": 7
+   },
+   "targets": {
+    "1000.00": 7
+   },
+   "discounts": {
+    "5000": 7
+   },
+   "first_start": "2026-11-19T05:00:00Z",
+   "last_end": "2026-11-27T05:00:00Z"
+  },
+  "KXKEVCOUNT": {
+   "programs": 7,
+   "reward_usd": 1400.0,
+   "types": {
+    "liquidity": 7
+   },
+   "targets": {
+    "1000.00": 7
+   },
+   "discounts": {
+    "5000": 7
+   },
+   "first_start": "2026-11-20T05:00:00Z",
+   "last_end": "2026-11-27T05:00:00Z"
+  },
+  "KXNBAFRANCHISECOST": {
+   "programs": 7,
+   "reward_usd": 700.0,
+   "types": {
+    "liquidity": 7
+   },
+   "targets": {
+    "1000.00": 7
+   },
+   "discounts": {
+    "5000": 7
+   },
+   "first_start": "2026-11-19T05:00:00Z",
+   "last_end": "2026-11-26T05:00:00Z"
+  },
+  "KXNEXTTEAMNFL": {
+   "programs": 7,
+   "reward_usd": 700.0,
+   "types": {
+    "liquidity": 7
+   },
+   "targets": {
+    "1000.00": 7
+   },
+   "discounts": {
+    "5000": 7
+   },
+   "first_start": "2026-11-19T05:00:00Z",
+   "last_end": "2026-11-26T05:00:00Z"
+  },
+  "KXPAMFGEMP": {
+   "programs": 6,
+   "reward_usd": 1500.0,
+   "types": {
+    "liquidity": 6
+   },
+   "targets": {
+    "1000.00": 6
+   },
+   "discounts": {
+    "5000": 6
+   },
+   "first_start": "2026-11-20T05:00:00Z",
+   "last_end": "2026-12-02T05:00:00Z"
+  },
+  "KXRDUVISITS": {
+   "programs": 6,
+   "reward_usd": 600.0,
+   "types": {
+    "liquidity": 6
+   },
+   "targets": {
+    "1000.00": 6
+   },
+   "discounts": {
+    "5000": 6
+   },
+   "first_start": "2026-11-20T05:00:00Z",
+   "last_end": "2026-12-01T05:00:00Z"
+  },
+  "KXSCREWWORMCOUNT": {
+   "programs": 6,
+   "reward_usd": 600.0,
+   "types": {
+    "liquidity": 6
+   },
+   "targets": {
+    "1000.00": 6
+   },
+   "discounts": {
+    "5000": 6
+   },
+   "first_start": "2026-11-23T05:00:00Z",
+   "last_end": "2026-11-30T05:00:00Z"
+  },
+  "KXSENDEMLEADRUN": {
+   "programs": 6,
+   "reward_usd": 600.0,
+   "types": {
+    "liquidity": 6
+   },
+   "targets": {
+    "1000.00": 6
+   },
+   "discounts": {
+    "5000": 6
+   },
+   "first_start": "2026-11-23T05:00:00Z",
+   "last_end": "2026-11-30T05:00:00Z"
+  },
+  "KXSCPORTTEU": {
+   "programs": 6,
+   "reward_usd": 600.0,
+   "types": {
+    "liquidity": 6
+   },
+   "targets": {
+    "1000.00": 6
+   },
+   "discounts": {
+    "5000": 6
+   },
+   "first_start": "2026-11-22T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXCABUILDPERMITS": {
+   "programs": 6,
+   "reward_usd": 1500.0,
+   "types": {
+    "liquidity": 6
+   },
+   "targets": {
+    "1000.00": 6
+   },
+   "discounts": {
+    "5000": 6
+   },
+   "first_start": "2026-11-20T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXMSCOTTON": {
+   "programs": 6,
+   "reward_usd": 600.0,
+   "types": {
+    "liquidity": 6
+   },
+   "targets": {
+    "1000.00": 6
+   },
+   "discounts": {
+    "5000": 6
+   },
+   "first_start": "2026-11-21T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXMARCELLUSGAS": {
+   "programs": 6,
+   "reward_usd": 600.0,
+   "types": {
+    "liquidity": 6
+   },
+   "targets": {
+    "1000.00": 6
+   },
+   "discounts": {
+    "5000": 6
+   },
+   "first_start": "2026-11-20T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXTRUMPNUMSTATES": {
+   "programs": 6,
+   "reward_usd": 600.0,
+   "types": {
+    "liquidity": 6
+   },
+   "targets": {
+    "1000.00": 6
+   },
+   "discounts": {
+    "5000": 6
+   },
+   "first_start": "2026-11-22T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXVAPORTTEU": {
+   "programs": 6,
+   "reward_usd": 600.0,
+   "types": {
+    "liquidity": 6
+   },
+   "targets": {
+    "1000.00": 6
+   },
+   "discounts": {
+    "5000": 6
+   },
+   "first_start": "2026-11-20T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXRIQUAHOG": {
+   "programs": 6,
+   "reward_usd": 580.0,
+   "types": {
+    "liquidity": 6
+   },
+   "targets": {
+    "1000.00": 6
+   },
+   "discounts": {
+    "5000": 6
+   },
+   "first_start": "2026-11-21T00:11:12Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXCHIHOME": {
+   "programs": 6,
+   "reward_usd": 590.0,
+   "types": {
+    "liquidity": 6
+   },
+   "targets": {
+    "1000.00": 6
+   },
+   "discounts": {
+    "5000": 6
+   },
+   "first_start": "2026-11-19T05:00:00Z",
+   "last_end": "2026-11-27T05:00:00Z"
+  },
+  "KXAUSHOME": {
+   "programs": 6,
+   "reward_usd": 590.0,
+   "types": {
+    "liquidity": 6
+   },
+   "targets": {
+    "1000.00": 6
+   },
+   "discounts": {
+    "5000": 6
+   },
+   "first_start": "2026-11-19T05:00:00Z",
+   "last_end": "2026-11-27T05:00:00Z"
+  },
+  "KXPHXHOME": {
+   "programs": 6,
+   "reward_usd": 590.0,
+   "types": {
+    "liquidity": 6
+   },
+   "targets": {
+    "1000.00": 6
+   },
+   "discounts": {
+    "5000": 6
+   },
+   "first_start": "2026-11-19T05:00:00Z",
+   "last_end": "2026-11-27T05:00:00Z"
+  },
+  "KXPHLHOME": {
+   "programs": 6,
+   "reward_usd": 590.0,
+   "types": {
+    "liquidity": 6
+   },
+   "targets": {
+    "1000.00": 6
+   },
+   "discounts": {
+    "5000": 6
+   },
+   "first_start": "2026-11-19T05:00:00Z",
+   "last_end": "2026-11-27T05:00:00Z"
+  },
+  "KXKYCOAL": {
+   "programs": 6,
+   "reward_usd": 600.0,
+   "types": {
+    "liquidity": 6
+   },
+   "targets": {
+    "1000.00": 6
+   },
+   "discounts": {
+    "5000": 6
+   },
+   "first_start": "2026-11-19T07:11:22Z",
+   "last_end": "2026-11-26T05:00:00Z"
+  },
+  "KXPNP": {
+   "programs": 6,
+   "reward_usd": 600.0,
+   "types": {
+    "liquidity": 6
+   },
+   "targets": {
+    "1000.00": 6
+   },
+   "discounts": {
+    "5000": 6
+   },
+   "first_start": "2026-10-27T14:54:00Z",
+   "last_end": "2026-11-27T14:54:00Z"
+  },
+  "KXCBDECISIONKOREA": {
+   "programs": 5,
+   "reward_usd": 600.0,
+   "types": {
+    "liquidity": 5
+   },
+   "targets": {
+    "1000.00": 5
+   },
+   "discounts": {
+    "5000": 5
+   },
+   "first_start": "2026-11-26T02:00:51Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXTRUMPIMMACTION": {
+   "programs": 5,
+   "reward_usd": 600.0,
+   "types": {
+    "liquidity": 5
+   },
+   "targets": {
+    "1000.00": 5
+   },
+   "discounts": {
+    "5000": 5
+   },
+   "first_start": "2026-11-25T21:01:38Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXPRESDEBATECOUNTD": {
+   "programs": 5,
+   "reward_usd": 600.0,
+   "types": {
+    "liquidity": 5
+   },
+   "targets": {
+    "1000.00": 5
+   },
+   "discounts": {
+    "5000": 5
+   },
+   "first_start": "2026-11-25T21:01:38Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXUKEURESETBILL": {
+   "programs": 5,
+   "reward_usd": 600.0,
+   "types": {
+    "liquidity": 5
+   },
+   "targets": {
+    "1000.00": 5
+   },
+   "discounts": {
+    "5000": 5
+   },
+   "first_start": "2026-11-25T21:01:38Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXAIMILLENNIUM": {
+   "programs": 5,
+   "reward_usd": 600.0,
+   "types": {
+    "liquidity": 5
+   },
+   "targets": {
+    "1000.00": 5
+   },
+   "discounts": {
+    "5000": 5
+   },
+   "first_start": "2026-11-25T19:01:48Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXHEGSETHIMPEACH": {
+   "programs": 5,
+   "reward_usd": 500.0,
+   "types": {
+    "liquidity": 5
+   },
+   "targets": {
+    "1000.00": 5
+   },
+   "discounts": {
+    "5000": 5
+   },
+   "first_start": "2026-11-21T05:00:00Z",
+   "last_end": "2026-12-02T05:00:00Z"
+  },
+  "KXTRUMPPHOTO": {
+   "programs": 5,
+   "reward_usd": 500.0,
+   "types": {
+    "liquidity": 5
+   },
+   "targets": {
+    "1000.00": 5
+   },
+   "discounts": {
+    "5000": 5
+   },
+   "first_start": "2026-11-25T05:00:00Z",
+   "last_end": "2026-11-26T05:00:00Z"
+  },
+  "KXWNBANEXTCOMMISH": {
+   "programs": 5,
+   "reward_usd": 500.0,
+   "types": {
+    "liquidity": 5
+   },
+   "targets": {
+    "1000.00": 5
+   },
+   "discounts": {
+    "5000": 5
+   },
+   "first_start": "2026-11-25T05:00:00Z",
+   "last_end": "2026-12-02T05:00:00Z"
+  },
+  "KXTRUMPENDORSEMENTS": {
+   "programs": 5,
+   "reward_usd": 500.0,
+   "types": {
+    "liquidity": 5
+   },
+   "targets": {
+    "1000.00": 5
+   },
+   "discounts": {
+    "5000": 5
+   },
+   "first_start": "2026-11-25T05:00:00Z",
+   "last_end": "2026-11-26T05:00:00Z"
+  },
+  "KXCOBUILDPERMITS": {
+   "programs": 5,
+   "reward_usd": 500.0,
+   "types": {
+    "liquidity": 5
+   },
+   "targets": {
+    "1000.00": 5
+   },
+   "discounts": {
+    "5000": 5
+   },
+   "first_start": "2026-11-25T05:00:00Z",
+   "last_end": "2026-12-02T05:00:00Z"
+  },
+  "KXRAINSNYC": {
+   "programs": 5,
+   "reward_usd": 800.0,
+   "types": {
+    "liquidity": 5
+   },
+   "targets": {
+    "1000.00": 5
+   },
+   "discounts": {
+    "5000": 5
+   },
+   "first_start": "2026-11-25T02:01:04Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXCBDISRAEL": {
+   "programs": 5,
+   "reward_usd": 800.0,
+   "types": {
+    "liquidity": 5
+   },
+   "targets": {
+    "1000.00": 5
+   },
+   "discounts": {
+    "5000": 5
+   },
+   "first_start": "2026-11-25T01:01:21Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXNVDACHARGE": {
+   "programs": 5,
+   "reward_usd": 1000.0,
+   "types": {
+    "liquidity": 5
+   },
+   "targets": {
+    "1000.00": 5
+   },
+   "discounts": {
+    "5000": 5
+   },
+   "first_start": "2026-11-24T16:01:32Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXCONFIRMDAVIES": {
+   "programs": 5,
+   "reward_usd": 1000.0,
+   "types": {
+    "liquidity": 5
+   },
+   "targets": {
+    "1000.00": 5
+   },
+   "discounts": {
+    "5000": 5
+   },
+   "first_start": "2026-11-24T16:01:32Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXFDARETATRUTIDE": {
+   "programs": 5,
+   "reward_usd": 500.0,
+   "types": {
+    "liquidity": 5
+   },
+   "targets": {
+    "1000.00": 5
+   },
+   "discounts": {
+    "5000": 5
+   },
+   "first_start": "2026-11-24T05:00:00Z",
+   "last_end": "2026-12-01T05:00:00Z"
+  },
+  "KXPRODCAGR": {
+   "programs": 5,
+   "reward_usd": 1000.0,
+   "types": {
+    "liquidity": 5
+   },
+   "targets": {
+    "1000.00": 5
+   },
+   "discounts": {
+    "5000": 5
+   },
+   "first_start": "2026-11-24T05:00:00Z",
+   "last_end": "2026-12-01T05:00:00Z"
+  },
+  "KXAISPIKE": {
+   "programs": 5,
+   "reward_usd": 500.0,
+   "types": {
+    "liquidity": 5
+   },
+   "targets": {
+    "1000.00": 5
+   },
+   "discounts": {
+    "5000": 5
+   },
+   "first_start": "2026-11-23T05:00:00Z",
+   "last_end": "2026-11-30T05:00:00Z"
+  },
+  "KXARBROILER": {
+   "programs": 5,
+   "reward_usd": 500.0,
+   "types": {
+    "liquidity": 5
+   },
+   "targets": {
+    "1000.00": 5
+   },
+   "discounts": {
+    "5000": 5
+   },
+   "first_start": "2026-11-23T05:00:00Z",
+   "last_end": "2026-11-30T05:00:00Z"
+  },
+  "KXSCOTUSPOWER": {
+   "programs": 5,
+   "reward_usd": 450.0,
+   "types": {
+    "liquidity": 5
+   },
+   "targets": {
+    "1000.00": 5
+   },
+   "discounts": {
+    "5000": 5
+   },
+   "first_start": "2026-11-22T18:11:07Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXORBOFHARVEST": {
+   "programs": 5,
+   "reward_usd": 500.0,
+   "types": {
+    "liquidity": 5
+   },
+   "targets": {
+    "1000.00": 5
+   },
+   "discounts": {
+    "5000": 5
+   },
+   "first_start": "2026-11-21T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXHIVISITORS": {
+   "programs": 5,
+   "reward_usd": 500.0,
+   "types": {
+    "liquidity": 5
+   },
+   "targets": {
+    "1000.00": 5
+   },
+   "discounts": {
+    "5000": 5
+   },
+   "first_start": "2026-11-22T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXWIMILK": {
+   "programs": 5,
+   "reward_usd": 500.0,
+   "types": {
+    "liquidity": 5
+   },
+   "targets": {
+    "1000.00": 5
+   },
+   "discounts": {
+    "5000": 5
+   },
+   "first_start": "2026-11-20T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXGTAONLINE": {
+   "programs": 5,
+   "reward_usd": 970.0,
+   "types": {
+    "liquidity": 5
+   },
+   "targets": {
+    "1000.00": 5
+   },
+   "discounts": {
+    "5000": 5
+   },
+   "first_start": "2026-11-20T16:41:15Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXVTMILK": {
+   "programs": 5,
+   "reward_usd": 500.0,
+   "types": {
+    "liquidity": 5
+   },
+   "targets": {
+    "1000.00": 5
+   },
+   "discounts": {
+    "5000": 5
+   },
+   "first_start": "2026-11-20T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXKYBOURBONBARRELS": {
+   "programs": 5,
+   "reward_usd": 500.0,
+   "types": {
+    "liquidity": 5
+   },
+   "targets": {
+    "1000.00": 5
+   },
+   "discounts": {
+    "5000": 5
+   },
+   "first_start": "2026-11-20T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXAKPFD": {
+   "programs": 5,
+   "reward_usd": 425.0,
+   "types": {
+    "liquidity": 5
+   },
+   "targets": {
+    "1000.00": 5
+   },
+   "discounts": {
+    "5000": 5
+   },
+   "first_start": "2026-11-22T04:11:12Z",
+   "last_end": "2026-11-28T05:00:00Z"
+  },
+  "KXANTHROPICLEADLEFT": {
+   "programs": 5,
+   "reward_usd": 375.0,
+   "types": {
+    "liquidity": 5
+   },
+   "targets": {
+    "1000.00": 5
+   },
+   "discounts": {
+    "5000": 5
+   },
+   "first_start": "2026-11-20T05:00:00Z",
+   "last_end": "2026-11-27T05:00:00Z"
+  },
+  "KXSEAHOME": {
+   "programs": 5,
+   "reward_usd": 500.0,
+   "types": {
+    "liquidity": 5
+   },
+   "targets": {
+    "1000.00": 5
+   },
+   "discounts": {
+    "5000": 5
+   },
+   "first_start": "2026-11-19T05:00:00Z",
+   "last_end": "2026-11-26T05:00:00Z"
+  },
+  "KXJCHOME": {
+   "programs": 5,
+   "reward_usd": 500.0,
+   "types": {
+    "liquidity": 5
+   },
+   "targets": {
+    "1000.00": 5
+   },
+   "discounts": {
+    "5000": 5
+   },
+   "first_start": "2026-11-19T05:00:00Z",
+   "last_end": "2026-11-26T05:00:00Z"
+  },
+  "KXSANTAMONICAHOME": {
+   "programs": 5,
+   "reward_usd": 500.0,
+   "types": {
+    "liquidity": 5
+   },
+   "targets": {
+    "1000.00": 5
+   },
+   "discounts": {
+    "5000": 5
+   },
+   "first_start": "2026-11-19T05:00:00Z",
+   "last_end": "2026-11-26T05:00:00Z"
+  },
+  "KXPALOHOME": {
+   "programs": 5,
+   "reward_usd": 500.0,
+   "types": {
+    "liquidity": 5
+   },
+   "targets": {
+    "1000.00": 5
+   },
+   "discounts": {
+    "5000": 5
+   },
+   "first_start": "2026-11-19T05:00:00Z",
+   "last_end": "2026-11-26T05:00:00Z"
+  },
+  "KXRONI": {
+   "programs": 5,
+   "reward_usd": 500.0,
+   "types": {
+    "liquidity": 5
+   },
+   "targets": {
+    "1000.00": 5
+   },
+   "discounts": {
+    "5000": 5
+   },
+   "first_start": "2026-11-19T05:00:00Z",
+   "last_end": "2026-11-26T05:00:00Z"
+  },
+  "KXNYCHOME": {
+   "programs": 5,
+   "reward_usd": 500.0,
+   "types": {
+    "liquidity": 5
+   },
+   "targets": {
+    "1000.00": 5
+   },
+   "discounts": {
+    "5000": 5
+   },
+   "first_start": "2026-11-19T05:00:00Z",
+   "last_end": "2026-11-26T05:00:00Z"
+  },
+  "KXDALHOME": {
+   "programs": 5,
+   "reward_usd": 500.0,
+   "types": {
+    "liquidity": 5
+   },
+   "targets": {
+    "1000.00": 5
+   },
+   "discounts": {
+    "5000": 5
+   },
+   "first_start": "2026-11-19T05:00:00Z",
+   "last_end": "2026-11-26T05:00:00Z"
+  },
+  "KXMIAHOME": {
+   "programs": 5,
+   "reward_usd": 500.0,
+   "types": {
+    "liquidity": 5
+   },
+   "targets": {
+    "1000.00": 5
+   },
+   "discounts": {
+    "5000": 5
+   },
+   "first_start": "2026-11-19T05:00:00Z",
+   "last_end": "2026-11-26T05:00:00Z"
+  },
+  "KXLAHOME": {
+   "programs": 5,
+   "reward_usd": 500.0,
+   "types": {
+    "liquidity": 5
+   },
+   "targets": {
+    "1000.00": 5
+   },
+   "discounts": {
+    "5000": 5
+   },
+   "first_start": "2026-11-19T05:00:00Z",
+   "last_end": "2026-11-26T05:00:00Z"
+  },
+  "KXVENICEHOME": {
+   "programs": 5,
+   "reward_usd": 500.0,
+   "types": {
+    "liquidity": 5
+   },
+   "targets": {
+    "1000.00": 5
+   },
+   "discounts": {
+    "5000": 5
+   },
+   "first_start": "2026-11-19T05:00:00Z",
+   "last_end": "2026-11-26T05:00:00Z"
+  },
+  "KXSDHOME": {
+   "programs": 5,
+   "reward_usd": 500.0,
+   "types": {
+    "liquidity": 5
+   },
+   "targets": {
+    "1000.00": 5
+   },
+   "discounts": {
+    "5000": 5
+   },
+   "first_start": "2026-11-19T05:00:00Z",
+   "last_end": "2026-11-26T05:00:00Z"
+  },
+  "KXTRUMPELSAYEDMEET": {
+   "programs": 4,
+   "reward_usd": 600.0,
+   "types": {
+    "liquidity": 4
+   },
+   "targets": {
+    "1000.00": 4
+   },
+   "discounts": {
+    "5000": 4
+   },
+   "first_start": "2026-11-26T01:01:44Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXSENDEMNEITHER": {
+   "programs": 4,
+   "reward_usd": 600.0,
+   "types": {
+    "liquidity": 4
+   },
+   "targets": {
+    "1000.00": 4
+   },
+   "discounts": {
+    "5000": 4
+   },
+   "first_start": "2026-11-26T00:01:16Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXTECHRECESS": {
+   "programs": 4,
+   "reward_usd": 600.0,
+   "types": {
+    "liquidity": 4
+   },
+   "targets": {
+    "1000.00": 4
+   },
+   "discounts": {
+    "5000": 4
+   },
+   "first_start": "2026-11-26T00:01:16Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXCHINAAIDISCLOSE": {
+   "programs": 4,
+   "reward_usd": 600.0,
+   "types": {
+    "liquidity": 4
+   },
+   "targets": {
+    "1000.00": 4
+   },
+   "discounts": {
+    "5000": 4
+   },
+   "first_start": "2026-11-25T21:01:38Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXCANBYLIBSEATS": {
+   "programs": 4,
+   "reward_usd": 600.0,
+   "types": {
+    "liquidity": 4
+   },
+   "targets": {
+    "1000.00": 4
+   },
+   "discounts": {
+    "5000": 4
+   },
+   "first_start": "2026-11-25T21:01:38Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXSAVTEU": {
+   "programs": 4,
+   "reward_usd": 400.0,
+   "types": {
+    "liquidity": 4
+   },
+   "targets": {
+    "1000.00": 4
+   },
+   "discounts": {
+    "5000": 4
+   },
+   "first_start": "2026-11-25T05:00:00Z",
+   "last_end": "2026-12-02T05:00:00Z"
+  },
+  "KXSENATESEATSR": {
+   "programs": 4,
+   "reward_usd": 400.0,
+   "types": {
+    "liquidity": 4
+   },
+   "targets": {
+    "1000.00": 4
+   },
+   "discounts": {
+    "5000": 4
+   },
+   "first_start": "2026-11-25T05:00:00Z",
+   "last_end": "2026-12-02T05:00:00Z"
+  },
+  "KXNVDABOARDTESTIFY": {
+   "programs": 4,
+   "reward_usd": 800.0,
+   "types": {
+    "liquidity": 4
+   },
+   "targets": {
+    "1000.00": 4
+   },
+   "discounts": {
+    "5000": 4
+   },
+   "first_start": "2026-11-25T00:01:29Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXRIKERSDEADLINE": {
+   "programs": 4,
+   "reward_usd": 1000.0,
+   "types": {
+    "liquidity": 4
+   },
+   "targets": {
+    "1000.00": 4
+   },
+   "discounts": {
+    "5000": 4
+   },
+   "first_start": "2026-11-24T16:01:32Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXTXSPEAKER90": {
+   "programs": 4,
+   "reward_usd": 360.0,
+   "types": {
+    "liquidity": 4
+   },
+   "targets": {
+    "1000.00": 4
+   },
+   "discounts": {
+    "5000": 4
+   },
+   "first_start": "2026-11-23T21:10:56Z",
+   "last_end": "2026-11-30T05:00:00Z"
+  },
+  "KXDANCINGWITHTHESTARS": {
+   "programs": 4,
+   "reward_usd": 200.0,
+   "types": {
+    "liquidity": 4
+   },
+   "targets": {
+    "1000.00": 4
+   },
+   "discounts": {
+    "5000": 4
+   },
+   "first_start": "2026-11-23T04:41:32Z",
+   "last_end": "2026-11-30T04:41:32Z"
+  },
+  "KXTXOIL": {
+   "programs": 4,
+   "reward_usd": 1000.0,
+   "types": {
+    "liquidity": 4
+   },
+   "targets": {
+    "1000.00": 4
+   },
+   "discounts": {
+    "5000": 4
+   },
+   "first_start": "2026-11-22T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXIAFARMLAND": {
+   "programs": 4,
+   "reward_usd": 400.0,
+   "types": {
+    "liquidity": 4
+   },
+   "targets": {
+    "1000.00": 4
+   },
+   "discounts": {
+    "5000": 4
+   },
+   "first_start": "2026-11-22T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXBOZPERMITS": {
+   "programs": 4,
+   "reward_usd": 400.0,
+   "types": {
+    "liquidity": 4
+   },
+   "targets": {
+    "1000.00": 4
+   },
+   "discounts": {
+    "5000": 4
+   },
+   "first_start": "2026-11-22T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXPJMEMERGENCY": {
+   "programs": 4,
+   "reward_usd": 1000.0,
+   "types": {
+    "liquidity": 4
+   },
+   "targets": {
+    "1000.00": 4
+   },
+   "discounts": {
+    "5000": 4
+   },
+   "first_start": "2026-11-20T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXACQLETTERBOXD": {
+   "programs": 4,
+   "reward_usd": 400.0,
+   "types": {
+    "liquidity": 4
+   },
+   "targets": {
+    "1000.00": 4
+   },
+   "discounts": {
+    "5000": 4
+   },
+   "first_start": "2026-11-21T05:00:00Z",
+   "last_end": "2026-11-28T05:00:00Z"
+  },
+  "KXONIONACT": {
+   "programs": 4,
+   "reward_usd": 4000.0,
+   "types": {
+    "liquidity": 4
+   },
+   "targets": {
+    "1000.00": 4
+   },
+   "discounts": {
+    "5000": 4
+   },
+   "first_start": "2026-11-21T05:00:00Z",
+   "last_end": "2026-11-28T05:00:00Z"
+  },
+  "KXKEELUNGMAYOR": {
+   "programs": 3,
+   "reward_usd": 510.0,
+   "types": {
+    "liquidity": 3
+   },
+   "targets": {
+    "1000.00": 3
+   },
+   "discounts": {
+    "5000": 3
+   },
+   "first_start": "2026-11-26T00:01:16Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXHOUSECONTEMPTANY": {
+   "programs": 3,
+   "reward_usd": 510.0,
+   "types": {
+    "liquidity": 3
+   },
+   "targets": {
+    "1000.00": 3
+   },
+   "discounts": {
+    "5000": 3
+   },
+   "first_start": "2026-11-25T21:01:38Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXSENATEFASTTRACK": {
+   "programs": 3,
+   "reward_usd": 510.0,
+   "types": {
+    "liquidity": 3
+   },
+   "targets": {
+    "1000.00": 3
+   },
+   "discounts": {
+    "5000": 3
+   },
+   "first_start": "2026-11-25T21:01:38Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXRUBIONSAOUT": {
+   "programs": 3,
+   "reward_usd": 510.0,
+   "types": {
+    "liquidity": 3
+   },
+   "targets": {
+    "1000.00": 3
+   },
+   "discounts": {
+    "5000": 3
+   },
+   "first_start": "2026-11-25T18:00:52Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXVANCEELSAYEDMEET": {
+   "programs": 3,
+   "reward_usd": 690.0,
+   "types": {
+    "liquidity": 3
+   },
+   "targets": {
+    "1000.00": 3
+   },
+   "discounts": {
+    "5000": 3
+   },
+   "first_start": "2026-11-25T16:01:20Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXSSINVESTFUND": {
+   "programs": 3,
+   "reward_usd": 690.0,
+   "types": {
+    "liquidity": 3
+   },
+   "targets": {
+    "1000.00": 3
+   },
+   "discounts": {
+    "5000": 3
+   },
+   "first_start": "2026-11-25T16:01:20Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXUKCHINAEVTARIFF": {
+   "programs": 3,
+   "reward_usd": 690.0,
+   "types": {
+    "liquidity": 3
+   },
+   "targets": {
+    "1000.00": 3
+   },
+   "discounts": {
+    "5000": 3
+   },
+   "first_start": "2026-11-25T16:01:20Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXFRANCEBUDGETRULE": {
+   "programs": 3,
+   "reward_usd": 690.0,
+   "types": {
+    "liquidity": 3
+   },
+   "targets": {
+    "1000.00": 3
+   },
+   "discounts": {
+    "5000": 3
+   },
+   "first_start": "2026-11-25T16:01:20Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXBELGIUMBUDGET": {
+   "programs": 3,
+   "reward_usd": 690.0,
+   "types": {
+    "liquidity": 3
+   },
+   "targets": {
+    "1000.00": 3
+   },
+   "discounts": {
+    "5000": 3
+   },
+   "first_start": "2026-11-25T16:01:20Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXUSTESTSREADING": {
+   "programs": 3,
+   "reward_usd": 300.0,
+   "types": {
+    "liquidity": 3
+   },
+   "targets": {
+    "1000.00": 3
+   },
+   "discounts": {
+    "5000": 3
+   },
+   "first_start": "2026-11-25T05:00:00Z",
+   "last_end": "2026-12-02T05:00:00Z"
+  },
+  "KXUSTESTSMATH": {
+   "programs": 3,
+   "reward_usd": 300.0,
+   "types": {
+    "liquidity": 3
+   },
+   "targets": {
+    "1000.00": 3
+   },
+   "discounts": {
+    "5000": 3
+   },
+   "first_start": "2026-11-25T05:00:00Z",
+   "last_end": "2026-12-02T05:00:00Z"
+  },
+  "KXASPENMTNOPEN": {
+   "programs": 3,
+   "reward_usd": 1225.0,
+   "types": {
+    "liquidity": 3
+   },
+   "targets": {
+    "1000.00": 3
+   },
+   "discounts": {
+    "5000": 3
+   },
+   "first_start": "2026-11-25T05:00:00Z",
+   "last_end": "2026-12-02T05:00:00Z"
+  },
+  "KXWAYMOFREEWAYSTATE": {
+   "programs": 3,
+   "reward_usd": 855.0,
+   "types": {
+    "liquidity": 3
+   },
+   "targets": {
+    "1000.00": 3
+   },
+   "discounts": {
+    "5000": 3
+   },
+   "first_start": "2026-11-24T16:01:32Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXTRUMPNYTJUDGE": {
+   "programs": 3,
+   "reward_usd": 855.0,
+   "types": {
+    "liquidity": 3
+   },
+   "targets": {
+    "1000.00": 3
+   },
+   "discounts": {
+    "5000": 3
+   },
+   "first_start": "2026-11-24T16:01:32Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXUAPFILES": {
+   "programs": 3,
+   "reward_usd": 855.0,
+   "types": {
+    "liquidity": 3
+   },
+   "targets": {
+    "1000.00": 3
+   },
+   "discounts": {
+    "5000": 3
+   },
+   "first_start": "2026-11-24T16:01:32Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXHOWMANYSPEAKERHOUSE": {
+   "programs": 3,
+   "reward_usd": 300.0,
+   "types": {
+    "liquidity": 3
+   },
+   "targets": {
+    "1000.00": 3
+   },
+   "discounts": {
+    "5000": 3
+   },
+   "first_start": "2026-11-23T05:00:00Z",
+   "last_end": "2026-11-30T05:00:00Z"
+  },
+  "KXTXINCOMETAX": {
+   "programs": 3,
+   "reward_usd": 1470.0,
+   "types": {
+    "liquidity": 3
+   },
+   "targets": {
+    "1000.00": 3
+   },
+   "discounts": {
+    "5000": 3
+   },
+   "first_start": "2026-11-22T08:10:58Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXHUANGTESTIFY": {
+   "programs": 3,
+   "reward_usd": 1500.0,
+   "types": {
+    "liquidity": 3
+   },
+   "targets": {
+    "1000.00": 3
+   },
+   "discounts": {
+    "5000": 3
+   },
+   "first_start": "2026-11-22T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXGAMEAWARDS": {
+   "programs": 3,
+   "reward_usd": 300.0,
+   "types": {
+    "liquidity": 3
+   },
+   "targets": {
+    "1000.00": 3
+   },
+   "discounts": {
+    "5000": 3
+   },
+   "first_start": "2026-11-22T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXHURCITYTPA": {
+   "programs": 3,
+   "reward_usd": 315.0,
+   "types": {
+    "liquidity": 3
+   },
+   "targets": {
+    "1000.00": 3
+   },
+   "discounts": {
+    "5000": 3
+   },
+   "first_start": "2026-11-21T05:00:00Z",
+   "last_end": "2026-11-28T05:00:00Z"
+  },
+  "KXSTATELEG": {
+   "programs": 3,
+   "reward_usd": 300.0,
+   "types": {
+    "liquidity": 3
+   },
+   "targets": {
+    "1000.00": 3
+   },
+   "discounts": {
+    "5000": 3
+   },
+   "first_start": "2026-11-20T05:00:00Z",
+   "last_end": "2026-11-27T05:00:00Z"
+  },
+  "KXBRRATECUT": {
+   "programs": 3,
+   "reward_usd": 450.0,
+   "types": {
+    "liquidity": 3
+   },
+   "targets": {
+    "1000.00": 3
+   },
+   "discounts": {
+    "5000": 3
+   },
+   "first_start": "2026-11-19T05:00:00Z",
+   "last_end": "2026-11-26T05:00:00Z"
+  },
+  "KXNYCLOBSTER": {
+   "programs": 2,
+   "reward_usd": 350.0,
+   "types": {
+    "liquidity": 2
+   },
+   "targets": {
+    "1000.00": 2
+   },
+   "discounts": {
+    "5000": 2
+   },
+   "first_start": "2026-11-26T00:01:16Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXPRSTATEHOUSE": {
+   "programs": 2,
+   "reward_usd": 180.0,
+   "types": {
+    "liquidity": 2
+   },
+   "targets": {
+    "1000.00": 2
+   },
+   "discounts": {
+    "5000": 2
+   },
+   "first_start": "2026-11-25T23:10:47Z",
+   "last_end": "2026-12-02T05:00:00Z"
+  },
+  "KXSTATELEGGA": {
+   "programs": 2,
+   "reward_usd": 350.0,
+   "types": {
+    "liquidity": 2
+   },
+   "targets": {
+    "1000.00": 2
+   },
+   "discounts": {
+    "5000": 2
+   },
+   "first_start": "2026-11-25T21:01:38Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXSTATELEGFL": {
+   "programs": 2,
+   "reward_usd": 350.0,
+   "types": {
+    "liquidity": 2
+   },
+   "targets": {
+    "1000.00": 2
+   },
+   "discounts": {
+    "5000": 2
+   },
+   "first_start": "2026-11-25T21:01:38Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXINDONESIAVP": {
+   "programs": 2,
+   "reward_usd": 350.0,
+   "types": {
+    "liquidity": 2
+   },
+   "targets": {
+    "1000.00": 2
+   },
+   "discounts": {
+    "5000": 2
+   },
+   "first_start": "2026-11-25T21:01:38Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXCAHSR": {
+   "programs": 2,
+   "reward_usd": 500.0,
+   "types": {
+    "liquidity": 2
+   },
+   "targets": {
+    "1000.00": 2
+   },
+   "discounts": {
+    "5000": 2
+   },
+   "first_start": "2026-11-23T05:00:00Z",
+   "last_end": "2026-11-30T05:00:00Z"
+  },
+  "KXNEWTAYLOR": {
+   "programs": 2,
+   "reward_usd": 190.0,
+   "types": {
+    "liquidity": 2
+   },
+   "targets": {
+    "1000.00": 2
+   },
+   "discounts": {
+    "5000": 2
+   },
+   "first_start": "2026-11-20T21:11:39Z",
+   "last_end": "2026-12-02T05:00:00Z"
+  },
+  "KXOAIPERSONALAGENT": {
+   "programs": 2,
+   "reward_usd": 215.0,
+   "types": {
+    "liquidity": 2
+   },
+   "targets": {
+    "1000.00": 2
+   },
+   "discounts": {
+    "5000": 2
+   },
+   "first_start": "2026-11-25T05:00:00Z",
+   "last_end": "2026-12-02T05:00:00Z"
+  },
+  "CONTROLS": {
+   "programs": 2,
+   "reward_usd": 190.0,
+   "types": {
+    "liquidity": 2
+   },
+   "targets": {
+    "1000.00": 2
+   },
+   "discounts": {
+    "5000": 2
+   },
+   "first_start": "2026-11-24T16:11:13Z",
+   "last_end": "2026-12-01T05:00:00Z"
+  },
+  "KXARUNAMILLERANNOUNCEOUT": {
+   "programs": 2,
+   "reward_usd": 570.0,
+   "types": {
+    "liquidity": 2
+   },
+   "targets": {
+    "1000.00": 2
+   },
+   "discounts": {
+    "5000": 2
+   },
+   "first_start": "2026-11-24T16:01:32Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXANTHROPICMILLENNIUM": {
+   "programs": 2,
+   "reward_usd": 200.0,
+   "types": {
+    "liquidity": 2
+   },
+   "targets": {
+    "1000.00": 2
+   },
+   "discounts": {
+    "5000": 2
+   },
+   "first_start": "2026-11-23T05:00:00Z",
+   "last_end": "2026-12-01T05:00:00Z"
+  },
+  "KXTRUMPDIVIDEND": {
+   "programs": 2,
+   "reward_usd": 190.0,
+   "types": {
+    "liquidity": 2
+   },
+   "targets": {
+    "1000.00": 2
+   },
+   "discounts": {
+    "5000": 2
+   },
+   "first_start": "2026-11-23T16:11:44Z",
+   "last_end": "2026-11-30T05:00:00Z"
+  },
+  "KXPNEUMONICPLAGUE": {
+   "programs": 2,
+   "reward_usd": 200.0,
+   "types": {
+    "liquidity": 2
+   },
+   "targets": {
+    "1000.00": 2
+   },
+   "discounts": {
+    "5000": 2
+   },
+   "first_start": "2026-11-22T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXNFLSTADIUM": {
+   "programs": 2,
+   "reward_usd": 310.0,
+   "types": {
+    "liquidity": 2
+   },
+   "targets": {
+    "1000.00": 2
+   },
+   "discounts": {
+    "5000": 2
+   },
+   "first_start": "2026-11-21T01:11:18Z",
+   "last_end": "2026-11-27T05:00:00Z"
+  },
+  "KXAUCTIONRECORD": {
+   "programs": 2,
+   "reward_usd": 200.0,
+   "types": {
+    "liquidity": 2
+   },
+   "targets": {
+    "1000.00": 2
+   },
+   "discounts": {
+    "5000": 2
+   },
+   "first_start": "2026-11-20T05:00:00Z",
+   "last_end": "2026-11-27T05:00:00Z"
+  },
+  "KXNCAAFPAC12": {
+   "programs": 2,
+   "reward_usd": 200.0,
+   "types": {
+    "liquidity": 2
+   },
+   "targets": {
+    "1000.00": 2
+   },
+   "discounts": {
+    "5000": 2
+   },
+   "first_start": "2026-11-19T05:00:00Z",
+   "last_end": "2026-11-26T05:00:00Z"
+  },
+  "KXTHANDRINGQVISTOUT": {
+   "programs": 1,
+   "reward_usd": 170.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-26T00:01:16Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXCASUENVDA": {
+   "programs": 1,
+   "reward_usd": 170.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-25T21:01:38Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXEUSANCTIONSPKG": {
+   "programs": 1,
+   "reward_usd": 170.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-25T21:01:38Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXFISAWARRANT": {
+   "programs": 1,
+   "reward_usd": 170.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-25T21:01:38Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXPUBLICOPTIONLAW": {
+   "programs": 1,
+   "reward_usd": 170.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-25T21:01:38Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXARMINWAGE": {
+   "programs": 1,
+   "reward_usd": 170.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-25T21:01:38Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXHOUSESUPERPACPLEDGE": {
+   "programs": 1,
+   "reward_usd": 170.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-25T21:01:38Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXCHINACARBAN": {
+   "programs": 1,
+   "reward_usd": 170.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-25T21:01:38Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXMEDICAREAGELAW": {
+   "programs": 1,
+   "reward_usd": 170.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-25T21:01:38Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXDCMINWAGEBALLOT": {
+   "programs": 1,
+   "reward_usd": 170.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-25T21:01:38Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXMEDICAREHOMECARE": {
+   "programs": 1,
+   "reward_usd": 170.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-25T21:01:38Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXDNCDEBATEBAR": {
+   "programs": 1,
+   "reward_usd": 170.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-25T21:01:38Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXDCMINWAGEPASS": {
+   "programs": 1,
+   "reward_usd": 170.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-25T21:01:38Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXPRESDEBATETWONIGHTD": {
+   "programs": 1,
+   "reward_usd": 170.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-25T21:01:38Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXEUSUBSIDYTARIFF": {
+   "programs": 1,
+   "reward_usd": 170.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-25T21:01:38Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXNVDASUBPOENA": {
+   "programs": 1,
+   "reward_usd": 170.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-25T21:01:38Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXJPSGINFL": {
+   "programs": 1,
+   "reward_usd": 170.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-25T19:01:48Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXCOHPIYOY": {
+   "programs": 1,
+   "reward_usd": 95.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-25T17:11:07Z",
+   "last_end": "2026-12-02T05:00:00Z"
+  },
+  "KXNVHOMEPRICE": {
+   "programs": 1,
+   "reward_usd": 95.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-25T16:11:04Z",
+   "last_end": "2026-12-02T05:00:00Z"
+  },
+  "KXKLOBCABGOP": {
+   "programs": 1,
+   "reward_usd": 230.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-25T16:01:20Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXSENATEAICOMMITTEE": {
+   "programs": 1,
+   "reward_usd": 230.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-25T16:01:20Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXNYCAIAUDIT": {
+   "programs": 1,
+   "reward_usd": 230.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-25T16:01:20Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXEUDIGITALLEVY": {
+   "programs": 1,
+   "reward_usd": 230.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-25T16:01:20Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXNYCOPENPRIM": {
+   "programs": 1,
+   "reward_usd": 230.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-25T16:01:20Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXSUPERBALLONDOR": {
+   "programs": 1,
+   "reward_usd": 100.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-25T05:00:00Z",
+   "last_end": "2026-12-02T05:00:00Z"
+  },
+  "KXTOPALBUMTHIRD": {
+   "programs": 1,
+   "reward_usd": 100.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-25T05:00:00Z",
+   "last_end": "2026-12-02T05:00:00Z"
+  },
+  "KXTOPSONGSPOTIFY": {
+   "programs": 1,
+   "reward_usd": 100.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-25T05:00:00Z",
+   "last_end": "2026-12-02T05:00:00Z"
+  },
+  "KXPAGAS": {
+   "programs": 1,
+   "reward_usd": 250.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-25T05:00:00Z",
+   "last_end": "2026-12-02T05:00:00Z"
+  },
+  "KXWVPOP": {
+   "programs": 1,
+   "reward_usd": 100.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-25T05:00:00Z",
+   "last_end": "2026-12-02T05:00:00Z"
+  },
+  "KXTOPALBUMSPOTIFY": {
+   "programs": 1,
+   "reward_usd": 100.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-25T05:00:00Z",
+   "last_end": "2026-12-02T05:00:00Z"
+  },
+  "KXMAMDANIEO": {
+   "programs": 1,
+   "reward_usd": 100.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-25T05:00:00Z",
+   "last_end": "2026-11-26T05:00:00Z"
+  },
+  "KXTOPSONGSPOTIFYUSA": {
+   "programs": 1,
+   "reward_usd": 100.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-25T05:00:00Z",
+   "last_end": "2026-12-02T05:00:00Z"
+  },
+  "KXMSCATFISH": {
+   "programs": 1,
+   "reward_usd": 100.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-25T05:00:00Z",
+   "last_end": "2026-12-02T05:00:00Z"
+  },
+  "KXGRASSLEYRESIGN": {
+   "programs": 1,
+   "reward_usd": 100.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-25T05:00:00Z",
+   "last_end": "2026-12-02T05:00:00Z"
+  },
+  "KXTOPALBUMSPOTIFYUSA": {
+   "programs": 1,
+   "reward_usd": 100.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-25T05:00:00Z",
+   "last_end": "2026-12-02T05:00:00Z"
+  },
+  "KXTOPSONGTHIRDUSA": {
+   "programs": 1,
+   "reward_usd": 100.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-25T05:00:00Z",
+   "last_end": "2026-12-02T05:00:00Z"
+  },
+  "KXNMCOIL": {
+   "programs": 1,
+   "reward_usd": 100.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-25T05:00:00Z",
+   "last_end": "2026-12-02T05:00:00Z"
+  },
+  "KXRIHOMEPRICE": {
+   "programs": 1,
+   "reward_usd": 100.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-25T05:00:00Z",
+   "last_end": "2026-12-02T05:00:00Z"
+  },
+  "KXUTHOMEPRICE": {
+   "programs": 1,
+   "reward_usd": 100.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-25T05:00:00Z",
+   "last_end": "2026-12-02T05:00:00Z"
+  },
+  "KXTOPSONGRUNNERUPUSA": {
+   "programs": 1,
+   "reward_usd": 100.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-25T05:00:00Z",
+   "last_end": "2026-12-02T05:00:00Z"
+  },
+  "KXDPRESPRIMARY": {
+   "programs": 1,
+   "reward_usd": 50.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-25T05:00:00Z",
+   "last_end": "2026-12-02T05:00:00Z"
+  },
+  "KXVADOMNEX": {
+   "programs": 1,
+   "reward_usd": 100.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-25T05:00:00Z",
+   "last_end": "2026-12-02T05:00:00Z"
+  },
+  "KXMTCATTLE": {
+   "programs": 1,
+   "reward_usd": 100.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-25T05:00:00Z",
+   "last_end": "2026-12-02T05:00:00Z"
+  },
+  "KXMORRISCONF": {
+   "programs": 1,
+   "reward_usd": 230.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-25T03:00:57Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXHURRLANDTX3": {
+   "programs": 1,
+   "reward_usd": 230.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-25T00:01:29Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXNECOF": {
+   "programs": 1,
+   "reward_usd": 90.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-24T21:11:04Z",
+   "last_end": "2026-12-01T05:00:00Z"
+  },
+  "KXJENSENOUT": {
+   "programs": 1,
+   "reward_usd": 230.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-24T18:01:47Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXDEBTPOWERHOUSE": {
+   "programs": 1,
+   "reward_usd": 285.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-24T16:01:32Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXSLOVENIAZIURS": {
+   "programs": 1,
+   "reward_usd": 285.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-24T16:01:32Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXINTRANSEMP": {
+   "programs": 1,
+   "reward_usd": 100.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-24T06:11:13Z",
+   "last_end": "2026-12-01T05:00:00Z"
+  },
+  "KXILHPIYOY": {
+   "programs": 1,
+   "reward_usd": 250.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-24T06:11:13Z",
+   "last_end": "2026-12-01T05:00:00Z"
+  },
+  "KXNCAAMBBOTHQUAL": {
+   "programs": 1,
+   "reward_usd": 100.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-24T05:00:00Z",
+   "last_end": "2026-12-01T05:00:00Z"
+  },
+  "KXMIAUTOEMP": {
+   "programs": 1,
+   "reward_usd": 100.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-24T05:00:00Z",
+   "last_end": "2026-12-01T05:00:00Z"
+  },
+  "KXGA4GW": {
+   "programs": 1,
+   "reward_usd": 100.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-24T05:00:00Z",
+   "last_end": "2026-12-01T05:00:00Z"
+  },
+  "KXORSEMICONEMP": {
+   "programs": 1,
+   "reward_usd": 85.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-24T04:11:32Z",
+   "last_end": "2026-11-30T05:00:00Z"
+  },
+  "KXGTEMP": {
+   "programs": 1,
+   "reward_usd": 285.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-24T02:01:25Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXMOMFGEMP": {
+   "programs": 1,
+   "reward_usd": 100.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-23T05:11:26Z",
+   "last_end": "2026-11-30T05:00:00Z"
+  },
+  "KXGEMINI": {
+   "programs": 1,
+   "reward_usd": 85.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-23T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXSCHUMERVOICE": {
+   "programs": 1,
+   "reward_usd": 100.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-23T05:00:00Z",
+   "last_end": "2026-11-30T05:00:00Z"
+  },
+  "KXTOPALBUMRUNNERUPUSA": {
+   "programs": 1,
+   "reward_usd": 100.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-23T05:00:00Z",
+   "last_end": "2026-11-30T05:00:00Z"
+  },
+  "KXMANOFFVAC": {
+   "programs": 1,
+   "reward_usd": 250.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-23T05:00:00Z",
+   "last_end": "2026-11-30T05:00:00Z"
+  },
+  "KXWYUNEMPLOW": {
+   "programs": 1,
+   "reward_usd": 100.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-23T05:00:00Z",
+   "last_end": "2026-11-30T05:00:00Z"
+  },
+  "KXGPTCOST": {
+   "programs": 1,
+   "reward_usd": 100.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-23T05:00:00Z",
+   "last_end": "2026-11-30T05:00:00Z"
+  },
+  "KXSPACEXMARS": {
+   "programs": 1,
+   "reward_usd": 100.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-23T05:00:00Z",
+   "last_end": "2026-11-30T05:00:00Z"
+  },
+  "KXYELLVISITS": {
+   "programs": 1,
+   "reward_usd": 100.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-23T05:00:00Z",
+   "last_end": "2026-11-30T05:00:00Z"
+  },
+  "KXFLVISITORS": {
+   "programs": 1,
+   "reward_usd": 250.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-23T05:00:00Z",
+   "last_end": "2026-11-30T05:00:00Z"
+  },
+  "KXINTERSTELLAR": {
+   "programs": 1,
+   "reward_usd": 100.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-23T05:00:00Z",
+   "last_end": "2026-11-30T05:00:00Z"
+  },
+  "KXFDAANNOUNCE": {
+   "programs": 1,
+   "reward_usd": 100.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-23T05:00:00Z",
+   "last_end": "2026-11-30T05:00:00Z"
+  },
+  "KXNYSECEEMP": {
+   "programs": 1,
+   "reward_usd": 250.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-23T05:00:00Z",
+   "last_end": "2026-11-30T05:00:00Z"
+  },
+  "KXAKCRUDEOIL": {
+   "programs": 1,
+   "reward_usd": 100.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-23T05:00:00Z",
+   "last_end": "2026-11-30T05:00:00Z"
+  },
+  "KXJEFFRIESFIRST": {
+   "programs": 1,
+   "reward_usd": 100.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-23T05:00:00Z",
+   "last_end": "2026-11-30T05:00:00Z"
+  },
+  "KXSCTRANSEMP": {
+   "programs": 1,
+   "reward_usd": 100.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-23T05:00:00Z",
+   "last_end": "2026-11-30T05:00:00Z"
+  },
+  "KXKEYCONTRACT": {
+   "programs": 1,
+   "reward_usd": 90.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-23T01:11:37Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXNUBONDS": {
+   "programs": 1,
+   "reward_usd": 90.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-22T22:11:12Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXDECREDITJOBS": {
+   "programs": 1,
+   "reward_usd": 90.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-22T21:11:04Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXTOPALBUMTHIRDUSA": {
+   "programs": 1,
+   "reward_usd": 90.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-22T19:11:28Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXNCAAFDRAFTDECLARE": {
+   "programs": 1,
+   "reward_usd": 50.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-22T19:00:00Z",
+   "last_end": "2026-11-29T19:00:00Z"
+  },
+  "KXMLBTEAMSALE": {
+   "programs": 1,
+   "reward_usd": 230.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-22T18:11:34Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXHIVISITORSPEND": {
+   "programs": 1,
+   "reward_usd": 90.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-22T18:11:34Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXGLACIERVISITS": {
+   "programs": 1,
+   "reward_usd": 100.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-22T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXMASCIENRDEMP": {
+   "programs": 1,
+   "reward_usd": 100.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-22T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXOKOIL": {
+   "programs": 1,
+   "reward_usd": 100.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-22T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXORDPAX": {
+   "programs": 1,
+   "reward_usd": 250.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-22T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXDCSTATEHOODHOUSE": {
+   "programs": 1,
+   "reward_usd": 100.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-22T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXOHMFGEMP": {
+   "programs": 1,
+   "reward_usd": 100.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-22T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXGOOGLESEARCH": {
+   "programs": 1,
+   "reward_usd": 100.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-22T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXLAOILGASEMP": {
+   "programs": 1,
+   "reward_usd": 100.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-22T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXNJPHARMAEMP": {
+   "programs": 1,
+   "reward_usd": 250.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-22T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXINCORNYIELD": {
+   "programs": 1,
+   "reward_usd": 100.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-22T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXCTINSURANCEJOBS": {
+   "programs": 1,
+   "reward_usd": 100.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-22T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXKYDISTEMP": {
+   "programs": 1,
+   "reward_usd": 150.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-22T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXMILEAD": {
+   "programs": 1,
+   "reward_usd": 100.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-22T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXTNTRANSEMP": {
+   "programs": 1,
+   "reward_usd": 100.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-22T05:00:00Z",
+   "last_end": "2026-11-29T05:00:00Z"
+  },
+  "KXLAGOVISITCOUNT": {
+   "programs": 1,
+   "reward_usd": 100.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-21T18:20:00Z",
+   "last_end": "2026-11-28T18:20:00Z"
+  },
+  "KXNCPHARMAEMP": {
+   "programs": 1,
+   "reward_usd": 95.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-21T17:11:17Z",
+   "last_end": "2026-11-28T05:00:00Z"
+  },
+  "KXOPENAICEOCHANGE": {
+   "programs": 1,
+   "reward_usd": 100.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-21T05:00:00Z",
+   "last_end": "2026-11-28T05:00:00Z"
+  },
+  "KXCHISNOWM": {
+   "programs": 1,
+   "reward_usd": 500.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-21T01:15:00Z",
+   "last_end": "2026-11-26T23:35:00Z"
+  },
+  "KXSTARSHIPDOCK": {
+   "programs": 1,
+   "reward_usd": 90.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-20T20:11:32Z",
+   "last_end": "2026-11-27T05:00:00Z"
+  },
+  "KXBALTPORTTEU": {
+   "programs": 1,
+   "reward_usd": 95.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-20T17:25:53Z",
+   "last_end": "2026-11-27T05:00:00Z"
+  },
+  "KXCAHPIYOY": {
+   "programs": 1,
+   "reward_usd": 250.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-20T05:11:36Z",
+   "last_end": "2026-11-27T05:00:00Z"
+  },
+  "KXBESTLLMCHINA": {
+   "programs": 1,
+   "reward_usd": 200.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-20T05:00:00Z",
+   "last_end": "2026-11-27T05:00:00Z"
+  },
+  "KXCANAUTOSTEEL50": {
+   "programs": 1,
+   "reward_usd": 250.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-20T05:00:00Z",
+   "last_end": "2026-11-27T05:00:00Z"
+  },
+  "KXNECORNYIELD": {
+   "programs": 1,
+   "reward_usd": 100.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-20T05:00:00Z",
+   "last_end": "2026-11-27T05:00:00Z"
+  },
+  "KXBOIPASSENGERS": {
+   "programs": 1,
+   "reward_usd": 90.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-19T23:11:54Z",
+   "last_end": "2026-11-26T05:00:00Z"
+  },
+  "KXNDKOIL": {
+   "programs": 1,
+   "reward_usd": 100.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-19T08:11:07Z",
+   "last_end": "2026-11-26T05:00:00Z"
+  },
+  "KXNBAWHATTEND": {
+   "programs": 1,
+   "reward_usd": 200.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-19T05:11:08Z",
+   "last_end": "2026-11-26T05:00:00Z"
+  },
+  "KXNFLPLAYOFFC": {
+   "programs": 1,
+   "reward_usd": 250.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-19T05:00:00Z",
+   "last_end": "2026-11-26T05:00:00Z"
+  },
+  "KXNCAAMBTEAMSQUAL": {
+   "programs": 1,
+   "reward_usd": 100.0,
+   "types": {
+    "liquidity": 1
+   },
+   "targets": {
+    "1000.00": 1
+   },
+   "discounts": {
+    "5000": 1
+   },
+   "first_start": "2026-11-19T05:00:00Z",
+   "last_end": "2026-11-26T05:00:00Z"
+  }
+ }
+}
