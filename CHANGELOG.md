@@ -2221,3 +2221,11 @@ unfamiliar codebase ... do not change functionality. only upgrade the code quali
   a fill (adverse selection). Not testable means the test could not tell; it cannot be rescued (PLAN5 rules).
 - The hourly sampling workflow (plan5-lip.yml) is disabled. The PC's run.bat still calls lip.py in the hourly job
   (it samples nothing after Nov 20); removing those two lines waits for the user's word.
+
+## 2026-11-25 22:00 (La Paz) - r94: the hourly job stops calling lip.py (user: "please do")
+- run.bat :hourly no longer runs `research\lip.py sample` and `settle` (PLAN5 L sampled to Nov 20 and was scored once
+  on Nov 25); a rem line records why; the usage comment no longer mentions PLAN5. freshness.py shows PLAN5 L's rows as
+  information outside the window, so nothing else depends on those calls.
+- tests/test_moves.py: asserts lip.py is gone from :hourly; a time-dependent check (merged.json stamped by the real
+  clock, now after the window) is backdated in the test so it reads the same after the window ended.
+- Deployed to the PC after 1 AM La Paz (outside the scan window), with the old run.bat kept in backups\code_pre_r94.

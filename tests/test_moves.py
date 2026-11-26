@@ -114,12 +114,12 @@ line = control_view.safety_line(NOW, lip_n)
 assert note in line and "%d" not in line
 assert "market-hours sampled so far" in control_view.safety_line(NOW, 12)
 print("dashboard: the safety line says where PLAN5 L is sampled: ok")
-# since 2026-10-29 both sample: run.bat runs lip.py again; the GitHub workflow samples on its own concurrency group, never
-# scores (the score runs once, by hand, after the PC's hours are merged), and every push retries on a race
+# since 2026-11-25 (r94) PLAN5 L is scored and over: run.bat's hourly job no longer runs lip.py at all (it never scored);
+# the GitHub workflow samples on its own concurrency group, never scores, and every push retries on a race
 bat = open(os.path.join(WORK, "run.bat"), encoding="utf-8").read()
 code = re.sub(r"(?m)^rem .*$", "", bat)
 hourly = code[code.index(":hourly"):code.index("exit /b 0", code.index(":hourly"))]
-assert 'research\\lip.py sample' in hourly and 'research\\lip.py settle' in hourly and "score" not in hourly, hourly
+assert "lip.py" not in hourly and "score" not in hourly, hourly
 wf = open(os.path.join(WORK, "cloud", "workflows", "plan5-lip.yml"), encoding="utf-8").read()
 assert '- cron: "5,20,35,50 * * * *"' in wf and "python research/lip.py sample" in wf and "python research/lip.py settle" in wf
 assert "group: tradebot-lip" in wf and "main.py" not in wf and "live.py" not in wf and "MOVED.txt" in wf and "plan5_L.json" in wf
@@ -212,7 +212,7 @@ if BACKSTOP_RUN:
     assert (rc, n) == (0, 1) and "git checkout" not in lg, "no fresh copy: it goes on and the scan checks tonight itself"
     rc, n, lg = backstop(wins=(3, 0), hm="2000", co=1); assert (rc, n) == (1, 0), "a failed checkout starts nothing"
     tmo = int(re.search(r"timeout-minutes: (\d+)", bs).group(1)); assert tmo >= (1256 - 1010) + 10, "the job outlives the longest wait"
-print("both copies sample; the workflow never scores; several start times with one scan an evening; pushes retry; the backstop starts a missed trial scan%s: ok" % ("" if BACKSTOP_RUN else " (its script test needs bash; skipped here)"))
+print("the PC no longer runs lip.py; the workflow never scores; several start times with one scan an evening; pushes retry; the backstop starts a missed trial scan%s: ok" % ("" if BACKSTOP_RUN else " (its script test needs bash; skipped here)"))
 # merge: the hours only the other copy took come over (samples, fills, log, hours.json), the target keeps any hour it has
 # rows for, results are united, a second merge changes nothing, and wrong folders or directions are refused
 A = os.path.join(OUT, "repo_lip"); B = os.path.join(OUT, "pc_lip"); os.makedirs(A); os.makedirs(B)
@@ -264,6 +264,8 @@ try: P.score(now=P.SCORE_FROM + 86400); raise AssertionError("expected an exit")
 except SystemExit as ex: assert "after lip.py merge" in str(ex), ex
 P.DATA = A
 assert P.primary() and not P.secondary()
+# the merges above stamp merged.json with the real clock; backdate it so the test reads the same after the window ended
+mk = os.path.join(A, "merged.json"); P.save(mk, dict(P.load(mk), ts=P.END - 3600))
 try: P.score(now=P.SCORE_FROM + 86400); raise AssertionError("expected an exit")
 except SystemExit as ex: assert "Merge the PC's copy first" in str(ex), ex   # merged.json is from before END
 quiet(P.merge, None, none_reason="test: the PC copy was lost")

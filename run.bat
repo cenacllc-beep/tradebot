@@ -10,7 +10,7 @@ rem   run dashboard  current prices of open paper trades (marks.py), rebuild das
 rem                  (add --no-open to skip the browser)
 rem   run watch      dashboard_live.html: prices and the page refresh every 5 minutes until you close the window
 rem   run marks      current prices of open paper trades, then rebuild dashboard.html (no browser)
-rem   run hourly     research samples (PLAN5 test L, read-only) and prices, then rebuild dashboard.html (scheduled hourly)
+rem   run hourly     read-only research and prices, then rebuild dashboard.html (scheduled hourly)
 rem   run structure  market-structure scan of open weather events (research, read-only)
 rem   run discover   refresh the catalogue of open Kalshi markets and summarize it (research, read-only)
 rem   run freshness  how old each dataset is, scheduled-job results and the PC clock (read-only; add --clock to
@@ -141,10 +141,7 @@ exit /b 0
 rem Read-only research and prices: nothing here places orders, so it runs even while the kill switch is on.
 rem PLAN4 (2026-10-29): starts a finishing chain once from research\results\plan4_go_KS.txt or _PS.txt, detached; returns at once.
 "%PY%" research\plan4_launch.py
-rem PLAN5 L: GitHub Actions samples it too since 2026-10-28; this copy (research\data\lip\SECONDARY.txt) is merged into
-rem the repository's before the single score, so an hour either one takes counts once.
-"%PY%" research\lip.py sample
-"%PY%" research\lip.py settle
+rem PLAN5 L ended: sampled to 2026-11-20, scored once 2026-11-25 (not testable); its two lip.py calls were removed (r94).
 "%PY%" research\structure.py scan --every 21600
 "%PY%" research\discover.py refresh --every 21600 --singles
 "%PY%" research\ohlc_audit.py run --every 86400
