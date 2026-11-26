@@ -23,3 +23,6 @@ __pycache__/
 /research/results/freshness.*
 # PLAN4 chain locks on the PC (held open while a chain runs; git could not read them)
 /research/results/plan4_lock_*.txt
+
+# graphify code map (rebuilt each session; CLAUDE.md "graphify")
+/graphify-out/

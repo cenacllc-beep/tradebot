@@ -433,7 +433,8 @@ for bad in (["research/plan20.py"], None, "raise", ["no identity record (run fre
     IDENT[0] = bad
     assert L.paper() is None, bad
 IDENT[0] = []
-assert real_identity is not fake_identity and real_identity(WORK) != [], "the real check is not clean without a freeze"
+_noid = os.path.join(OUT, "no_identity.json")   # the repository is frozen since 2026-11-26: test against a missing record
+assert real_identity is not fake_identity and real_identity(WORK, path=_noid) != [], "the real check is not clean without a freeze"
 print("identity and model hash ok")
 
 # stage C: a row counts only for a group the stored result shows passed, from the first full La Paz day after it

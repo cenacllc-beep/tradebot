@@ -2333,3 +2333,17 @@ unfamiliar codebase ... do not change functionality. only upgrade the code quali
 - live20's first run (00:13-05:38 La Paz) logged 8,954 snapshots of 24 active series (4 missed minutes, 57 single
   failed reads); GitHub then started no scheduled run until 12:05 (a 6.5-hour gap). Its schedule is now hourly
   (":07"); runs share one concurrency group, so a queued run starts as the previous one ends. Logistics only.
+
+## 2026-11-26 12:50 (La Paz) - graphify installed as Claude's code map (user: "we need to install and use open source graphify moving forward for claude")
+- graphify (PyPI graphifyy, Apache-2.0, Graphify Labs) pinned at 0.9.106 (released 2026-11-10; the newest, 0.9.120, was
+  one day old), in an isolated virtual environment in the cloud session only; never on the PC. Code-only
+  (GRAPHIFY_BACKEND=none): source is parsed locally with tree-sitter and nothing is sent anywhere.
+- `graphify install --project --platform claude` wrote .claude/skills/graphify/ (the /graphify skill), .claude/CLAUDE.md,
+  .claude/settings.json (PreToolUse hooks that nudge Claude to query the graph before searching or reading; a
+  SessionStart hook after compaction; not --strict) and a "graphify" section in CLAUDE.md, to which the session setup
+  line and "navigation aid only; changes no rule" were added. Approval recorded in CLAUDE.md section 3.
+- First graph: 300 code files, 4,421 nodes, 8,967 edges, 197 communities (data files skipped). graphify-out/ is
+  git-ignored (14 MB, rebuilt in about 10 s each session).
+- tests/test_live20.py: one check assumed PLAN20 was not frozen; it now uses a missing identity record. All tests pass
+  (test_gatelook failed once in a full run and passed alone and on the rerun: a same-second backup-name clash, left
+  as is).
