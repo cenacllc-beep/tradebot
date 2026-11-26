@@ -8,6 +8,8 @@ an order and never opens paper.db or live.db. Python 3.8+, needs requests.
   python research/plan19.py settle   results of sampled markets that have closed
   python research/plan19.py status   counts only (PLAN19 section 5: no reward or P&L figure before the score)
   python research/plan19.py score    scored once, from 2026-12-29 00:00 local -> research/results/plan19_result.md/.json
+  python research/plan19.py auto-score   the score, once every sample is checked and every closed market has a result
+                                     (or from the 2027-01-05 backstop); nothing before 2026-12-29 (the hourly job runs it)
 Each step is safe to rerun: a sample hour is taken once, and a failed request is retried on the next run."""
 import os, sys, time, random, re, math, hashlib
 from datetime import datetime, timezone, timedelta
@@ -132,12 +134,13 @@ def side_bid(c, side):
 def weight_sum(cs, side, ts, b0, d, t_fill):
     """Section 3: the sum over the minutes before the side's first fill of d^max(0, B_t - B_0) (cents). B_t = the side's
     best bid from the latest one-minute candle in the hour ending at or before the minute's end; minutes before the first
-    candle carry B_0 (the last known); no candle at all in the hour for this side: weight 0.5 every minute."""
+    candle carry B_0 (the last known); no candle at all in the hour for this side: weight 0.5 every minute. A minute
+    counts only if it ends at or before the first fill (the minute in which the fill happens is not before it)."""
     inh = [c for c in cs if ts < (c.get("end_period_ts") or 0) <= ts + 3600 and side_bid(c, side) is not None]
     tot = 0.0
     for m in range(60):
         t0 = ts + 60 * m
-        if t_fill is not None and t0 >= t_fill: break
+        if t_fill is not None and t0 + 60 > t_fill: break
         if not inh: tot += 0.5; continue
         bt = b0
         for c in inh:
@@ -190,14 +193,20 @@ def markets(tickers):
         for m in (http("/markets", dict(tickers=",".join(ts[i:i + 100]), limit=1000)).get("markets") or []): out[m.get("ticker")] = m
     return out
 def bump(why, k, n=1): why[k] = why.get(k, 0) + n
+def last_sampled(ss):
+    """{ticker: time of its latest sample}, from the sample rows themselves (section 1's open-window rule)."""
+    last = {}
+    for s in ss: last[s["ticker"]] = max(last.get(s["ticker"], -1e18), s["ts"])
+    return last
 def sample(now=None):
     now = now or time.time(); hour = int(now // 3600)
     took = load(path("hours.json"), {})
+    ss = rows_of("samples") if START <= now < END else []
     if not (START <= now < END): print("plan19 sample: outside the sampling window (2026-11-28 .. 2026-12-27 local)")
-    elif str(hour) in took: print("plan19 sample: this hour was already sampled")
-    else: take(now, hour, took)
+    elif str(hour) in took or any(s["hour"] == hour for s in ss): print("plan19 sample: this hour was already sampled")
+    else: take(now, hour, took, last_sampled(ss))
     fill_step(now)
-def take(now, hour, took):
+def take(now, hour, took, last):
     live = [x for x in programs(now) if (rts(x["start_date"]) or 1e18) <= now < (rts(x["end_date"]) or 0)]
     by = {}; why = {}
     for x in live: by.setdefault(x["market_ticker"], []).append(x)
@@ -208,8 +217,7 @@ def take(now, hour, took):
         pick_prog[t] = min(ok, key=hourly_pool)   # section 3: the lowest hourly rate when programs overlap
         if len(ps) > 1: bump(why, "markets with overlapping programs (lowest rate used)")
     ms = markets(list(pick_prog)); info = series_info([series_of(t) for t in pick_prog])
-    last = load(path("last_sampled.json"), {})
-    uni = []; long_n = 0; long_usd = 0.0
+    uni = []; long_n = 0; long_usd = 0.0; long_total = 0.0
     for t in sorted(pick_prog):
         m = ms.get(t) or {}
         if (m.get("status") or "").lower() != "active": bump(why, "not active"); continue
@@ -219,8 +227,8 @@ def take(now, hour, took):
         if fee is None: bump(why, "fee type unknown (series lookup failed)"); continue
         if fee != "quadratic": bump(why, "fee type not quadratic"); continue
         if ct > CLOSE_MAX:   # section 1: long-dated programs are reported descriptively only
-            long_n += 1; long_usd += hourly_pool(pick_prog[t]) * 24; continue
-        if now - (last.get(t) or -1e18) < 3600: bump(why, "previous sample's window still open"); continue
+            long_n += 1; long_usd += hourly_pool(pick_prog[t]) * 24; long_total += (num(pick_prog[t].get("period_reward")) or 0) * UNIT; continue
+        if now - last.get(t, -1e18) < 3600: bump(why, "previous sample's window still open"); continue
         uni.append(t)
     pick = random.Random(hour).sample(uni, min(PER, len(uni)))   # uni is sorted by ticker; seed = the UTC epoch hour
     rows = []
@@ -235,10 +243,9 @@ def take(now, hour, took):
         rows.append(dict(ts=round(now, 1), hour=hour, ticker=t, series=series_of(t), event=m.get("event_ticker") or t.rsplit("-", 1)[0],
                          category=(info.get(series_of(t)) or {}).get("category"), close=rts(m.get("close_time")),
                          program=pick_prog[t], book=b, quote=qt))
-        last[t] = now
-    add_rows("samples", rows, now); save(path("last_sampled.json"), last)
+    add_rows("samples", rows, now)
     rec = dict(ts=now, day=day_of(now), universe=len(uni), sampled=len(rows), skipped=why, long_dated_programs=long_n,
-               long_dated_usd_per_day=round(long_usd, 2))
+               long_dated_usd_per_day=round(long_usd, 2), long_dated_total_reward=round(long_total, 2))
     took[str(hour)] = rec; save(path("hours.json"), took); add_rows("sample_log", [rec], now)
     print("plan19 sample: %d markets in the universe, %d sampled, %d long-dated left out; skipped %s" % (len(uni), len(rows), long_n, why))
 def candles(series, ticker, t0, t1):
@@ -247,7 +254,8 @@ def candles(series, ticker, t0, t1):
 def fill_step(now):
     """For each sample whose hour (plus 7 minutes for the 5-minute check) is over: the hour's trades, each side's fills
     for every size, the candles for the weight drift, and the mid after each fill. Each sample once; a failed trade list
-    is retried on the next run; failed candles give the no-candle weight (0.5) and an empty adverse check."""
+    or a failed candle request is retried on the next run (a failed request is not "no candle": the 0.5 weight of
+    section 3 is only for a side with no candle in an answer that came back)."""
     have = {(r["hour"], r["ticker"]) for r in rows_of("fills")}
     n = 0
     for s in rows_of("samples"):
@@ -260,9 +268,9 @@ def fill_step(now):
                 j = http("/markets/trades", prm); tr += j.get("trades") or []; cur = j.get("cursor")
                 if not cur: break
         except Exception as ex: print("  trades failed (retried next run)", s["ticker"], str(ex)[:120]); continue
-        try: cs = candles(s["series"], s["ticker"], s["ts"] - 60, s["ts"] + 3600 + 420); cok = True
-        except Exception as ex: cs = []; cok = False; print("  candles failed (weight 0.5, adverse empty)", s["ticker"], str(ex)[:120])
-        qt = s["quote"]; rec = dict(hour=s["hour"], ticker=s["ticker"], trades=len(tr), candles=len(cs), candles_failed=not cok, sides={})
+        try: cs = candles(s["series"], s["ticker"], s["ts"] - 60, s["ts"] + 3600 + 420)
+        except Exception as ex: print("  candles failed (retried next run)", s["ticker"], str(ex)[:120]); continue
+        qt = s["quote"]; rec = dict(hour=s["hour"], ticker=s["ticker"], trades=len(tr), candles=len(cs), sides={})
         for side, sd in qt["sides"].items():
             per = {}
             for q in QS:
@@ -329,9 +337,10 @@ def se_units(units):
     v0 = sum(v * v for v in ev.values()) / W ** 2
     return m, max(two, vd, ve, vs, v0) ** 0.5
 def band(p): return "1-5c" if p <= 0.055 else "6-20c" if p <= 0.205 else "21-50c" if p <= 0.505 else "51-99c"
+def finite(x): return None if x is None or not math.isfinite(x) else x
 def score(now=None, marks=None):
-    """Scored once (section 5). marks: {ticker: order book} for markets with fills that have no result at scoring (fetched
-    here when None)."""
+    """Scored once (section 5). marks: {ticker: order book} for markets with open (unsettled, unpaired) fills at scoring
+    (fetched here when None)."""
     import strategy
     now = now or time.time(); out = os.path.join(OUT, "plan19_result.json")
     if os.path.exists(out): sys.exit("plan19_result.json exists: PLAN19 is scored once.")
@@ -342,66 +351,82 @@ def score(now=None, marks=None):
     res = load(path("results.json"), {})
     hours_by_day = {}
     for hr, rec in took.items(): hours_by_day.setdefault(rec["day"], set()).add(int(hr))
+    d0 = datetime.fromtimestamp(START, LOCAL).date(); n_days = int(round((END - START) / 86400.0))
+    sampled_by_day = {}
+    for i in range(n_days):   # section 1: missed hours are reported by day
+        dd = (d0 + timedelta(days=i)).isoformat(); k = len(hours_by_day.get(dd, ()))
+        sampled_by_day[dd] = dict(sampled=k, missed=24 - k)
+    skipped = {}
+    for rec in took.values():
+        for k, v in (rec.get("skipped") or {}).items(): bump(skipped, k, v)
     left = {"no fill check": 0, "day with under 12 sampled hours": 0}
-    U = []
+    U = []; checked = []
     for s in ss:
         f = fl.get((s["hour"], s["ticker"]))
         if not f: left["no fill check"] += 1; continue
+        checked.append((s, f))
         if len(hours_by_day.get(day_of(s["ts"]), ())) < 12: left["day with under 12 sampled hours"] += 1; continue
         U.append((s, f))
-    # results or marks for markets with fills
-    need = sorted({s["ticker"] for s, f in U if any(sd["per_q"][str(q)]["filled"] for sd in f["sides"].values() for q in QS)
-                   and s["ticker"] not in res})
+    # the $1 minimum per market program (section 3), for each size: mean sampled hourly reward of that market (every
+    # sample with a fill check) x the hours the market was eligible in the window
+    def pkey(s): return (s["ticker"], s["program"]["start_date"], s["program"]["end_date"])
+    def elig_hours(s):
+        p = s["program"]; a = max(rts(p["start_date"]) or START, START); b = min(rts(p["end_date"]) or END, END, (s["close"] or END) - CLOSE_GAP)
+        return max(0.0, (b - a) / 3600.0)
+    rws = {}; first = {}
+    for s, f in checked:
+        first.setdefault(pkey(s), s)
+        for q in QS: rws.setdefault((pkey(s), q), []).append(sum(sd["per_q"][str(q)]["reward"] for sd in f["sides"].values()))
+    paid = {k: (sum(v) / len(v)) * elig_hours(first[k[0]]) >= 1.0 for k, v in rws.items()}
+    # positions (section 4): settled markets pay strategy.payout; otherwise a YES and a NO fill of the same market-hour
+    # lock in 1.00 minus both prices, and the rest is sold into that side's bid ladder at scoring (all open contracts of
+    # a market, side and size together, so one ladder level is never sold twice)
+    pos = []; openc = {}
+    for s, f in U:
+        settled = s["ticker"] in res; P = {}
+        for q in QS:
+            fq = {side: f["sides"][side]["per_q"][str(q)]["filled"] for side in s["quote"]["sides"]}
+            lk = 0 if settled else min(fq.get("yes", 0), fq.get("no", 0))
+            P[q] = {side: (c, lk, 0 if settled else c - lk) for side, c in fq.items()}
+            for side, (c, l_, op) in P[q].items():
+                if op: openc[(s["ticker"], side, q)] = openc.get((s["ticker"], side, q), 0) + op
+        pos.append(P)
+    need = sorted({k[0] for k in openc})
     if marks is None:
         marks = {}
         for t in need:
             try: b = http("/markets/%s/orderbook" % t).get("orderbook_fp") or {}
             except RuntimeError: b = {}
             marks[t] = {"yes": b.get("yes_dollars") or [], "no": b.get("no_dollars") or []}
-    def value(t, side, c, price):
-        """(P&L of c contracts bought at price, valued at a settlement (True) or at the ladder (False))."""
-        r = res.get(t)
+    per_contract = {k: sell_value((marks.get(k[0]) or {}).get(k[1]) or [], n) / n for k, n in openc.items()}
+    def side_pnl(s, side, q, c, lk, op):
+        if not c: return 0.0
+        sides = s["quote"]["sides"]; p = sides[side]["price"]; r = res.get(s["ticker"])
         if r is not None:
             po = strategy.payout(r, side)
-            if po is not None:
-                return (0.0 if po[1] is None else c * (po[1] - price)), True
-        return sell_value((marks.get(t) or {}).get(side) or [], c) - c * price, False
-    # the $1 minimum per market program (section 3): mean sampled hourly reward x hours the market was eligible
-    prog_units = {}
-    for s, f in U:
-        key = (s["ticker"], s["program"]["start_date"], s["program"]["end_date"])
-        prog_units.setdefault(key, []).append(sum(sd["per_q"][str(Q)]["reward"] for sd in f["sides"].values()))
-    def elig_hours(s):
-        p = s["program"]; a = max(rts(p["start_date"]) or START, START); b = min(rts(p["end_date"]) or END, END, (s["close"] or END) - CLOSE_GAP)
-        return max(0.0, (b - a) / 3600.0)
-    paid = {}
-    first = {}
-    for s, f in U: first.setdefault((s["ticker"], s["program"]["start_date"], s["program"]["end_date"]), s)
-    for key, rws in prog_units.items(): paid[key] = (sum(rws) / len(rws)) * elig_hours(first[key]) >= 1.0
+            if po is not None: return 0.0 if po[1] is None else c * (po[1] - p)
+        locked = lk * (1.0 - sides["yes"]["price"] - sides["no"]["price"]) / 2.0 if lk else 0.0   # the pair's P&L, half on each side
+        return locked + (op * (per_contract[(s["ticker"], side, q)] - p) if op else 0.0)
     tot = dict(reward=0.0, fillpnl=0.0, capital=0.0, units=0, valid=0); qv = {str(q): dict(reward=0.0, fillpnl=0.0, capital=0.0) for q in QS}
     units_net = []; units_half = []; units_fill = []; days = set(); fill_sides = 0; fill_events = set()
     contracts = 0; contracts_marked = 0; byser = {}; bycat = {}; byband = {}; adv = {"60": [], "300": []}; prices = []
-    bad_units = sorted({s["ticker"] for s, f in U if not (1.0 <= s["quote"]["usd_per_day"] <= 1000.0)})
-    for s, f in U:
-        qt = s["quote"]; key = (s["ticker"], s["program"]["start_date"], s["program"]["end_date"]); ok = paid[key]
-        u_rew = u_pnl = u_cap = 0.0; sdv = 0.0
+    bad_units = sorted({s["ticker"] for s in ss if not (1.0 <= s["quote"]["usd_per_day"] <= 1000.0)})   # section 3's unit check
+    for (s, f), P in zip(U, pos):
+        qt = s["quote"]; u_rew = u_pnl = u_cap = 0.0; sdv = 0.0
         for side, sd in qt["sides"].items():
-            fr = f["sides"].get(side) or {"per_q": {}}
+            fr = f["sides"][side]
             for q in QS:
-                pq = fr["per_q"].get(str(q)) or dict(filled=0, reward=0.0)
-                rew = pq["reward"] if ok else 0.0; cap = q * sd["price"]
-                pnl = 0.0
-                if pq["filled"]:
-                    pnl, settled = value(s["ticker"], side, pq["filled"], sd["price"])
+                pq = fr["per_q"][str(q)]; c, lk, op = P[q][side]
+                rew = pq["reward"] if paid[(pkey(s), q)] else 0.0; cap = q * sd["price"]
+                pnl = side_pnl(s, side, q, c, lk, op)
                 qv[str(q)]["reward"] += rew; qv[str(q)]["fillpnl"] += pnl; qv[str(q)]["capital"] += cap
                 if q == Q:
                     u_rew += rew; u_pnl += pnl; u_cap += cap; prices.append(sd["price"])
                     b = byband.setdefault(band(sd["price"]), dict(sides=0, reward=0.0, fillpnl=0.0, capital=0.0))
                     b["sides"] += 1; b["reward"] += rew; b["fillpnl"] += pnl; b["capital"] += cap
-                    if pq["filled"]:
-                        fill_sides += 1; fill_events.add(s["event"]); contracts += pq["filled"]
-                        if not settled: contracts_marked += pq["filled"]
-                        sdv += pq["filled"] * (sd["price"] * (1 - sd["price"])) ** 0.5
+                    if c:
+                        fill_sides += 1; fill_events.add(s["event"]); contracts += c; contracts_marked += op
+                        sdv += c * (sd["price"] * (1 - sd["price"])) ** 0.5
                         for l in adv:
                             a = (fr.get("adverse") or {}).get(l)
                             if a is not None: adv[l].append(a)
@@ -414,8 +439,10 @@ def score(now=None, marks=None):
         for d_, k in ((byser, s["series"]), (bycat, s.get("category") or "?")):
             b = d_.setdefault(k, dict(units=0, reward=0.0, fillpnl=0.0, capital=0.0))
             b["units"] += 1; b["reward"] += u_rew; b["fillpnl"] += u_pnl; b["capital"] += u_cap
-    m, se = se_units(units_net); mh, seh = se_units(units_half); mf, sef = se_units(units_fill)
-    t = m / se if se else None; th = mh / seh if seh else None; tf = mf / sef if sef else None
+    def stat(units):
+        m_, se_ = se_units(units); se_ = finite(se_)   # a single cluster gives no SE: no t, so no PASS
+        return m_, se_, (m_ / se_ if (m_ is not None and se_) else None)
+    m, se, t = stat(units_net); mh, seh, th = stat(units_half); mf, sef, tf = stat(units_fill)
     floors = len(days) >= 20 and fill_sides >= 100 and len(fill_events) >= 30
     marked_ok = contracts_marked <= 0.05 * contracts
     spread = "NOT TESTABLE" if not (floors and marked_ok) else ("PASS" if tf is not None and tf >= 2.5 else "FAIL")
@@ -427,29 +454,34 @@ def score(now=None, marks=None):
     n25 = int(25 // (Q * med)) if med else 0
     illus = n25 * ((tot["reward"] + tot["fillpnl"]) / sides_n) * 24 if sides_n else None
     top = lambda d_: dict(sorted(d_.items(), key=lambda kv: -kv[1]["units"])[:10])
+    hrs = list(took.values())
+    mean_h = lambda k: (sum(h.get(k, 0) for h in hrs) / len(hrs)) if hrs else None
     R = dict(plan="research/PLAN19.md", plan_sha256=PLAN_SHA, scored=clock.iso(seconds=False),
              spread_only=dict(verdict=spread, mean_return_per_dollar_hour=mf, se=sef, t=tf),
              with_rewards=dict(verdict=rew, applies=REWARDS_APPLY, eligibility=ELIGIBILITY_RECORD, mean_return_per_dollar_hour=m, se=se, t=t,
                                t_with_rewards_halved=th, fills_not_eating_rewards=c3, unit_problem_tickers=bad_units[:20]),
              days=len(days), filled_market_hour_sides=fill_sides, events_with_fills=len(fill_events), contracts_filled=contracts,
-             contracts_valued_at_ladder=contracts_marked, totals=tot, left_out=left,
-             programs_under_1_dollar=sum(1 for v in paid.values() if not v), programs=len(paid),
+             contracts_valued_at_ladder=contracts_marked, totals=tot, left_out=left, skipped_at_sample=skipped,
+             sampled_hours=len(took), hours_by_day=sampled_by_day,
+             programs_under_1_dollar=sum(1 for k, v in paid.items() if k[1] == Q and not v), programs=sum(1 for k in paid if k[1] == Q),
              exploratory=dict(by_series_top10=top(byser), by_category=bycat, by_quote_price_band=byband, by_size=qv,
                               valid_share=(tot["valid"] / tot["units"]) if tot["units"] else None,
                               adverse_selection={l: dict(n=len(v), mean=(sum(v) / len(v)) if v else None) for l, v in adv.items()},
-                              long_dated=dict(hours=len(took), mean_programs=(sum(h.get("long_dated_programs", 0) for h in took.values()) / len(took)) if took else None,
-                                              mean_usd_per_day=(sum(h.get("long_dated_usd_per_day", 0) for h in took.values()) / len(took)) if took else None),
+                              long_dated=dict(hours=len(hrs), mean_programs=mean_h("long_dated_programs"), mean_usd_per_day=mean_h("long_dated_usd_per_day"),
+                                              mean_total_reward=mean_h("long_dated_total_reward")),
                               illustration_25=dict(sides_funded=n25, median_quote_price=med, dollars_per_day=illus)))
     os.makedirs(OUT, exist_ok=True); save(out, R)
     pc = lambda x: "n/a" if x is None else "%+.4f%%" % (100 * x)
     tt = lambda x: "n/a" if x is None else "%.2f" % x
     L = ["# PLAN19: resting bids for Kalshi's liquidity rewards (scored once, %s)" % R["scored"], "",
-         "**With rewards: %s** (t %s; with rewards halved, t %s). This verdict applies: %s." % (rew, tt(t), tt(th), ELIGIBILITY_RECORD),
+         "**With rewards: %s** (t %s; with rewards halved, t %s). %s." % (rew, tt(t), tt(th), ("This verdict applies: " + ELIGIBILITY_RECORD)
+                                                                          if REWARDS_APPLY else "Reported only: eligibility was not on record before the first sample"),
          "**Spread alone: %s** (t %s)." % (spread, tt(tf)),
          "%d days, %d counted market-hours (%d valid for rewards), %d filled market-hour-sides in %d events, %d contracts filled "
          "(%d valued at the bid ladder, not a settlement)." % (len(days), tot["units"], tot["valid"], fill_sides, len(fill_events), contracts, contracts_marked),
          "Return per dollar of capital per hour: %s with rewards, %s from fills alone. Rewards $%.2f, fill P&L $%.2f over $%.2f of capital-hours." % (
              pc(m), pc(mf), tot["reward"], tot["fillpnl"], tot["capital"]),
+         "%d sampled hours; missed hours by day are in the .json." % len(took),
          "Illustration at $25 (an upper bound): %d sides of 100 at the median quote price, about $%s a day." % (n25, "n/a" if illus is None else "%.2f" % illus),
          "Paper estimate only, and the rewards are modelled: Kalshi's own fills and reward statement are the real test. "
          "A FAIL means the test could not tell, not that there is no edge. The breakdowns in the .json are exploratory."]
