@@ -1,50 +1,13 @@
 {
  "ai": {
-  "listed": 30,
-  "listed_ids": [
-   "bigcode/starcoder2-15b",
-   "fastino/gliner2-pii",
-   "google/gemma-3-12b-it",
-   "google/gemma-3-4b-it",
-   "minimaxai/minimax-m3.1-flash",
-   "mistralai/mistral-large-4-1t-a52b",
-   "moonshotai/kimi-k3.1-pro",
-   "nvidia/ai-synthetic-video-detector",
-   "nvidia/cosmos-reason2-8b",
-   "nvidia/embed-qa-4",
-   "nvidia/ising-calibration-1.5-31b",
-   "nvidia/llama-3.1-nemoguard-8b-topic-control",
-   "nvidia/llama-3.1-nemotron-safety-guard-8b-v3",
-   "nvidia/llama-3.2-nemoretriever-1b-vlm-embed-v1",
-   "nvidia/llama-3.2-nv-embedqa-1b-v1",
-   "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
-   "nvidia/nemotron-3-ultra-550b-a55b",
-   "nvidia/nemotron-3.5-bolt-e4b",
-   "nvidia/nemotron-3.5-content-safety",
-   "nvidia/nemotron-3.5-embed-1b",
-   "nvidia/nemotron-3.5-embed-8b",
-   "nvidia/nemotron-3.5-lightning-30b-a3b",
-   "nvidia/nemotron-3.5-super-vl-120b-a12b",
-   "nvidia/nv-embedqa-mistral-7b-v2",
-   "nvidia/nvclip",
-   "nvidia/riva-translate-4b-instruct-v2",
-   "poolside/laguna-xs-2.1",
-   "snowflake/arctic-embed-l",
-   "stepfun-ai/step-5-preview",
-   "z-ai/glm-5.3-flash"
-  ],
-  "model": null,
-  "note": "NVIDIA API answered HTTP 404 on /chat/completions",
+  "model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+  "note": null,
   "task": "check-summary",
-  "tried": [
-   "google/gemma-3-12b-it:404",
-   "google/gemma-3-4b-it:404"
-  ],
-  "used": false
+  "used": true
  },
  "data": [
   {
-   "age_hours": 1.6,
+   "age_hours": 1.7,
    "limit_hours": 6,
    "newest_commit_at": "2026-11-26T21:30:45Z",
    "path": "research/data/live20",
@@ -60,7 +23,7 @@
    "state": "inactive"
   },
   {
-   "age_hours": 3.6,
+   "age_hours": 3.7,
    "limit_hours": null,
    "newest_commit_at": "2026-11-26T19:32:10Z",
    "path": "research/data/plan20",
@@ -68,7 +31,7 @@
    "state": "info"
   },
   {
-   "age_hours": 3.6,
+   "age_hours": 3.7,
    "limit_hours": null,
    "newest_commit_at": "2026-11-26T19:32:10Z",
    "path": "research/results",
@@ -76,7 +39,7 @@
    "state": "info"
   },
   {
-   "age_hours": 21.1,
+   "age_hours": 21.2,
    "limit_hours": 30,
    "newest_commit_at": "2026-11-26T02:04:37Z",
    "path": "trial",
@@ -85,13 +48,13 @@
   }
  ],
  "errors": [],
- "generated_at": "2026-11-26T23:08:16Z",
- "generated_at_la_paz": "2026-11-26 19:08",
+ "generated_at": "2026-11-26T23:13:43Z",
+ "generated_at_la_paz": "2026-11-26 19:13",
  "issue": "none",
  "key_present": true,
  "note": "Reads GitHub only; the PC is not reachable from here.",
  "problems": [],
- "report_text": "No AI report (NVIDIA API answered HTTP 404 on /chat/completions). The table above is the non-AI status check.",
+ "report_text": "",
  "repository": "cenacllc-beep/tradebot",
  "schema": 1,
  "workflows": [
@@ -103,23 +66,23 @@
     "attempt": 1,
     "branch": "main",
     "conclusion": null,
-    "created_at": "2026-11-26T23:08:05Z",
+    "created_at": "2026-11-26T23:13:33Z",
     "event": "workflow_dispatch",
-    "id": 45909084975,
+    "id": 45909652394,
     "status": "in_progress",
     "title": "Backup AI operator",
-    "url": "https://github.com/cenacllc-beep/tradebot/actions/runs/45909084975"
+    "url": "https://github.com/cenacllc-beep/tradebot/actions/runs/45909652394"
    },
    "latest_completed": {
     "attempt": 1,
     "branch": "main",
     "conclusion": "success",
-    "created_at": "2026-11-26T23:06:26Z",
+    "created_at": "2026-11-26T23:08:05Z",
     "event": "workflow_dispatch",
-    "id": 45908918598,
+    "id": 45909084975,
     "status": "completed",
     "title": "Backup AI operator",
-    "url": "https://github.com/cenacllc-beep/tradebot/actions/runs/45908918598"
+    "url": "https://github.com/cenacllc-beep/tradebot/actions/runs/45909084975"
    },
    "limit_minutes": 360,
    "name": "Backup AI operator",
@@ -130,7 +93,7 @@
    "state": "running"
   },
   {
-   "age_minutes": 422,
+   "age_minutes": 427,
    "expected_max_gap_minutes": 60,
    "file": "live20.yml",
    "latest": {
@@ -164,7 +127,7 @@
    "state": "ok"
   },
   {
-   "age_minutes": 18562,
+   "age_minutes": 18567,
    "expected_max_gap_minutes": null,
    "file": "plan10.yml",
    "latest": {
@@ -196,7 +159,7 @@
    "state": "manual-only"
   },
   {
-   "age_minutes": 11365,
+   "age_minutes": 11370,
    "expected_max_gap_minutes": null,
    "file": "plan15.yml",
    "latest": {
@@ -228,7 +191,7 @@
    "state": "manual-only"
   },
   {
-   "age_minutes": 10790,
+   "age_minutes": 10795,
    "expected_max_gap_minutes": null,
    "file": "plan16.yml",
    "latest": {
@@ -260,7 +223,7 @@
    "state": "manual-only"
   },
   {
-   "age_minutes": 10789,
+   "age_minutes": 10794,
    "expected_max_gap_minutes": null,
    "file": "plan17.yml",
    "latest": {
@@ -292,7 +255,7 @@
    "state": "manual-only"
   },
   {
-   "age_minutes": 9608,
+   "age_minutes": 9614,
    "expected_max_gap_minutes": null,
    "file": "plan18.yml",
    "latest": {
@@ -324,7 +287,7 @@
    "state": "manual-only"
   },
   {
-   "age_minutes": 220,
+   "age_minutes": 226,
    "expected_max_gap_minutes": 60,
    "file": "plan19.yml",
    "latest": {
@@ -358,7 +321,7 @@
    "state": "running"
   },
   {
-   "age_minutes": 421,
+   "age_minutes": 427,
    "expected_max_gap_minutes": null,
    "file": "plan20.yml",
    "latest": {
@@ -404,7 +367,7 @@
    "state": "disabled"
   },
   {
-   "age_minutes": 11432,
+   "age_minutes": 11438,
    "expected_max_gap_minutes": null,
    "file": "probe18.yml",
    "latest": {
@@ -436,7 +399,7 @@
    "state": "manual-only"
   },
   {
-   "age_minutes": 1261,
+   "age_minutes": 1266,
    "expected_max_gap_minutes": null,
    "file": "probe19.yml",
    "latest": {
@@ -468,7 +431,7 @@
    "state": "manual-only"
   },
   {
-   "age_minutes": 546,
+   "age_minutes": 551,
    "expected_max_gap_minutes": 1230,
    "file": "tradebot-scan.yml",
    "latest": {
@@ -504,7 +467,7 @@
    "state": "ok"
   },
   {
-   "age_minutes": 1271,
+   "age_minutes": 1277,
    "expected_max_gap_minutes": 1200,
    "file": "tradebot-settle.yml",
    "latest": {
@@ -538,7 +501,7 @@
    "state": "ok"
   },
   {
-   "age_minutes": 561,
+   "age_minutes": 566,
    "expected_max_gap_minutes": 1260,
    "file": "trial-scan-backstop.yml",
    "latest": {
