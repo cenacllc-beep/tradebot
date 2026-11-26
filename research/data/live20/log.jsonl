@@ -14,3 +14,66 @@
 {"kind":"run_end","ts":1795678988.1,"minutes_read":30,"rows":840,"gaps":0}
 {"kind":"run_start","ts":1795678989.4,"minutes":30,"series":["KX10YRRATE15M","KX2YRRATE15M","KX30YRRATE15M","KX5YRRATE15M","KXADA15M","KXAUDUSD15M","KXBCH15M","KXBNB15M","KXBRENT15M","KXBTC15M","KXCOFFEE15M","KXCOPPER15M","KXCRYPTOCOMP15M","KXCRYPTOLEAD15M","KXDJIA15M","KXDOGE15M","KXETH15M","KXEURUSD15M","KXGBPUSD15M","KXGOLD15M","KXHYPE15M","KXINX15M","KXKPOWMID15M","KXNATGAS15M","KXNDQ15M","KXNEAR15M","KXPALLADIUM15M","KXPLATINUM15M","KXSILVER15M","KXSOL15M","KXTON15M","KXUSDCAD15M","KXUSDCNH15M","KXUSDCNY15M","KXUSDCZK15M","KXUSDHKD15M","KXUSDHUF15M","KXUSDIDR15M","KXUSDINR15M","KXUSDJPY15M","KXUSDKRW15M","KXUSDMXN15M","KXUSDMYR15M","KXUSDPHP15M","KXUSDPLN15M","KXUSDSGD15M","KXUSDTHB15M","KXUSDTRY15M","KXUSDTWD15M","KXUSDZAR15M","KXWTI15M","KXXRP15M","KXZEC15M"],"source":"file"}
 {"kind":"run_end","ts":1795680788.1,"minutes_read":30,"rows":840,"gaps":0}
+{"kind":"run_start","ts":1795680789.6,"minutes":30,"series":["KX10YRRATE15M","KX2YRRATE15M","KX30YRRATE15M","KX5YRRATE15M","KXADA15M","KXAUDUSD15M","KXBCH15M","KXBNB15M","KXBRENT15M","KXBTC15M","KXCOFFEE15M","KXCOPPER15M","KXCRYPTOCOMP15M","KXCRYPTOLEAD15M","KXDJIA15M","KXDOGE15M","KXETH15M","KXEURUSD15M","KXGBPUSD15M","KXGOLD15M","KXHYPE15M","KXINX15M","KXKPOWMID15M","KXNATGAS15M","KXNDQ15M","KXNEAR15M","KXPALLADIUM15M","KXPLATINUM15M","KXSILVER15M","KXSOL15M","KXTON15M","KXUSDCAD15M","KXUSDCNH15M","KXUSDCNY15M","KXUSDCZK15M","KXUSDHKD15M","KXUSDHUF15M","KXUSDIDR15M","KXUSDINR15M","KXUSDJPY15M","KXUSDKRW15M","KXUSDMXN15M","KXUSDMYR15M","KXUSDPHP15M","KXUSDPLN15M","KXUSDSGD15M","KXUSDTHB15M","KXUSDTRY15M","KXUSDTWD15M","KXUSDZAR15M","KXWTI15M","KXXRP15M","KXZEC15M"],"source":"file"}
+{"kind":"error","ts":1795681032.8,"minute":1795681020,"series":"KXCOPPER15M","error":"giving up on /markets"}
+{"kind":"error","ts":1795681041.2,"minute":1795681020,"series":"KXCRYPTOLEAD15M","error":"giving up on /markets"}
+{"kind":"error","ts":1795681052.8,"minute":1795681020,"series":"KXUSDMXN15M","error":"giving up on /markets"}
+{"kind":"error","ts":1795681092.1,"minute":1795681080,"series":"KX10YRRATE15M","error":"giving up on /markets"}
+{"kind":"error","ts":1795681099.8,"minute":1795681080,"series":"KX2YRRATE15M","error":"giving up on /markets"}
+{"kind":"error","ts":1795681107.4,"minute":1795681080,"series":"KX30YRRATE15M","error":"giving up on /markets"}
+{"kind":"error","ts":1795681116.2,"minute":1795681080,"series":"KXCOPPER15M","error":"giving up on /markets"}
+{"kind":"error","ts":1795681123.4,"minute":1795681080,"series":"KXCRYPTOLEAD15M","error":"giving up on /markets"}
+{"kind":"error","ts":1795681132.6,"minute":1795681080,"series":"KXHYPE15M","error":"giving up on /markets"}
+{"kind":"error","ts":1795681142.5,"minute":1795681080,"series":"KXUSDMXN15M","error":"giving up on /markets"}
+{"kind":"error","ts":1795681152.1,"minute":1795681140,"series":"KX10YRRATE15M","error":"giving up on /markets"}
+{"kind":"error","ts":1795681160.5,"minute":1795681140,"series":"KX2YRRATE15M","error":"giving up on /markets"}
+{"kind":"error","ts":1795681167.7,"minute":1795681140,"series":"KX30YRRATE15M","error":"giving up on /markets"}
+{"kind":"error","ts":1795681175.2,"minute":1795681140,"series":"KX5YRRATE15M","error":"giving up on /markets"}
+{"kind":"error","ts":1795681182.5,"minute":1795681140,"series":"KXADA15M","error":"giving up on /markets"}
+{"kind":"error","ts":1795681190.6,"minute":1795681140,"series":"KXBTC15M","error":"giving up on /markets"}
+{"kind":"error","ts":1795681198.3,"minute":1795681140,"series":"KXCOFFEE15M","error":"giving up on /markets"}
+{"kind":"error","ts":1795681205.5,"minute":1795681140,"series":"KXCOPPER15M","error":"giving up on /markets"}
+{"kind":"error","ts":1795681212.5,"minute":1795681140,"series":"KXCRYPTOCOMP15M","error":"giving up on /markets"}
+{"kind":"error","ts":1795681219.8,"minute":1795681140,"series":"KXCRYPTOLEAD15M","error":"giving up on /markets"}
+{"kind":"error","ts":1795681227.3,"minute":1795681140,"series":"KXDJIA15M","error":"giving up on /markets"}
+{"kind":"error","ts":1795681235.2,"minute":1795681140,"series":"KXEURUSD15M","error":"giving up on /markets"}
+{"kind":"error","ts":1795681242.7,"minute":1795681140,"series":"KXGBPUSD15M","error":"giving up on /markets"}
+{"kind":"error","ts":1795681252.1,"minute":1795681140,"series":"KXHYPE15M","error":"giving up on /markets"}
+{"kind":"error","ts":1795681259.7,"minute":1795681140,"series":"KXINX15M","error":"giving up on /markets"}
+{"kind":"error","ts":1795681266.9,"minute":1795681140,"series":"KXNDQ15M","error":"giving up on /markets"}
+{"kind":"error","ts":1795681274.0,"minute":1795681140,"series":"KXNEAR15M","error":"giving up on /markets"}
+{"kind":"error","ts":1795681282.8,"minute":1795681140,"series":"KXTON15M","error":"giving up on /markets"}
+{"kind":"error","ts":1795681290.1,"minute":1795681140,"series":"KXUSDCAD15M","error":"giving up on /markets"}
+{"kind":"error","ts":1795681297.3,"minute":1795681140,"series":"KXUSDCNH15M","error":"giving up on /markets"}
+{"kind":"error","ts":1795681304.8,"minute":1795681140,"series":"KXUSDCNY15M","error":"giving up on /markets"}
+{"kind":"error","ts":1795681312.4,"minute":1795681140,"series":"KXUSDHKD15M","error":"giving up on /markets"}
+{"kind":"error","ts":1795681319.8,"minute":1795681140,"series":"KXUSDHUF15M","error":"giving up on /markets"}
+{"kind":"error","ts":1795681326.9,"minute":1795681140,"series":"KXUSDIDR15M","error":"giving up on /markets"}
+{"kind":"error","ts":1795681334.0,"minute":1795681140,"series":"KXUSDINR15M","error":"giving up on /markets"}
+{"kind":"error","ts":1795681341.5,"minute":1795681140,"series":"KXUSDJPY15M","error":"giving up on /markets"}
+{"kind":"error","ts":1795681349.1,"minute":1795681140,"series":"KXUSDKRW15M","error":"giving up on /markets"}
+{"kind":"error","ts":1795681356.2,"minute":1795681140,"series":"KXUSDMXN15M","error":"giving up on /markets"}
+{"kind":"error","ts":1795681363.4,"minute":1795681140,"series":"KXUSDPHP15M","error":"giving up on /markets"}
+{"kind":"error","ts":1795681371.3,"minute":1795681140,"series":"KXUSDPLN15M","error":"giving up on /markets"}
+{"kind":"error","ts":1795681378.7,"minute":1795681140,"series":"KXUSDSGD15M","error":"giving up on /markets"}
+{"kind":"error","ts":1795681385.8,"minute":1795681140,"series":"KXUSDTHB15M","error":"giving up on /markets"}
+{"kind":"error","ts":1795681392.9,"minute":1795681140,"series":"KXUSDTRY15M","error":"giving up on /markets"}
+{"kind":"error","ts":1795681400.3,"minute":1795681140,"series":"KXUSDTWD15M","error":"giving up on /markets"}
+{"kind":"error","ts":1795681407.8,"minute":1795681140,"series":"KXUSDZAR15M","error":"giving up on /markets"}
+{"kind":"gap","ts":1795681408.6,"minute":1795681200,"why":"read could not start in time (204 s late)"}
+{"kind":"gap","ts":1795681408.6,"minute":1795681260,"why":"read could not start in time (144 s late)"}
+{"kind":"gap","ts":1795681408.6,"minute":1795681320,"why":"read could not start in time (84 s late)"}
+{"kind":"error","ts":1795681415.7,"minute":1795681380,"series":"KX10YRRATE15M","error":"giving up on /markets"}
+{"kind":"error","ts":1795681423.0,"minute":1795681380,"series":"KX2YRRATE15M","error":"giving up on /markets"}
+{"kind":"error","ts":1795681430.5,"minute":1795681380,"series":"KX30YRRATE15M","error":"giving up on /markets"}
+{"kind":"error","ts":1795681437.8,"minute":1795681380,"series":"KX5YRRATE15M","error":"giving up on /markets"}
+{"kind":"error","ts":1795681444.9,"minute":1795681380,"series":"KXADA15M","error":"giving up on /markets"}
+{"kind":"error","ts":1795681452.0,"minute":1795681380,"series":"KXAUDUSD15M","error":"giving up on /markets"}
+{"kind":"error","ts":1795681460.1,"minute":1795681380,"series":"KXBCH15M","error":"giving up on /markets"}
+{"kind":"error","ts":1795681467.7,"minute":1795681380,"series":"KXBTC15M","error":"giving up on /markets"}
+{"kind":"error","ts":1795681475.1,"minute":1795681380,"series":"KXCOFFEE15M","error":"giving up on /markets"}
+{"kind":"error","ts":1795681482.6,"minute":1795681380,"series":"KXCOPPER15M","error":"giving up on /markets"}
+{"kind":"gap","ts":1795681500.3,"minute":1795681440,"why":"read could not start in time (55 s late)"}
+{"kind":"error","ts":1795681933.0,"minute":1795681920,"series":"KXDOGE15M","error":"giving up on /markets"}
+{"kind":"error","ts":1795681940.9,"minute":1795681920,"series":"KXUSDCAD15M","error":"giving up on /markets"}
+{"kind":"run_end","ts":1795682588.1,"minutes_read":26,"rows":694,"gaps":4}
