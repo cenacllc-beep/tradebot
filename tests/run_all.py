@@ -44,6 +44,7 @@ TESTS=[("test_fix.py",[],"daily loss stop, migration, clear margin, single-look 
        ("test_plan16.py",[],"PLAN16: four rules for the 15-minute markets on synthetic data, scored once, never an order"),
        ("test_live15.py",[],"PLAN15F: live paper bets on the 15-minute markets, fake Kalshi/Coinbase, never an order"),
        ("test_plan19.py",[],"PLAN19: liquidity-reward quotes on all rewarded markets, weight drift, fills, ladder marks, single score"),
+       ("test_plan20.py",[],"PLAN20: cheap sides of every 15-minute series, groups, frozen ridge model, scored once, never an order"),
        ("test_live20.py",[],"PLAN20 forward logger: snapshots, gaps, settle, paper replay, never an order"),
        ("test_manifest.py",[],"code manifest: the same code on the PC, in the repository and in the working copy"),
        ("test_plan4launch.py",[],"PLAN4 chains started from a flag by the hourly job: once, detached, never while running"),

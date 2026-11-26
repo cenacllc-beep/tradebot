@@ -3,7 +3,8 @@ results, and paper bets by PLAN20's frozen rule once its model exists. Research 
 
     python research/live20.py run --minutes N     one snapshot of every open market each minute (+5 s), for N minutes
     python research/live20.py settle [--budget-seconds S]   results of logged markets that have closed
-    python research/live20.py paper               replay the snapshots with the frozen rule (only once the model exists)
+    python research/live20.py paper [--budget-seconds S]   PLAN20's rule on Kalshi's one-minute candles of the logged
+                                                  windows (only once the model exists)
     python research/live20.py status              counts only (minutes, markets, gaps); never a profit figure
 
 What it never does: place, change or cancel an order (no order endpoint exists in this file), import live.py, or touch
@@ -20,15 +21,17 @@ Files (research/data/live20/, overridable with LIVE20_DATA for tests):
 - log.jsonl: run_start / run_end rows, a "gap" row for every minute not read (late or every request failed) and an
   "error" row for every series that failed in a minute.
 - results.json: {ticker: {result, yes_pay, no_pay, status, close, settled_ts}} by strategy.payout's rules.
-- paper.jsonl: the paper bets (rebuilt in full by each `paper` run from the logged snapshots, so it is idempotent).
+- candles/SERIES/TICKER.json: Kalshi's one-minute candlesticks of each logged market, fetched once after its close.
+- paper.jsonl: the paper bets (rebuilt in full by each `paper` run, so it is idempotent).
 
-The paper rule (PLAN20 sections 2 and 5): windows that opened at or after the model's freeze time; minutes m = 1..13
-in order, markets by ticker, YES before NO; a chance is a side whose ask at minute m is 1-10c; the decision comes from
-research/plan20.py (imported lazily: features() and decide(), see _rule) and sees only minutes 1..m; the fill is the
-side's ask in the snapshot of minute m+1, used only if that snapshot exists, shows 0 < bid < ask and the ask is at most
-10c (a quote is never carried forward to a fill); a skipped fill does not use up the side; one bet per window per
-series; a $1 bet: C = floor(1 / P) contracts, fee = round-up-to-cent(0.07 x C x P x (1 - P)). Without the model file
-or plan20.py, nothing is bet (fail closed). Python 3.8+.
+The paper rule (PLAN20 sections 2 and 5) is research/plan20.py's own code, imported lazily (fail closed without it,
+without the model file, or with a model fitted under another plan text): for every logged window (one series, one
+close time; start = close - 15 minutes) that opened at or after the model's freeze time, has closed and whose logged
+markets all have a result, Kalshi's one-minute candles of each market are fetched once (the endpoint, interval and
+span plan20.py downloads), parsed by plan20.parse_candles, and replayed exactly as plan20's score stage does
+(chances(), decide(), fill() at candle m+1, one bet per window per series, bet_row()'s $1 bet and whole-cent fee).
+The minute snapshots are a raw record only (they have no per-minute highs and lows). Markets with a scalar or void
+result are left out of the replay, as plan20's download leaves them out. Python 3.8+.
 """
 import argparse
 import glob
@@ -36,7 +39,6 @@ import gzip
 import hashlib
 import importlib
 import json
-import math
 import os
 import re
 import sys
@@ -59,9 +61,6 @@ MODEL_FILE = os.environ.get("LIVE20_MODEL") or os.path.join(HERE, "results", "pl
 OFFSET = 5            # seconds after each minute boundary that the snapshot is read
 LATE = 25             # a minute whose read cannot start within OFFSET + LATE seconds of its boundary is a gap
 SETTLE_AFTER = 120    # a market is asked for its result this long after it closes
-CHEAP = (0.01, 0.10)  # PLAN20 section 2: a chance's ask, and the most a fill may cost
-MINUTES = 15
-FEE_RATE = 0.07
 PAGE = 1000
 
 CLIENT = JsonClient(KALSHI_PUBLIC, tries=3, timeout=10, min_gap=0.06, backoff_base=1.0, backoff_cap=8.0)
@@ -376,73 +375,156 @@ def settle(budget_seconds=240):
 
 
 # ---------- paper ----------
-def fee_for(price):
-    """(contracts, fee) of a $1 bet at price P (PLAN20 section 2: whole-cent round-up)."""
-    c = int(math.floor(1.0 / price + 1e-9))
-    return c, math.ceil(FEE_RATE * c * price * (1 - price) * 100 - 1e-9) / 100
+# The paper bets are NOT computed from the minute snapshots above (those are a raw record only: they have no
+# per-minute highs and lows, so the higher-highs flag and the window's high/low would differ from the fit data).
+# Instead, for every logged market whose window has closed, Kalshi's own one-minute candlesticks are fetched once
+# (GET /series/{series}/markets/{ticker}/candlesticks, period_interval=1, start_ts = window start, end_ts = close: the
+# same endpoint, interval and span research/plan20.py downloads), cached under candles/, parsed by plan20.parse_candles
+# and replayed by plan20's own chances(), decide(), fill(), bet_row(), y_of() and wins(), in the same order as its score
+# stage (collect()). Live and history therefore share one code path.
+# Fill (PLAN20 sections 2 and 5): section 5 words the forward fill as "the live ask about 60 seconds later"; candle
+# m+1's closing ask is exactly that quote (candle m closes at the decision minute's end, candle m+1 closes 60 s later),
+# so plan20.fill(candles, m, side) is the forward fill too.
+CANDLE_AFTER = 120          # candles are fetched this long after a market closes (Kalshi's last candle is written)
+EMPTY_FINAL = 6 * 3600      # an empty candle answer is cached as final only for a market closed this long ago
+NEEDED = ("features", "decide", "chances", "fill", "bet_row", "parse_candles", "y_of", "wins", "lapaz_date", "T")
 
 
-def side_quote(row, side):
-    """(bid, ask) of one side from a snapshot row."""
-    return (row.get("yes_bid"), row.get("yes_ask")) if side == "yes" else (row.get("no_bid"), row.get("no_ask"))
+def candle_path(series, ticker):
+    return os.path.join(DATA, "candles", series, "%s.json" % ticker)
 
 
-def candle(row, prev):
-    """A snapshot row as PLAN20's minute candle (yes quotes, last, the minute's volume from the running total)."""
-    vol = None
-    if prev is not None and row.get("volume") is not None and prev.get("volume") is not None:
-        vol = max(0.0, row["volume"] - prev["volume"])
-    return dict(end_period_ts=row["minute"], yes_bid=row.get("yes_bid"), yes_ask=row.get("yes_ask"),
-                no_bid=row.get("no_bid"), no_ask=row.get("no_ask"), last=row.get("last"), volume=vol,
-                volume_total=row.get("volume"), open_interest=row.get("oi"))
+def fetch_candles(series, ticker, open_ts, close_ts):
+    """Kalshi's one-minute candlesticks of one market (raw list), as plan20.fetch_candles asks for them; the archive
+    endpoint is tried when the live one fails (a market past Kalshi's historical cutoff)."""
+    q = dict(start_ts=int(open_ts), end_ts=int(close_ts), period_interval=1)
+    try:
+        j = http("/series/%s/markets/%s/candlesticks" % (series, ticker), q) or {}
+    except Exception:
+        j = http("/historical/markets/%s/candlesticks" % ticker, q) or {}
+    return j.get("candlesticks") or []
 
 
-def history(rows_by_min, open_ts, upto):
-    """{m: candle} for minutes 1..upto that were logged (nothing after `upto`: no look-ahead)."""
+def candles_of(series, ticker, open_ts, close_ts, t_now):
+    """The market's raw candles from the cache, else fetched once and cached; None when not available yet."""
+    p = candle_path(series, ticker)
+    if os.path.exists(p):
+        try:
+            j = jsonio.load(p)
+            if isinstance(j, dict) and isinstance(j.get("candlesticks"), list):
+                return j["candlesticks"]
+        except (OSError, ValueError):
+            pass
+    cs = fetch_candles(series, ticker, open_ts, close_ts)
+    if cs or t_now - close_ts >= EMPTY_FINAL:
+        os.makedirs(os.path.dirname(p), exist_ok=True)
+        jsonio.save(p, dict(ticker=ticker, series=series, open=int(open_ts), close=int(close_ts), period_interval=1,
+                            fetched=round(t_now), candlesticks=cs))
+        return cs
+    return None
+
+
+def window_bet(Q, model, day, series, group, markets):
+    """The window's one bet, exactly as plan20.collect() makes it for one window: plan20.chances() (minutes in order,
+    markets by ticker, YES before NO; a chance's ask 1-10c), decide(), fill() at candle m+1 (a skipped fill does not use
+    up the side), first pass that fills wins. markets: plan20's market dicts {ticker, open, close, result, c} sorted
+    by ticker. Returns plan20.bet_row(...) or None. tests/test_live20.py checks it against plan20.collect()."""
+    for m, mk, side, f in Q.chances(markets, dict(series=series, group=group)):
+        y = Q.y_of(mk)
+        if y is None:
+            continue
+        d = Q.decide(model, f)
+        if not d["bet"]:
+            continue
+        price, _why = Q.fill(mk.get("c") or {}, m, side)
+        if price is None:
+            continue
+        return Q.bet_row(day, series, group, m, side, f["ask"], price, Q.wins(side, y), d["p"], mk["ticker"])
+    return None
+
+
+def logged_markets():
+    """{ticker: (series, close)} of every market in the snapshots (the window start is close - 15 minutes, as in
+    plan20.market_list)."""
     out = {}
-    for m in range(1, upto + 1):
-        r = rows_by_min.get(open_ts + 60 * m)
-        if r is not None:
-            out[m] = candle(r, rows_by_min.get(open_ts + 60 * (m - 1)))
+    for r in snapshots():
+        if r.get("close") is not None and r.get("series"):
+            out[r["ticker"]] = (r["series"], int(r["close"]))
     return out
 
 
-def _rule(mod, model, hist, m, side, meta, ask):
-    """PLAN20's frozen rule through research/plan20.py. Assumed interface (to be matched by plan20.py):
-    features(history, m, side, meta) -> the feature values; decide(model, features, ask) -> True to bet.
-    `history` holds candles 1..m only; meta = ticker, series, event, open, close, group."""
-    return bool(mod.decide(model, mod.features(hist, m, side, meta), ask))
-
-
-def decide_window(markets, mod, model, groups):
-    """The window's one bet (dict) or None. markets: {ticker: {minute: row}} for one series and one open time."""
-    any_rows = next(iter(markets.values()))
-    first = next(iter(any_rows.values()))
-    o, c, series = first["open"], first["close"], first["series"]
-    for m in range(1, MINUTES - 1):          # 1..13
-        for t in sorted(markets):
-            by_min = markets[t]
-            row = by_min.get(o + 60 * m)
-            if row is None:
+def paper(budget_seconds=600):
+    """Rebuild paper.jsonl: PLAN20's frozen rule replayed on Kalshi's one-minute candles of every logged window that
+    opened at or after the model's freeze time, has closed, and whose logged markets all have a result. Returns the
+    number of bets, or None when nothing may be bet (no model, no plan20.py, a model from another plan, the kill
+    switch). Windows still waiting for candles or results are counted, not bet."""
+    try:
+        model, sha, frozen = model_info()
+        Q = importlib.import_module("plan20")
+        missing = [k for k in NEEDED if not hasattr(Q, k)]
+        if missing:
+            raise ValueError("research/plan20.py lacks %s" % ", ".join(missing))
+        if model.get("plan_sha256") != getattr(Q, "PLAN_SHA256", None):
+            raise ValueError("the model was not fitted under research/PLAN20.md's frozen text")
+    except Exception as ex:
+        print("live20 paper: nothing is bet yet (%s)" % ex)
+        return None
+    k = halted()
+    if k:
+        print("live20 paper: halted by the kill switch (%s); nothing written" % k)
+        return None
+    _, groups = series_from_file()
+    res = load_results()
+    t0 = now()
+    windows = {}     # (close, series) -> [tickers]
+    for t, (s, c) in logged_markets().items():
+        if c - 60 * Q.T >= frozen and c + CANDLE_AFTER <= t0:
+            windows.setdefault((c, s), []).append(t)
+    bets, waiting, out_of_time, failed = [], 0, False, 0
+    for (c, s) in sorted(windows):
+        tickers = sorted(windows[(c, s)])
+        o = c - 60 * Q.T
+        if any(t not in res for t in tickers):
+            waiting += 1
+            continue
+        ms, ok = [], True
+        for t in tickers:
+            if out_of_time or now() - t0 > budget_seconds:
+                out_of_time, ok = True, False
+                break
+            try:
+                cs = candles_of(s, t, o, c, t0)
+            except Exception as ex:
+                failed += 1
+                log_row("error", where="candles", ticker=t, error=str(ex)[:200])
+                cs = None
+            if cs is None:
+                ok = False
+                break
+            if res[t].get("result") not in ("yes", "no"):   # plan20 keeps settled yes/no markets only
                 continue
-            for side in ("yes", "no"):
-                ask = side_quote(row, side)[1]
-                if ask is None or not (CHEAP[0] - 1e-9 <= ask <= CHEAP[1] + 1e-9):
-                    continue
-                meta = dict(ticker=t, series=series, event=row.get("event"), open=o, close=c, group=groups.get(series))
-                if not _rule(mod, model, history(by_min, o, m), m, side, meta, ask):
-                    continue
-                nxt = by_min.get(o + 60 * (m + 1))   # the fill: the next minute's logged ask, never carried forward
-                if nxt is None:
-                    continue
-                bid, fill = side_quote(nxt, side)
-                if bid is None or fill is None or not (0 < bid < fill) or fill > CHEAP[1] + 1e-9:
-                    continue
-                n, fee = fee_for(fill)
-                return dict(series=series, event=row.get("event"), ticker=t, side=side, open=o, close=c,
-                            group=groups.get(series), decision_minute=m, decision_ask=ask, fill_minute=m + 1,
-                            fill_price=fill, contracts=n, fee=fee)
-    return None
+            ms.append(dict(ticker=t, close=c, open=o, result=res[t]["result"], c=Q.parse_candles(cs, o)))
+        if not ok:
+            waiting += 1
+            continue
+        g = groups.get(s) or "other"
+        b = window_bet(Q, model, Q.lapaz_date(c), s, g, ms)
+        if b is None:
+            continue
+        b = json.loads(json.dumps(b, default=str))
+        b.update(open=o, close=c, fill_minute=b["m"] + 1, model_sha256=sha)
+        bets.append(b)
+    bets.sort(key=lambda b: (b["open"], b["series"]))
+    tmp = _p("paper.jsonl.tmp")
+    os.makedirs(DATA, exist_ok=True)
+    with open(tmp, "w", encoding="utf-8") as f:
+        for b in bets:
+            f.write(json.dumps(b, sort_keys=True, separators=(",", ":")) + "\n")
+    os.replace(tmp, _p("paper.jsonl"))
+    print("live20 paper: %d paper bets, %d windows waiting for candles or results%s%s (counts only; the verdict is "
+          "PLAN20 section 5's, at day 42)" % (len(bets), waiting, ", %d candle requests failed" % failed if failed else "",
+                                             "; time budget used" if out_of_time else ""))
+    return len(bets)
 
 
 def model_info():
@@ -471,66 +553,6 @@ def halted():
         return core.kill_file()
     except Exception as ex:
         return "the kill-switch check failed (%s)" % ex
-
-
-def paper():
-    """Rebuild paper.jsonl from the logged snapshots by the frozen rule. Returns the number of bets, or None when
-    nothing may be bet (no model, no plan20.py, the kill switch)."""
-    try:
-        model, sha, frozen = model_info()
-        mod = importlib.import_module("plan20")
-        if not (callable(getattr(mod, "features", None)) and callable(getattr(mod, "decide", None))):
-            raise ValueError("research/plan20.py has no features() and decide()")
-    except Exception as ex:
-        print("live20 paper: nothing is bet yet (%s)" % ex)
-        return None
-    k = halted()
-    if k:
-        print("live20 paper: halted by the kill switch (%s); nothing written" % k)
-        return None
-    from strategy import settled_pnl
-    _, groups = series_from_file()
-    res = load_results()
-    t_now = now()
-    windows = {}     # (series, open) -> {ticker: {minute: row}}
-    bets = []
-
-    def finish(key):
-        mk = windows.pop(key)
-        b = decide_window(mk, mod, model, groups)
-        if b is None:
-            return
-        r = res.get(b["ticker"])
-        if r:
-            pay = r["yes_pay"] if b["side"] == "yes" else r["no_pay"]
-            n = b["contracts"]
-            b.update(result=r["result"], pay=pay,
-                     pnl_per_contract=round(settled_pnl(r["result"], b["side"], n, n * b["fill_price"], b["fee"], pay) / n, 6))
-        b["model_sha256"] = sha
-        bets.append(b)
-
-    cur = None
-    for r in snapshots():
-        o, c = r.get("open"), r.get("close")
-        if o is None or c is None or o < frozen:
-            continue
-        if r["minute"] != cur:   # a new minute: windows closed before it can get no more rows
-            cur = r["minute"]
-            for k2 in sorted(k3 for k3 in windows if k3[2] + 60 <= cur):
-                finish(k2)
-        key = (r["series"], o, c)
-        windows.setdefault(key, {}).setdefault(r["ticker"], {})[r["minute"]] = r
-    for k2 in sorted(k3 for k3 in windows if k3[2] + 60 <= t_now):   # closed by the clock: no more rows can come
-        finish(k2)
-    bets.sort(key=lambda b: (b["open"], b["series"]))
-    tmp = _p("paper.jsonl.tmp")
-    os.makedirs(DATA, exist_ok=True)
-    with open(tmp, "w", encoding="utf-8") as f:
-        for b in bets:
-            f.write(json.dumps(b, sort_keys=True, separators=(",", ":")) + "\n")
-    os.replace(tmp, _p("paper.jsonl"))
-    print("live20 paper: %d paper bets (counts only; the verdict is PLAN20 section 5's, at day 42)" % len(bets))
-    return len(bets)
 
 
 # ---------- status ----------
@@ -567,7 +589,8 @@ def main(argv=None):
     sub = ap.add_subparsers(dest="cmd")
     r = sub.add_parser("run"); r.add_argument("--minutes", type=int, required=True)
     s = sub.add_parser("settle"); s.add_argument("--budget-seconds", type=int, default=240)
-    sub.add_parser("paper"); sub.add_parser("status")
+    pp = sub.add_parser("paper"); pp.add_argument("--budget-seconds", type=int, default=600)
+    sub.add_parser("status")
     a = ap.parse_args(argv)
     os.makedirs(DATA, exist_ok=True)
     if a.cmd == "run":
@@ -575,7 +598,7 @@ def main(argv=None):
     if a.cmd == "settle":
         settle(a.budget_seconds); return 0
     if a.cmd == "paper":
-        paper(); return 0
+        paper(a.budget_seconds); return 0
     if a.cmd == "status":
         status(); return 0
     ap.print_help()

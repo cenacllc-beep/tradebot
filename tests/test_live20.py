@@ -135,92 +135,181 @@ assert all(v["result"] == "no" and v["yes_pay"] == 0.0 and v["no_pay"] == 1.0 fo
 asked.clear(); assert L.settle() == 0 and len(asked) == 2   # the two undecided markets are asked again, not the settled
 print("settle ok")
 
-# ---- paper refuses without a model (and without plan20.py)
+# ---- paper refuses without a model, and with a model not fitted under PLAN20.md's frozen text
 assert L.paper() is None and not os.path.exists(os.path.join(DATA, "paper.jsonl"))
 json.dump({"frozen": iso(T0 - 86400), "coef": [1.0]}, open(os.environ["LIVE20_MODEL"], "w"))
 sys.modules.pop("plan20", None)
-if not os.path.exists(os.path.join(WORK, "research", "plan20.py")):
-    assert L.paper() is None and not os.path.exists(os.path.join(DATA, "paper.jsonl"))
+assert L.paper() is None and not os.path.exists(os.path.join(DATA, "paper.jsonl"))
 os.remove(os.environ["LIVE20_MODEL"])
 print("paper refuses without a model ok")
 
-# ---- paper on a hand-made log: no look-ahead, fill at the next minute's logged ask, one bet per window per series
+# ---- paper: plan20's own replay on Kalshi's one-minute candles (fake candles, no network)
+import random, importlib
+sys.modules.pop("plan20", None)
+Q = importlib.import_module("plan20")
+assert L.NEEDED and all(hasattr(Q, k) for k in L.NEEDED)
 shutil.rmtree(DATA); os.makedirs(DATA)
-W = T0 + 900 * 4
-def row(series, k, minute, yb, ya, o=W):
-    return dict(ts=minute + 5, minute=minute, ticker="%s-W-%02d" % (series, k), series=series, event="%s-W" % series,
-                open=o, close=o + 900, status="active", yes_bid=yb, yes_ask=ya, no_bid=round(1 - ya, 4),
-                no_ask=round(1 - yb, 4), last=ya, volume=float(minute // 60), oi=5.0)
-rows = []
-for i in range(1, 15):
-    mi = W + 60 * i
-    # SOL: market 00 is cheap on YES from minute 2 (ask 4c); at minute 3 the fill snapshot (minute 4) is missing,
-    # so the minute-3 chance cannot fill; minute 5's chance fills at minute 6's ask (6c, not the decision ask).
-    if i != 4:
-        ask = {2: 0.04, 3: 0.04, 5: 0.04, 6: 0.06}.get(i, 0.30)
-        rows.append(row("KXSOL15M", 0, mi, round(ask - 0.01, 2), ask))
-    rows.append(row("KXSOL15M", 1, mi, 0.50, 0.55))
-    # GOLD: two cheap markets in the same window from minute 7; only one bet for the window (ticker order)
-    if i >= 7:
-        rows.append(row("KXGOLD15M", 0, mi, 0.02, 0.03)); rows.append(row("KXGOLD15M", 1, mi, 0.02, 0.03))
+SERIES = {"KXSOL15M": "crypto", "KXGOLD15M": "metals"}
+json.dump({"series": [{"ticker": k, "group": v} for k, v in SERIES.items()]}, open(os.environ["LIVE20_SERIES"], "w"))
+rnd = random.Random(7)
+slist = sorted(SERIES)
+width = len(Q.input_names(slist))
+k = len(Q.CONT)
+coef = [rnd.uniform(-0.4, 0.4) for _ in range(width)]
+coef[Q.CONT.index("minutes_left")] = 0.05
+coef[Q.CONT.index("oi_d3")] = 0.002            # open interest moves by hundreds of contracts here
+coef[k] = 2.5                                    # hhhl: the candle highs and lows matter to the bets
+FREEZE = Q.lapaz_start(Q.date(2026, 10, 1))
+model = dict(plan_sha256=Q.PLAN_SHA256, series=slist, mean=[0.0] * k, sd=[1.0] * k, intercept=-4.5, coef=coef,
+             fitted=iso(FREEZE), frozen=iso(FREEZE))
+json.dump(model, open(os.environ["LIVE20_MODEL"], "w"))
+
+def raw_candle(end, yb, ya, rnd):
+    """One Kalshi candlestick (dollar strings), with highs and lows around the closes."""
+    bh, bl = min(0.99, yb + rnd.choice((0, 0.01, 0.02))), max(0.0, yb - rnd.choice((0, 0.01)))
+    ah, al = min(1.0, ya + rnd.choice((0, 0.01, 0.02))), max(0.01, ya - rnd.choice((0, 0.01)))
+    d = lambda v: "%.4f" % v   # noqa: E731
+    return dict(end_period_ts=end, yes_bid=dict(close_dollars=d(yb), high_dollars=d(bh), low_dollars=d(bl)),
+                yes_ask=dict(close_dollars=d(ya), high_dollars=d(ah), low_dollars=d(al)),
+                price=dict(close_dollars=d(ya)), volume_fp="%.2f" % rnd.randint(0, 50),
+                open_interest_fp="%.2f" % rnd.randint(10, 500))
+
+RAW, RESULTS, SNAP = {}, {}, []
+first_close = int(FREEZE) + 86400 * 3 + 900
+closes = [first_close + 900 * i for i in range(60)]
+for s in slist:
+    for c in closes:
+        o = c - 900
+        for j in range(rnd.choice((1, 2, 3))):
+            t = "%s-%d-%02d" % (s, c, j)
+            mid = rnd.choice((0.04, 0.07, 0.5, 0.93, 0.96))
+            cs = []
+            for m in range(1, 15):
+                mid = min(0.985, max(0.015, mid + rnd.choice((-0.02, -0.01, 0, 0.01, 0.02))))
+                if rnd.random() < 0.08:
+                    continue                     # a minute with no candle
+                yb = round(max(0.0, mid - 0.01), 2)
+                ya = round(min(1.0, mid + 0.01), 2)
+                cs.append(raw_candle(o + 60 * m, yb, ya, rnd))
+            RAW[t] = cs
+            RESULTS[t] = dict(result=rnd.choice(("yes", "no")), yes_pay=None, no_pay=None)
+            SNAP.append(dict(ts=o + 65, minute=o + 60, ticker=t, series=s, event="%s-%d" % (s, c), open=o, close=c,
+                             status="active", yes_bid=0.5, yes_ask=0.51, no_bid=0.49, no_ask=0.5, last=0.5, volume=1.0, oi=1.0))
+# one void market (left out of the replay, as plan20's download leaves it out), one window without a result yet,
+# one window that opened before the freeze, one window still open by the clock
+RESULTS["KXSOL15M-%d-00" % closes[5]]["result"] = "void"
+pending = "KXGOLD15M-%d-00" % closes[7]
+del RESULTS[pending]
+early_c = int(FREEZE) - 3600
+late_c = closes[-1] + 900 * 10
+for t, c in (("KXSOL15M-early-00", early_c), ("KXSOL15M-late-00", late_c)):
+    RAW[t] = []
+    RESULTS[t] = dict(result="yes")
+    SNAP.append(dict(ts=c - 835, minute=c - 840, ticker=t, series="KXSOL15M", event="E", open=c - 900, close=c,
+                     status="active", yes_bid=0.5, yes_ask=0.51, no_bid=0.49, no_ask=0.5, last=0.5, volume=1.0, oi=1.0))
+SNAP.sort(key=lambda x: x["minute"])
+for x in SNAP:
+    with open(os.path.join(DATA, "snap-%s.jsonl" % L.day_of(x["minute"])), "a") as f:
+        f.write(json.dumps(x) + "\n")
+json.dump(RESULTS, open(os.path.join(DATA, "results.json"), "w"))
+
+got_calls = []
+def candles_api(path, params=None):
+    got_calls.append((path, params))
+    assert not path.startswith("/portfolio")
+    parts = path.split("/")
+    if path.startswith("/series/") and parts[3] == "markets" and parts[5] == "candlesticks":
+        s, t = parts[2], parts[4]
+        assert t.startswith(s + "-")
+        if t == "KXGOLD15M-%d-01" % closes[3]:
+            raise RuntimeError("past the historical cutoff")   # the archive endpoint is tried next
+    elif path.startswith("/historical/markets/") and path.endswith("/candlesticks"):
+        t = parts[3]
     else:
-        rows.append(row("KXGOLD15M", 0, mi, 0.40, 0.45)); rows.append(row("KXGOLD15M", 1, mi, 0.40, 0.45))
-# a window that opened before the freeze time: never bet
-for i in range(1, 15):
-    rows.append(row("KXSOL15M", 0, W - 86400 * 3 + 60 * i, 0.03, 0.04, o=W - 86400 * 3))
-rows.sort(key=lambda x: x["minute"])
-byday = {}
-for x in rows:
-    byday.setdefault(L.day_of(x["minute"]), []).append(x)
-for d, rs in byday.items():
-    with open(os.path.join(DATA, "snap-%s.jsonl" % d), "w") as f:
-        for x in rs:
-            f.write(json.dumps(x) + "\n")
-json.dump({"KXSOL15M-W-00": dict(result="yes", yes_pay=1.0, no_pay=0.0)}, open(os.path.join(DATA, "results.json"), "w"))
-seen = []
-fake = types.ModuleType("plan20")
-def features(hist, m, side, meta):
-    assert max(hist) <= m and all(k >= 1 for k in hist), "look-ahead: candles after minute m were passed"
-    seen.append((meta["series"], meta["ticker"], m, side, max(hist)))
-    c = hist.get(m)
-    return dict(ask=c["yes_ask"] if side == "yes" else c["no_ask"], m=m, side=side)
-def decide(model, f, ask):
-    assert model["coef"] == [1.0]
-    return f["side"] == "yes" and f["m"] >= 3 and abs(f["ask"] - ask) < 1e-9
-fake.features, fake.decide = features, decide
-sys.modules["plan20"] = fake
-json.dump({"frozen": iso(W - 86400), "coef": [1.0]}, open(os.environ["LIVE20_MODEL"], "w"))
-json.dump({"KXSOL15M": "crypto", "KXGOLD15M": "metals"}, open(os.environ["LIVE20_SERIES"], "w"))
-clock[0] = W + 900 + 3600
-assert L.paper() == 2
+        raise AssertionError(path)
+    c = int(t.split("-")[1]) if t.split("-")[1].isdigit() else (early_c if "early" in t else late_c)
+    assert params == dict(start_ts=c - 900, end_ts=c, period_interval=1), (path, params)
+    return {"candlesticks": RAW[t]}
+L.http = candles_api
+clock[0] = closes[-1] + 3600
+n = L.paper()
 bets = [json.loads(l) for l in open(os.path.join(DATA, "paper.jsonl"))]
-sol = [b for b in bets if b["series"] == "KXSOL15M"]
-gold = [b for b in bets if b["series"] == "KXGOLD15M"]
-assert len(sol) == 1 and len(gold) == 1, bets
-b = sol[0]
-assert b["open"] == W and b["decision_minute"] == 5 and b["fill_minute"] == 6 and b["fill_price"] == 0.06 and b["decision_ask"] == 0.04, b
-assert b["contracts"] == 16 and b["fee"] == 0.07, b          # floor(1/0.06) = 16; 0.07 x 16 x 0.06 x 0.94 = 0.0632 -> 7c
-g = gold[0]
-assert g["ticker"] == "KXGOLD15M-W-00" and g["decision_minute"] == 7 and g["fill_price"] == 0.03 and g["group"] == "metals", g
-assert "pnl_per_contract" not in g and abs(b["pnl_per_contract"] - ((1.0 - 0.06) - b["fee"] / 16)) < 1e-9
-assert all(x[2] <= 13 for x in seen) and all(x[4] <= x[2] for x in seen)
-assert ("KXSOL15M", "KXSOL15M-W-00", 3, "yes", 3) in seen   # the minute-3 chance was judged; its fill (minute 4) was missing
+assert n == len(bets) and n > 0
+fetched = {p.split("/")[-2] for p, _ in got_calls}
+assert "KXSOL15M-early-00" not in fetched and "KXSOL15M-late-00" not in fetched and pending not in fetched
+assert any(p.startswith("/historical/") for p, _ in got_calls)
+assert all(p.endswith("/candlesticks") for p, _ in got_calls)
+
+# the same windows through plan20's own score stage (collect) on the same candles
+data = {}
+for s in slist:
+    for c in closes:
+        o = c - 900
+        for t in sorted(x for x in RAW if x.startswith("%s-%d-" % (s, c))):
+            if t == pending:
+                continue
+            r = RESULTS[t]["result"]
+            if r not in ("yes", "no"):
+                continue
+            day = Q.lapaz_date(c)
+            data.setdefault((s, day), dict(markets=[]))["markets"].append(
+                dict(ticker=t, close=c, open=o, result=r, c=Q.parse_candles(RAW[t], o)))
+pend_c = closes[7]
+for key in list(data):   # the window waiting for its result is not decided yet by live20
+    data[key]["markets"] = [m for m in data[key]["markets"] if not (m["close"] == pend_c and key[0] == "KXGOLD15M")]
+KEYS = ("series", "group", "ticker", "m", "side", "ask", "price", "contracts", "fee", "fee_cc", "win", "profit",
+        "profit_cc", "breakeven", "band", "left")
+
+
+def same_as_collect(mdl, mine):
+    """live20's bets equal plan20.collect()'s on the same candles; returns collect's counts."""
+    ref, _c, _k, cnt = Q.collect(data, SERIES, json.loads(json.dumps(mdl)))
+    mine = sorted(mine, key=lambda b: (b["close"], b["series"]))
+    theirs = sorted(ref, key=lambda b: (int(b["ticker"].split("-")[1]), b["series"]))
+    assert len(mine) == len(theirs), (len(mine), len(theirs))
+    for a, b in zip(mine, theirs):
+        for kk in KEYS:
+            assert a[kk] == b[kk] or (isinstance(b[kk], float) and abs(a[kk] - b[kk]) < 1e-12), (kk, a, b)
+        assert abs(a["p"] - b["p"]) < 1e-12 and a["day"] == b["day"].isoformat() and a["fill_minute"] == a["m"] + 1
+    return cnt
+
+
+cnt = same_as_collect(model, bets)
+assert cnt["windows"] // 2 > len(bets) > 5, (cnt, len(bets))
+# a looser model: passes that cannot fill (the window goes on to a later chance) must match too
+loose = dict(model, intercept=-3.0)
+json.dump(loose, open(os.environ["LIVE20_MODEL"], "w"))
+L.paper()
+cnt2 = same_as_collect(loose, [json.loads(l) for l in open(os.path.join(DATA, "paper.jsonl"))])
+assert sum(cnt2["passed_unfilled"].values()) > 0 and cnt2["windows_with_bet"] > len(bets), cnt2
+json.dump(model, open(os.environ["LIVE20_MODEL"], "w"))
+L.paper()
+# the candle highs and lows reach the features: some chance has hhhl = 1 (snapshots alone would give 0 everywhere)
+hh = [f["hhhl"] for s in slist for c in closes for t in RAW if t.startswith("%s-%d-" % (s, c))
+      for m in Q.MINUTES for side in ("yes", "no")
+      for f in [Q.features(Q.parse_candles(RAW[t], c - 900), side, m, dict(open=c - 900, series=s, group=SERIES[s]))] if f]
+assert 1.0 in hh and 0.0 in hh
+assert any(b["side"] == "no" for b in bets) or any(b["side"] == "yes" for b in bets)
+print("paper ok: %d bets in %d windows equal plan20.collect's" % (len(bets), cnt["windows"]))
+
+# cached: a second run asks Kalshi for nothing and writes the same file
 first = open(os.path.join(DATA, "paper.jsonl"), "rb").read()
-assert L.paper() == 2 and open(os.path.join(DATA, "paper.jsonl"), "rb").read() == first   # idempotent
-# compaction keeps every row and the replay gives the same bets
-L.compact(today="99991231")
-assert not any(f.endswith(".jsonl") and f.startswith("snap-") for f in os.listdir(DATA))
-assert sum(1 for _ in L.snapshots()) == len(rows)
-assert L.paper() == 2 and open(os.path.join(DATA, "paper.jsonl"), "rb").read() == first
-# a window still open by the clock is not decided yet
-clock[0] = W + 600
-assert L.paper() == 0
-st = L.status(); assert st["paper_bets"] == 0
-print("paper ok:", [(x["series"], x["decision_minute"], x["fill_price"]) for x in bets])
+got_calls.clear()
+assert L.paper() == n and not got_calls and open(os.path.join(DATA, "paper.jsonl"), "rb").read() == first
+assert os.path.exists(L.candle_path("KXSOL15M", "KXSOL15M-%d-00" % closes[0]))
+# the pending window's result arrives: it is now decided (one more candle fetch, nothing else)
+RESULTS[pending] = dict(result="no")
+json.dump(RESULTS, open(os.path.join(DATA, "results.json"), "w"))
+n2 = L.paper()
+assert {p.split("/")[-2] for p, _ in got_calls} <= {t for t in RAW if t.startswith("KXGOLD15M-%d-" % pend_c)}, got_calls
+assert n2 in (n, n + 1)
+# no model plan match: fail closed
+json.dump(dict(model, plan_sha256="0" * 64), open(os.environ["LIVE20_MODEL"], "w"))
+assert L.paper() is None
+json.dump(model, open(os.environ["LIVE20_MODEL"], "w"))
 
 # the kill switch stops paper bets (fails closed)
 import core
 core.kill_file = lambda: "KILL"
-clock[0] = W + 900 + 3600
 assert L.paper() is None
 print("all live20 tests passed")
