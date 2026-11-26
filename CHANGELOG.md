@@ -2263,3 +2263,19 @@ unfamiliar codebase ... do not change functionality. only upgrade the code quali
   taken as given; Kalshi's own reward statement remains the real check.
 - research/PLAN19.md frozen, SHA-256 ff25310ad62f9af77b9e2f330b907777b0098cf17aa37757c7d66b08e79144cf. Next: research/plan19.py, its tests and workflow, a code review,
   then the code is frozen before the first sample. Research and paper only; no rule, threshold, lock or limit changed.
+
+## 2026-11-25 23:40 (La Paz) - PLAN20 written, statistics-reviewed and frozen (research only)
+- research/PLAN20.md (user: "we need a system to understand every detail about the chart ... detect those
+  opportunities and place those bets ... come up with the correct plan"), written before any of its data: cheap-side
+  (1-10c) reversal bets on every Kalshi 15-minute series, Kalshi data only. Stage A map (June-July, descriptive), stage
+  B ridge logistic model fitted on June-July and scored once on August-October (four asset-group tests, Holm), stage C
+  42-day forward paper test for a group that passes. Real money only after stage C and the user's explicit approval of a
+  new live.py path ( bets).
+- Statistics review (fresh agent), all must-fix items applied before any data: candle, ask and fill definitions
+  (no stale fills, NO side from the yes_bid series); scored fee = whole-cent fee on a real $1 bet; Holm levels
+  0.625/0.833/1.25/2.5%; BTC/ETH out of every test (already read by PLAN15-18), descriptive row only; series-to-group
+  table fixed before outcomes, inactive series included; stage A cannot change the model; ridge settings pinned.
+  Should-fix applied: Poisson-binomial null at break-even and marked necessary-only; placebo rules (4,000 draws, per day
+  and cell); one bet per window per series; data already seen stated; stage C fill and Holm defined.
+- Frozen, SHA-256 abec08145a3f933f49cb434b661511f747490b49e6385efbf5100132e959d8ef. Next: research/plan20.py, tests, code review, then the download on GitHub. No rule, threshold,
+  lock or limit changed.
