@@ -9,6 +9,8 @@
 # stop the score. PRIMARY.txt (this copy is the scored one) and merged.json do go in.
 /research/data/*
 !/research/data/lip/
+!/research/data/plan19/
+!/research/data/live20/
 /research/data/lip/MOVED.txt*
 /research/data/lip/SECONDARY.txt
 /dashboard.html
