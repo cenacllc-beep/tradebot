@@ -327,6 +327,17 @@ try:
     B.AI(key="", sleep=sleeps.append).ask("diagnose", "s", "u"); raise SystemExit("ran without a key")
 except RuntimeError as e:
     assert "missing" in str(e)
+# a model that answers with no text (all thinking) is skipped for the next one
+class Empty(FakeAPI):
+    def post(self, url, headers, body, timeout):
+        self.posts.append((url, headers, body))
+        if body["model"] == "deepseek-ai/deepseek-r1":
+            return 200, {}, json.dumps(dict(choices=[dict(message=dict(content="<think>long thoughts, no end"))]))
+        return FakeAPI.post(self, url, headers, body, timeout)
+apiE = Empty(ALL + ["qwen/qwq-32b"]); B.http_get, B.http_post = apiE.get, apiE.post
+mE, tE = B.AI(key="k123456789", sleep=sleeps.append).ask("diagnose", "s", "u")
+assert mE == "qwen/qwq-32b" and tE.startswith("All fine."), (mE, tE)
+assert B.reply_text("not json") == "" and B.reply_text(json.dumps(dict(choices=[]))) == ""
 # a listed model this key cannot call (HTTP 404 on chat): the next candidate is tried; the error names the endpoint
 class Gone(FakeAPI):
     def post(self, url, headers, body, timeout):

@@ -45,7 +45,7 @@ USER_AGENT = "tradebot-paper-research/1.0"
 LABEL = "backup-ai"
 MAX_AI_CALLS = 6
 AI_TOTAL_SECONDS = 360         # all model calls of one run together (requests, retries and waits)
-AI_REQUEST_SECONDS = 90        # one HTTP request to the model
+AI_REQUEST_SECONDS = 150       # one HTTP request to the model
 TEST_SECONDS = 300             # the test suite on a proposed fix
 LA_PAZ = timezone(timedelta(hours=-4))
 SCHEMA = 1
@@ -730,7 +730,7 @@ PREFERENCES = {
                      pattern=r"(laguna|coder-.*instruct|codestral)"),
 }
 NOT_CHAT = re.compile(r"(embed|guard|safety|clip|detector|translate|retriever|pii|calibration|starcoder|reward|parse)", re.I)
-MAX_TOKENS = {"check-summary": 1200, "diagnose": 2000, "code-fix": 3000}
+MAX_TOKENS = {"check-summary": 4000, "diagnose": 6000, "code-fix": 8000}   # reasoning models think first
 
 
 def candidates(task, available):
@@ -759,6 +759,17 @@ def http_post(url, headers, body, timeout):
     import requests
     r = requests.post(url, headers=headers, json=body, timeout=timeout)
     return r.status_code, r.headers, r.text
+
+
+def reply_text(raw):
+    """The answer in a chat reply, without any <think> block; "" when there is none."""
+    try:
+        m = json.loads(raw)["choices"][0]["message"]
+    except (ValueError, KeyError, IndexError, TypeError):
+        return ""
+    msg = (m.get("content") or "") if isinstance(m, dict) else ""
+    msg = re.sub(r"(?s)<think>.*?(</think>|$)", "", msg).strip()
+    return msg
 
 
 class ApiError(RuntimeError):
@@ -843,19 +854,24 @@ class AI(object):
                         messages=[dict(role="system", content=SYSTEM_RULES + "\n\n" + system),
                                   dict(role="user", content=redact(user))])
             try:
-                text = self._request(http_post, self.base + "/chat/completions", body)
-                break
+                raw = self._request(http_post, self.base + "/chat/completions", body)
             except ApiError as e:
                 err = e
                 self.tried.append("%s:%s" % (model, e.code))
                 if e.code not in (404, 403, 400, 422):
                     raise
+                continue
+            msg = reply_text(raw)
+            if msg:
+                text = msg
+                break
+            # a reasoning model can spend its whole token budget thinking and return no answer: try the next one
+            err = RuntimeError("%s returned no answer" % model)
+            self.tried.append("%s:empty" % model)
         if text is None:
             raise err or RuntimeError("AI call budget (%d) spent" % self.max_calls)
-        msg = json.loads(text)["choices"][0]["message"].get("content") or ""
-        msg = re.sub(r"(?s)<think>.*?</think>", "", msg).strip()
         self.used.append(dict(task=task, model=model))
-        return model, redact(msg)
+        return model, redact(text)
 
 
 SYSTEM_RULES = (

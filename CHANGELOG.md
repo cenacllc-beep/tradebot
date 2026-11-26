@@ -2420,3 +2420,7 @@ unfamiliar codebase ... do not change functionality. only upgrade the code quali
   nemotron-3.5-lightning/bolt, glm/minimax flash; diagnose: kimi-k3.1-pro, nemotron-3-ultra, mistral-large-4; code:
   laguna, kimi, mistral-large), non-chat models excluded, up to 4 candidates tried; failed reports record the models
   tried and the listed ids. Tests updated; all pass.
+- 19:45: the next run reached NVIDIA (nemotron-3.5-lightning-30b-a3b) but got an empty answer: the reasoning model used
+  its token budget thinking. ops/backup_ai.py: an empty answer (or an unfinished <think> block) counts as a failure and
+  the next candidate is tried; token budgets raised (4,000 / 6,000 / 8,000) and one request may take 150 s (the run's
+  6-minute model budget is unchanged). Test added; all pass.
