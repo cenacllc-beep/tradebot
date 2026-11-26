@@ -34,9 +34,11 @@ jobs:
           PYTHONIOENCODING: utf-8
         run: |
           if [ -f research/results/plan19_result.json ]; then echo "PLAN19 is already scored: nothing to do"; echo "done=1" >> "$GITHUB_OUTPUT"; exit 0; fi
-          python research/plan19.py sample
-          python research/plan19.py settle
-          python research/plan19.py auto-score
+          rc=0   # each step runs even if an earlier one failed (code review 2026-11-26); the job still reports a failure
+          python research/plan19.py sample || rc=1
+          python research/plan19.py settle || rc=1
+          python research/plan19.py auto-score || rc=1
+          exit $rc
       - name: Save research/data/plan19 and research/results/plan19_result.* (and nothing else)
         if: always() && steps.run.outputs.done != '1'
         run: |

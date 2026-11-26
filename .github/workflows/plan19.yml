@@ -1,0 +1,61 @@
+# PLAN19 (research only, research/PLAN19.md): hourly samples of order books on markets that pay Kalshi's liquidity
+# rewards (2026-11-28 .. 2026-12-27 La Paz), the fill checks of each sample once its hour is over, the results of closed
+# markets, and the single score from 2026-12-29 once every sample is checked and every closed market has a result (or
+# from the 2027-01-05 backstop). Public Kalshi GETs only: it never places, changes or cancels an order, never touches
+# trial/, paper.db or live.db, and commits only research/data/plan19 and research/results/plan19_result.* (it refuses
+# to commit anything else). Every 20 minutes so a skipped start is made up within the hour; one sample per clock hour
+# (research/data/plan19/hours.json). Once research/results/plan19_result.json exists it does nothing.
+name: PLAN19 hourly sample (research)
+on:
+  schedule:
+    - cron: "5,25,45 * * * *"
+  workflow_dispatch: {}
+concurrency:
+  group: tradebot-plan19   # its own group: a queued run never cancels a pending scan, settle or other plan
+  cancel-in-progress: false
+permissions:
+  contents: write
+jobs:
+  sample:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09   # v5.1.0
+        with:
+          ref: main   # the newest commit when the job starts: a run that waited its turn sees the run before it
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1   # v6.3.0
+        with:
+          python-version: "3.12"
+      - run: pip install requests==2.32.3
+      - name: Sample, fill checks, results and (once, when ready) the score
+        id: run
+        env:
+          TZ: America/La_Paz
+          PYTHONIOENCODING: utf-8
+        run: |
+          if [ -f research/results/plan19_result.json ]; then echo "PLAN19 is already scored: nothing to do"; echo "done=1" >> "$GITHUB_OUTPUT"; exit 0; fi
+          rc=0   # each step runs even if an earlier one failed (code review 2026-11-26); the job still reports a failure
+          python research/plan19.py sample || rc=1
+          python research/plan19.py settle || rc=1
+          python research/plan19.py auto-score || rc=1
+          exit $rc
+      - name: Save research/data/plan19 and research/results/plan19_result.* (and nothing else)
+        if: always() && steps.run.outputs.done != '1'
+        run: |
+          others=$(git status --porcelain --untracked-files=all | grep -v -E '^.. "?research/(data/plan19/|results/plan19_result\.)' || true)
+          if [ -n "$others" ]; then echo "refusing to commit: files outside research/data/plan19 and research/results/plan19_result.* changed:"; echo "$others"; exit 1; fi
+          find research/data/plan19 -name '*.tmp' -type f -delete 2>/dev/null || true
+          git config user.name "tradebot-runner"
+          git config user.email "tradebot-runner@users.noreply.github.com"
+          git add -A   # safe: the check above found no other changed file; the check below makes sure
+          # the repository ignores /research/data/* (cloud/repo.gitignore): this one folder is added by name
+          if [ -d research/data/plan19 ]; then git add -f -A -- research/data/plan19; fi
+          git diff --cached --name-only | grep -v -E '^research/(data/plan19/|results/plan19_result\.)' && { echo "refusing: staged files outside research/data/plan19 and research/results/plan19_result.*"; exit 1; }
+          git commit -m "PLAN19 sample $(date -u +%FT%H:%MZ)" || { echo "nothing new"; exit 0; }
+          # other jobs commit at other times: on a race, replay this commit on top and try again
+          for i in 1 2 3 4 5 6; do
+            git push origin HEAD:main && exit 0
+            sleep $((i * 10))
+            git pull --rebase origin main || { git rebase --abort 2>/dev/null || true; }   # a failed fetch is retried too
+          done
+          exit 1

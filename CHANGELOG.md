@@ -2239,7 +2239,7 @@ unfamiliar codebase ... do not change functionality. only upgrade the code quali
   cloud/workflows/probe19.yml count, on GitHub's runner (Kalshi public GETs only), which series carry an active
   liquidity program now, their reward totals, target sizes, discount factors and fee types. Counts only.
 
-## 2026-11-26 (La Paz) - PLAN19 written and statistics-reviewed (not frozen)
+## 2026-11-25 22:30 (La Paz) - PLAN19 written and statistics-reviewed (not frozen; first labelled with its UTC date by mistake)
 - research/PLAN19.md: forward paper test of resting bids at Kalshi's reference price on markets with liquidity
   programs (quadratic fee type, closing by 2026-12-27), hourly samples Nov 28 - Dec 27 on GitHub, scored once from
   Dec 29. Written before any of its data (user: "go").
@@ -2279,3 +2279,15 @@ unfamiliar codebase ... do not change functionality. only upgrade the code quali
   and cell); one bet per window per series; data already seen stated; stage C fill and Holm defined.
 - Frozen, SHA-256 abec08145a3f933f49cb434b661511f747490b49e6385efbf5100132e959d8ef. Next: research/plan20.py, tests, code review, then the download on GitHub. No rule, threshold,
   lock or limit changed.
+
+## 2026-11-25 23:45 (La Paz) - PLAN19 code fixed, reviewed, and its hourly job switched on
+- research/plan19.py checked line by line against the frozen PLAN19.md (separate agent): 10 places brought in line
+  with the text (fill-minute weight, YES+NO lock, one ladder sale per market/side/size, $1 minimum per size, failed
+  candles retried, sample records from the rows, missing reports). tests/test_plan19.py added (and to run_all.py).
+- Independent code review (agents/code-reviewer.md). Fixed: a program without a market ticker no longer stops every
+  sample; workflow steps run independently; a lost hour record is rebuilt from its rows; a torn last line cannot swallow
+  the next row; series fee types re-read every 6 hours; series and event taken from Kalshi's records, not parsed from
+  the ticker; the score stops (writes nothing) if an order book cannot be read; full order books no longer stored
+  (the score never reads them; about 1.5-5 MB a day saved). Left as noted: reward fields in committed fill rows are
+  public before the score (nobody reads or sums them before Dec 29); CLOSE_MAX 23:59:59.
+- .github/workflows/plan19.yml switched on (runs at :05/:25/:45; samples only from 2026-11-28 00:00 La Paz).

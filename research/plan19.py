@@ -46,7 +46,17 @@ def rows_of(name):
     except OSError: daily = []
     return [r for f in daily for r in lines(path(f))]
 def add_rows(name, rows, now):
-    if rows: append(path("%s-%s.jsonl" % (name, time.strftime("%Y%m%d", time.gmtime(now)))), rows)
+    if not rows: return
+    f = path("%s-%s.jsonl" % (name, time.strftime("%Y%m%d", time.gmtime(now))))
+    try:   # a line torn by a killed run must not swallow the next row (code review 2026-11-26)
+        with open(f, "rb") as fh:
+            fh.seek(0, 2)
+            if fh.tell():
+                fh.seek(-1, 2)
+                if fh.read(1) != b"\n":
+                    with open(f, "ab") as fa: fa.write(b"\n")
+    except OSError: pass
+    append(f, rows)
 def series_of(t): return (t or "").split("-")[0]
 def day_of(ts): return datetime.fromtimestamp(ts, LOCAL).date().isoformat()   # section 1: the La Paz date of the sample
 def mils(p): return int(round(p * 10000))   # dollars -> 1/100 cent (Kalshi has sub-cent ticks on some markets)
@@ -172,19 +182,20 @@ def programs(now):
         prm = dict(status="active", limit=1000)
         if cur: prm["cursor"] = cur
         j = http("/incentive_programs", prm); page = j.get("incentive_programs") or []
-        rows += [{k: x.get(k) for k in ("market_ticker", "start_date", "end_date", "period_reward", "target_size_fp", "discount_factor_bps")}
+        rows += [{k: x.get(k) for k in ("market_ticker", "series_ticker", "event_ticker", "start_date", "end_date", "period_reward", "target_size_fp", "discount_factor_bps")}
                  for x in page if (x.get("incentive_type") or "") == "liquidity"]
         cur = j.get("next_cursor") or j.get("cursor")
         if not cur or not page: break
     save(path("programs.json"), dict(fetched=now, rows=rows)); return rows
 def series_info(series):
-    """{series: {fee_type, category}}, cached (one GET per new series)."""
-    c = load(path("series.json"), {})
-    new = sorted(set(series) - set(c))
+    """{series: {fee_type, category}}, cached and re-read once older than 6 hours, like the programs (a series can change
+    fee type mid-test)."""
+    c = load(path("series.json"), {}); now = time.time()
+    new = sorted(x for x in set(series) if x and (x not in c or now - (c[x].get("fetched") or 0) >= PROG_MAX_AGE))
     for s in new:
         try: j = http("/series/" + s).get("series") or {}
-        except RuntimeError: continue   # asked again next run; the market is left out this hour
-        c[s] = dict(fee_type=j.get("fee_type"), category=j.get("category"))
+        except RuntimeError: c.pop(s, None); continue   # asked again next run; the market is left out this hour
+        c[s] = dict(fee_type=j.get("fee_type"), category=j.get("category"), fetched=now)
     if new: save(path("series.json"), c)
     return c
 def markets(tickers):
@@ -203,27 +214,35 @@ def sample(now=None):
     took = load(path("hours.json"), {})
     ss = rows_of("samples") if START <= now < END else []
     if not (START <= now < END): print("plan19 sample: outside the sampling window (2026-11-28 .. 2026-12-27 local)")
-    elif str(hour) in took or any(s["hour"] == hour for s in ss): print("plan19 sample: this hour was already sampled")
+    elif str(hour) in took: print("plan19 sample: this hour was already sampled")
+    elif any(s["hour"] == hour for s in ss):   # rows written, record lost (a run killed between the two): rebuild it
+        rec = dict(ts=min(s["ts"] for s in ss if s["hour"] == hour), sampled=sum(1 for s in ss if s["hour"] == hour), skipped={"record lost": 1})
+        rec["day"] = day_of(rec["ts"]); took[str(hour)] = rec; save(path("hours.json"), took); add_rows("sample_log", [rec], now)
+        print("plan19 sample: this hour was already sampled (its record was rebuilt)")
     else: take(now, hour, took, last_sampled(ss))
     fill_step(now)
 def take(now, hour, took, last):
     live = [x for x in programs(now) if (rts(x["start_date"]) or 1e18) <= now < (rts(x["end_date"]) or 0)]
     by = {}; why = {}
-    for x in live: by.setdefault(x["market_ticker"], []).append(x)
+    for x in live:
+        if not x.get("market_ticker"): bump(why, "program without a market"); continue
+        by.setdefault(x["market_ticker"], []).append(x)
     pick_prog = {}
     for t, ps in by.items():
         ok = [p for p in ps if hourly_pool(p) is not None]
         if not ok: bump(why, "unreadable program"); continue
         pick_prog[t] = min(ok, key=hourly_pool)   # section 3: the lowest hourly rate when programs overlap
         if len(ps) > 1: bump(why, "markets with overlapping programs (lowest rate used)")
-    ms = markets(list(pick_prog)); info = series_info([series_of(t) for t in pick_prog])
+    ms = markets(list(pick_prog))
+    ser = {t: (pick_prog[t].get("series_ticker") or (ms.get(t) or {}).get("series_ticker") or series_of(t)) for t in pick_prog}
+    info = series_info(list(ser.values()))
     uni = []; long_n = 0; long_usd = 0.0; long_total = 0.0
     for t in sorted(pick_prog):
         m = ms.get(t) or {}
         if (m.get("status") or "").lower() != "active": bump(why, "not active"); continue
         ct = rts(m.get("close_time"))
         if not ct or ct <= now + CLOSE_GAP: bump(why, "closes within 6 hours"); continue
-        fee = (info.get(series_of(t)) or {}).get("fee_type")
+        fee = (info.get(ser[t]) or {}).get("fee_type")
         if fee is None: bump(why, "fee type unknown (series lookup failed)"); continue
         if fee != "quadratic": bump(why, "fee type not quadratic"); continue
         if ct > CLOSE_MAX:   # section 1: long-dated programs are reported descriptively only
@@ -240,9 +259,10 @@ def take(now, hour, took, last):
         if qt is None: bump(why, skip); continue
         for s in qt.pop("side_skips"): bump(why, s)
         m = ms.get(t) or {}
-        rows.append(dict(ts=round(now, 1), hour=hour, ticker=t, series=series_of(t), event=m.get("event_ticker") or t.rsplit("-", 1)[0],
-                         category=(info.get(series_of(t)) or {}).get("category"), close=rts(m.get("close_time")),
-                         program=pick_prog[t], book=b, quote=qt))
+        rows.append(dict(ts=round(now, 1), hour=hour, ticker=t, series=ser[t],
+                         event=m.get("event_ticker") or pick_prog[t].get("event_ticker") or t.rsplit("-", 1)[0],
+                         category=(info.get(ser[t]) or {}).get("category"), close=rts(m.get("close_time")),
+                         program=pick_prog[t], quote=qt))   # the full book is not kept (the score never reads it; size)
     add_rows("samples", rows, now)
     rec = dict(ts=now, day=day_of(now), universe=len(uni), sampled=len(rows), skipped=why, long_dated_programs=long_n,
                long_dated_usd_per_day=round(long_usd, 2), long_dated_total_reward=round(long_total, 2))
@@ -396,7 +416,7 @@ def score(now=None, marks=None):
         marks = {}
         for t in need:
             try: b = http("/markets/%s/orderbook" % t).get("orderbook_fp") or {}
-            except RuntimeError: b = {}
+            except RuntimeError: sys.exit("plan19 score: the order book of %s could not be read; nothing was written (scored once: retry)." % t)
             marks[t] = {"yes": b.get("yes_dollars") or [], "no": b.get("no_dollars") or []}
     per_contract = {k: sell_value((marks.get(k[0]) or {}).get(k[1]) or [], n) / n for k, n in openc.items()}
     def side_pnl(s, side, q, c, lk, op):
