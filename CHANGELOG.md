@@ -2428,3 +2428,13 @@ unfamiliar codebase ... do not change functionality. only upgrade the code quali
   5.5-hour live20 run "over its limit", manual-only plans "forgotten"). ops/backup_ai.py: when everything is green no
   model is called (a plain all-green line instead); when something is wrong the model sees only the failed or stale
   rows and is told the rest is healthy and not to invent problems. Tests updated; all pass.
+
+## 2026-11-26 20:00 (La Paz) - PLAN20: June-July download complete; map stage started
+- 3,233 of 3,233 series-days saved (46,425 markets, 647,088 one-minute candles; 0 crossed, out-of-range, damaged or
+  failed; 73 short days, all weekly ~84-87-market days in otherwise full series, i.e. Kalshi's own schedule).
+- Coverage, reported before the map (no outcome read here): in June-July only crypto series traded. BNB, DOGE, HYPE,
+  SOL, XRP, BTC and ETH have all 61 days; NEAR and ZEC 32; gold, silver and WTI only 1 day (39 markets); the other 41
+  series, including every FX pair, none. So the stage B model learns almost entirely from crypto-other (BTC/ETH are
+  in the fit, as PLAN20 section 4 says); for metals, energy and FX it applies those shared chart features with a
+  group indicator that has little or no data (section 4's rule for unseen series). No rule changes: this is how the
+  frozen plan reads; whether those groups reach their floors is known only after the August-October download.
