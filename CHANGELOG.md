@@ -2363,3 +2363,7 @@ unfamiliar codebase ... do not change functionality. only upgrade the code quali
   that anyone holding it could read. The panel's button opens GitHub's own secret form (name NVIDIA_API_KEY), which
   stores the key encrypted for the GitHub jobs only, plus links to the backup AI's runs, status report and alerts.
   Presentation only (no network, no file read). All tests pass; reviewed with the backup AI code before the PC deploy.
+- 14:13 (r95): dashboard.py with the Backup AI panel copied to the PC at the user's request ("Don't see that option on
+  the dashboard"); the PC copy matched the pre-panel version (original in backups\code_pre_r95\). The 14:20 hourly run
+  rebuilt dashboard.html with the panel. The code review found the panel fine (static links only). The backup AI
+  itself stays off: the review found model-written code would run in a job holding the write token (fixes under way).
