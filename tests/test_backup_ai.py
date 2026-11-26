@@ -390,7 +390,7 @@ try:
     ai4.ask("diagnose", "s", "u"); raise SystemExit("time budget not enforced")
 except RuntimeError as e:
     assert "budget" in str(e) or "HTTP" in str(e)
-assert timeouts and max(timeouts) <= B.AI_REQUEST_SECONDS == 90, timeouts
+assert timeouts and max(timeouts) <= B.AI_REQUEST_SECONDS == 150, timeouts
 assert clk.t <= B.AI_TOTAL_SECONDS == 360, clk.t
 try:
     ai4.ask("diagnose", "s", "u"); raise SystemExit("time budget not enforced")

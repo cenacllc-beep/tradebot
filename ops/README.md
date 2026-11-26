@@ -66,7 +66,7 @@ are only trusted once the API lists them; the model used is recorded in `status.
 - diagnose: deepseek-ai/deepseek-r1, nvidia llama-3.3-nemotron-super-49b, nemotron-ultra-253b, qwen/qwq-32b, llama-3.3-70b, llama-3.1-405b
 - code-fix: qwen/qwen3-coder-480b-a35b-instruct, qwen2.5-coder-32b, codestral-22b, deepseek-coder-6.7b, codellama-70b
 
-At most 6 model calls and 6 minutes of model time a run (each request at most 90 s, retries and waits included),
+At most 6 model calls and 6 minutes of model time a run (each request at most 150 s, retries and waits included),
 temperature 0.2, limited retries on 429 and 5xx. Job limits: operate 30 min (its main step 15), status 10, test 15
 (the tests themselves 300 s), publish 10.
 
