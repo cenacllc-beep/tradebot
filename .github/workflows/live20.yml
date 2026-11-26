@@ -1,0 +1,95 @@
+# PLAN20 forward logger (research and paper only, research/PLAN20.md sections 2 and 5; research/live20.py): one
+# snapshot a minute of every open Kalshi 15-minute market (yes bid/ask, last, volume, open interest), the results of
+# the markets that closed, and, once research/results/plan20_model.json exists, paper bets by PLAN20's frozen rule.
+# Kalshi's public API only (read-only GETs, already approved). It never places, changes or cancels an order, never
+# imports live.py, never touches trial/, paper.db or live.db, and commits only research/data/live20 (it refuses to
+# commit anything else). research/data/* is in .gitignore, so the folder is added with -f.
+# Each run samples for about 325 minutes and commits about every 30 minutes; GitHub starts scheduled runs late or not
+# at all, so the minutes between runs are gaps (counted by `live20.py status`). Every step has its own time limit and
+# the limits add up to the job's 355 minutes (3 + 3 + 3 + 328 + 10 + 6 + 2 to spare), so the results, the paper bets and
+# the last save always get their turn. The KILL file is on the PC only, so the kill switch is not seen here; the paper
+# bets written here are a research ledger and place nothing.
+name: PLAN20 forward logger (research)
+on:
+  schedule:
+    - cron: "0 */6 * * *"
+  workflow_dispatch: {}
+concurrency:
+  group: tradebot-live20   # its own group: never cancels or queues behind a scan, settle or another plan
+  cancel-in-progress: false
+permissions:
+  contents: write
+jobs:
+  log:
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09   # v5.1.0
+        timeout-minutes: 3
+        with:
+          ref: main
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1   # v6.3.0
+        timeout-minutes: 3
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --disable-pip-version-check requests==2.32.3
+        timeout-minutes: 3
+      - name: Sample for about 325 minutes, saving about every 30 minutes
+        timeout-minutes: 328
+        env:
+          TZ: UTC
+          PYTHONIOENCODING: utf-8
+        run: |
+          git config user.name "tradebot-runner"
+          git config user.email "tradebot-runner@users.noreply.github.com"
+          save() {
+            others=$(git status --porcelain --untracked-files=all | grep -v -E '^.. "?research/data/live20/' || true)
+            if [ -n "$others" ]; then echo "refusing to commit: files outside research/data/live20 changed:"; echo "$others"; return 1; fi
+            big=$(find research/data/live20 -type f -size +90M 2>/dev/null)
+            if [ -n "$big" ]; then echo "refusing to commit files over 90 MB:"; echo "$big"; return 1; fi
+            git add -f -A -- research/data/live20
+            git diff --cached --name-only | grep -v -E '^research/data/live20/' && { echo "refusing: staged files outside research/data/live20"; git reset -q; return 1; }
+            git commit -q -m "PLAN20 forward log $(date -u +%FT%H:%MZ)" || { echo "nothing new"; return 0; }
+            for i in 1 2 3 4 5 6; do
+              git push -q origin HEAD:main && return 0
+              sleep $((i * 10))
+              git pull -q --rebase origin main || { git rebase --abort 2>/dev/null || true; }
+            done
+            echo "push failed; the next save tries again"; return 0
+          }
+          end=$(( $(date +%s) + 325 * 60 ))
+          while :; do
+            left=$(( (end - $(date +%s)) / 60 ))
+            [ "$left" -ge 1 ] || break
+            chunk=$(( left < 30 ? left : 30 ))
+            python research/live20.py run --minutes "$chunk" || echo "run ended with an error; going on"
+            save || exit 1
+          done
+      - name: Results and paper bets (counts only)
+        if: always()
+        timeout-minutes: 10
+        env:
+          TZ: UTC
+          PYTHONIOENCODING: utf-8
+        run: |
+          python research/live20.py settle --budget-seconds 150 || echo "settle failed; next run"
+          python research/live20.py paper --budget-seconds 300 || echo "paper failed; next run"
+          python research/live20.py status || true
+      - name: Save research/data/live20 (and nothing else)
+        if: always()
+        timeout-minutes: 6
+        run: |
+          others=$(git status --porcelain --untracked-files=all | grep -v -E '^.. "?research/data/live20/' || true)
+          if [ -n "$others" ]; then echo "refusing to commit: files outside research/data/live20 changed:"; echo "$others"; exit 1; fi
+          git config user.name "tradebot-runner"
+          git config user.email "tradebot-runner@users.noreply.github.com"
+          find research/data/live20 -name '*.tmp' -type f -delete 2>/dev/null || true
+          git add -f -A -- research/data/live20
+          git diff --cached --name-only | grep -v -E '^research/data/live20/' && { echo "refusing: staged files outside research/data/live20"; exit 1; }
+          git commit -m "PLAN20 forward log $(date -u +%FT%H:%MZ)" || { echo "nothing new"; exit 0; }
+          for i in 1 2 3 4 5 6; do
+            git push origin HEAD:main && exit 0
+            sleep $((i * 10))
+            git pull --rebase origin main || { git rebase --abort 2>/dev/null || true; }
+          done
+          exit 1
