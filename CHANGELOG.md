@@ -2233,3 +2233,8 @@ unfamiliar codebase ... do not change functionality. only upgrade the code quali
   sampling ended and the test was scored once (after Nov 21); tasks\hourly.cmd's header no longer lists PLAN5 L;
   CLAUDE.md section 10 updated. tests/test_plan4launch.py checked the launcher ran before lip.py; it now checks it runs
   before the structure scan. Full suite: all 47 tests pass.
+
+## 2026-11-25 22:15 (La Paz) - PROBE19 (data check before PLAN19; research only)
+- User (21:43): "go" to PLAN19 (resting orders on markets that pay Kalshi's liquidity rewards). research/probe19.py +
+  cloud/workflows/probe19.yml count, on GitHub's runner (Kalshi public GETs only), which series carry an active
+  liquidity program now, their reward totals, target sizes, discount factors and fee types. Counts only.
