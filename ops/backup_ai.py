@@ -780,7 +780,7 @@ class AI(object):
         self._key = key if key is not None else os.environ.get("NVIDIA_API_KEY", "")
         self.base, self.max_calls, self.calls, self.sleep = base.rstrip("/"), max_calls, 0, sleep
         self.clock, self.deadline = clock, clock() + total
-        self._models, self.used = None, []
+        self._models, self.used, self.tried = None, [], []
 
     def available(self):
         return bool(self._key)
@@ -850,6 +850,7 @@ class AI(object):
                 break
             except ApiError as e:
                 err = e
+                self.tried.append("%s:%s" % (model, e.code))
                 if e.code not in (404, 403, 400, 422):
                     raise
         if text is None:
@@ -965,7 +966,10 @@ def report(ai=None):
             st["ai"] = dict(used=True, task=task, model=model, note=None)
         except (RuntimeError, ValueError, KeyError) as e:
             text = "No AI report (%s). The table above is the non-AI status check." % redact(str(e))
-            st["ai"] = dict(used=False, task=task, model=None, note=redact(str(e)))
+            st["ai"] = dict(used=False, task=task, model=None, note=redact(str(e)),
+                            tried=list(getattr(ai, "tried", []))[:6],
+                            listed=len(ai._models or []) if hasattr(ai, "_models") else None,
+                            listed_ids=sorted(ai._models or [])[:300] if getattr(ai, "_models", None) else [])
     st["issue"] = sync_issue(st, text)
     st["report_text"] = text
     save_status(st)
