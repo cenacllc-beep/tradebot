@@ -477,7 +477,9 @@ assert L.paper() is None
 # the workflow: about 325 minutes of sampling, a 300-second paper budget, every step limited inside the job's 355
 import re as _re
 wf = open(os.path.join(WORK, "cloud", "workflows", "live20.yml"), encoding="utf-8").read()
-assert not os.path.exists(os.path.join(WORK, ".github", "workflows", "live20.yml"))
+_gh = os.path.join(WORK, ".github", "workflows", "live20.yml")   # switched on 2026-11-26: must equal the cloud copy
+if os.path.exists(_gh):
+    assert open(_gh, "rb").read() == open(os.path.join(WORK, "cloud", "workflows", "live20.yml"), "rb").read()
 assert "+ 325 * 60" in wf and "345" not in wf.split("jobs:")[1]
 assert "live20.py paper --budget-seconds 300" in wf
 job_limit = int(_re.search(r"\n    timeout-minutes: (\d+)", wf).group(1))

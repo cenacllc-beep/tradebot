@@ -202,7 +202,10 @@ METAL_ROOTS = {"GOLD", "SILVER", "XAU", "XAG", "XAUUSD", "XAGUSD", "PLAT", "PLAT
 ENERGY_ROOTS = {"OIL", "WTI", "BRENT", "CRUDE", "CL", "BZ", "NATGAS", "NG", "GAS", "GASOLINE", "RBOB", "HEATINGOIL",
                 "HO", "WTIOIL", "CRUDEOIL"}
 CURRENCIES = {"USD", "EUR", "JPY", "GBP", "AUD", "CAD", "CHF", "NZD", "CNH", "CNY", "MXN", "SEK", "NOK", "HKD", "SGD",
-              "KRW", "INR", "BRL", "ZAR", "TRY"}
+              "KRW", "INR", "BRL", "ZAR", "TRY",
+              # added 2026-11-26 before the freeze and before any data: the series stage found eight more USD pairs
+              # (PLAN20 section 1: "FX pairs" is a group), which the first list sent to "other"
+              "CZK", "HUF", "IDR", "MYR", "PHP", "PLN", "THB", "TWD"}
 FX_ROOTS = {"DXY", "EURO", "YEN", "POUND", "CABLE"}
 TITLE_WORDS = (("metals", ("gold", "silver", "platinum", "palladium", "copper")),
                ("energy", ("crude", " oil", "oil ", "wti", "brent", "natural gas", "gasoline", "heating oil")),

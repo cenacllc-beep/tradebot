@@ -2318,3 +2318,15 @@ unfamiliar codebase ... do not change functionality. only upgrade the code quali
 - The user answered "Yes, approve numpy" to the question, asked in so many words, whether numpy may be installed for
   PLAN20 (pinned, GitHub's runner only, never the PC; fit and score only). Recorded in CLAUDE.md section 3. This closes
   the code review's must-fix 1; the other review items are fixed above.
+
+## 2026-11-26 12:15 (La Paz) - r94 deployed to the PC; PLAN20 series table regrouped before the freeze
+- r94 (the user's "please do"): run.bat, tasks\hourly.cmd, dashboard.py, freshness.py, tests\test_moves.py and
+  tests\test_plan4launch.py copied to the PC (each PC original matched the repository's pre-r94 version; originals in
+  backups\code_pre_r94\), and the r94 CHANGELOG entries appended to the PC's CHANGELOG.md. The scheduled deploy had
+  fired at 01:36 while this session was not running; done now, outside the scan window and the hourly job.
+- PLAN20 series stage (GitHub, 2026-11-26 00:13): 53 series ending in 15M. Its currency list missed eight USD pairs
+  (CZK, HUF, IDR, MYR, PHP, PLN, THB, TWD), which went to "other" although PLAN20 section 1 makes FX pairs a group.
+  Fixed in plan20.py's CURRENCIES and the stored table regrouped from its own rows (no new listing), before the freeze
+  and before any market or outcome was read: crypto 12, metals 5, energy 3, fx 22, other 9 (Treasury yields, stock
+  indices, coffee, KPOW midterms; never tested), BTC/ETH 2. A once-only file was rewritten: logged here on purpose.
+- tests: test_plan20/test_live20 accept the switched-on .github workflow copy when it equals the cloud copy. All pass.

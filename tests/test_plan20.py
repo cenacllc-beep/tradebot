@@ -668,7 +668,9 @@ assert "PLAN20:" in Q.status()
 
 # the workflow (cloud/workflows is the only copy): once-only guards by commit history, a blobless full clone
 wf = open(os.path.join(WORK, "cloud", "workflows", "plan20.yml"), encoding="utf-8").read()
-assert not os.path.exists(os.path.join(WORK, ".github", "workflows", "plan20.yml"))
+_gh = os.path.join(WORK, ".github", "workflows", "plan20.yml")   # switched on 2026-11-26: must equal the cloud copy
+if os.path.exists(_gh):
+    assert open(_gh, "rb").read() == open(os.path.join(WORK, "cloud", "workflows", "plan20.yml"), "rb").read()
 assert "git log --oneline -- research/results/plan20_identity.json | grep -q ." in wf, "freeze guard by history"
 assert "ls-files --error-unmatch research/results/plan20_identity.json" not in wf.split("Refuse every later stage")[0]
 assert "fetch-depth: 0" in wf and "filter: blob:none" in wf
