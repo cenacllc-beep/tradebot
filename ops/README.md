@@ -13,9 +13,23 @@ paper.db or live.db, never reads keys, and changes no rule, limit or lock. Its o
 | Job | Permissions and secrets | What it does |
 |---|---|---|
 | `operate` | NVIDIA key; GitHub token with contents read, issues write, actions write, pull requests read | `check`, `report`, `rerun`; for `fix` it only **proposes**: the diff and its metadata are uploaded as an artifact. Nothing from the model is applied or run here. |
-| `status` | contents write; no key | Commits `ops/status/` to main: exactly one commit by `tradebot-runner`, only `ops/status/` paths, hooks off (`core.hooksPath=/dev/null`); checked again before every push, including after each rebase retry. Anything else is refused. |
-| `test` | `permissions: {}`, no secret, no token, no stored credentials | Downloads the proposal, re-checks it against the path rules, applies it, runs `tests/run_all.py` (hard limit 300 s, no bytecode files) and fails unless the files changed afterwards (`git status --porcelain --ignored --untracked-files=all` plus `git diff --no-renames --name-only HEAD`) are exactly the diff's own files. Uploads the result (pass or fail, the end of the test output, the file set). |
-| `publish` | contents write, pull requests write; no key | Runs only if `test` passed, and runs **nothing** from the diff: a fresh checkout of the same commit, the path rules again, `git apply`, stages exactly the diff's paths (never `git add -A`), commits without hooks, pushes `backup-ai/fix-<failed run id>` and opens the pull request with `git show --stat` of the real commit and the test result: **Do not merge without review**. It never merges. |
+| `status` | contents write; no key | Runs before `test`, and refuses unless the downloaded status files match the `status_sha256` digest `operate` wrote as a job output. Commits `ops/status/` to main: exactly one commit by `tradebot-runner`, only `ops/status/` paths, hooks off (`core.hooksPath=/dev/null`); checked again before every push, including after each rebase retry. Anything else is refused. |
+| `test` | `permissions: {}`, no secret, no token, no stored credentials | Downloads the proposal, re-checks it against the path rules, applies it, runs `tests/run_all.py` (hard limit 300 s, no bytecode files) and fails unless the files changed afterwards (`git status --porcelain --ignored --untracked-files=all` plus `git diff --no-renames --name-only HEAD`) are exactly the diff's own files. That changed-file check is **advisory**: the tested code runs in this same job and could defeat it. The binding check is `publish`'s re-validation on a fresh checkout. Uploads the result (pass or fail, the end of the test output, the file set). |
+| `publish` | contents write, pull requests write; no key | Runs only if `test` passed, and runs **nothing** from the diff: a fresh checkout of the same commit, the hashes and path rules again, `git apply`, stages exactly the diff's paths (never `git add -A`), commits without hooks (the commit carries `Backup-AI-Run: <workflow run id>` and `Backup-AI-Diff-SHA256`), pushes `backup-ai/fix-<failed run id>` and opens the pull request with `git show --stat` of the real commit and the test result: **Do not merge without review**. The label is added in a separate step that may fail without failing the job. If the branch already exists, it is reused only when it is this same workflow run's earlier push of the same diff (one runner commit on the base commit, same trailers, same files); then only the pull request is opened (or nothing, if it is open). Any other existing branch is refused. It never merges. |
+
+### Artifacts and the `test` job
+Code run in `test` holds the runner's artifact credential (the upload step's token is reachable from the job), so it
+could upload artifacts of its own. Therefore:
+- `operate` writes job outputs `diff_sha256` and `meta_sha256` (the proposal files) and `status_sha256` (the status
+  files), computed by `ops/backup_ai.py` itself. `test` and `publish` get them as command-line arguments and refuse
+  unless the downloaded `fix.diff` and `meta.json` match byte for byte; `status` checks the status files the same way.
+  Hashes stored inside an artifact are never trusted.
+- `status` runs before `test` (`test` needs `status`), so the status artifact is used before any proposed code runs.
+- No upload uses `overwrite`, so an artifact name already taken cannot be replaced.
+- The pull request's "cause" comes only from `operate`'s hash-checked `meta.json` and is redacted.
+- The tests run in their own process group, which is killed when they finish as well as at the time limit. This is
+  partial: a process that starts its own session escapes the group. It does not matter for the binding checks, which
+  run in `publish`.
 
 ## What each step does
 | Step | AI? | What it does |
@@ -36,7 +50,11 @@ joblock.py, scan_window.py, audit.py, CLAUDE.md, any dotfile or dot folder (`.gi
 `.github/`), `sitecustomize.py`, `*.pth`, `pyproject.toml`, `setup.cfg`, `__init__.py`, workflows, `agents/`, `tasks/`,
 `tests/` (the model may not add or edit tests), `ops/`, `research/data/`, `research/results/`, `research/PLAN*.md`,
 `backups/`, `trial/`, scripts (`.cmd .ps1 .bat .sh`) and key files. Deleting, renaming or copying files, mode changes
-and binary patches are refused. The diff is checked in all three jobs.
+and binary patches are refused. New files are refused outright. Every file section must start with
+`diff --git a/X b/X` (the same X on both sides) and its `---` / `+++` lines must be exactly `a/X` / `b/X`; a diff
+without `diff --git` headers is refused (otherwise `--- tbcommon/config.py` would be read as an allowed path while
+`git apply` at -p1 changes the root `config.py`). Hunks are counted, so a removed line starting `--- ` is not mistaken
+for a header. The diff is checked in all three jobs.
 
 On main it commits only `ops/status/**` (refused otherwise).
 

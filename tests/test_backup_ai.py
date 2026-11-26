@@ -50,7 +50,7 @@ ops_job, st_job, test_job, pub_job = job("operate"), job("status"), job("test"),
 assert re.search(r"(?m)^    permissions: \{\}$", test_job), "test job: permissions: {}"
 for bad in ("secrets.", "github.token", "GH_TOKEN", "GITHUB_TOKEN", "NVIDIA", "contents: write", "persist-credentials: true"):
     assert bad not in test_job, "test job must not have " + bad
-assert "persist-credentials: false" in test_job and "test-proposal" in test_job and "needs: operate" in test_job
+assert "persist-credentials: false" in test_job and "test-proposal" in test_job and "needs: [operate, status]" in test_job
 # the jobs holding a token or the key never run the tests or apply anything themselves
 for j in (ops_job, st_job, pub_job):
     assert "run_all" not in j and "test-proposal" not in j
@@ -61,6 +61,18 @@ assert "contents: write" in pub_job and "pull-requests: write" in pub_job and "n
 assert "contents: write" in st_job and "pull-requests" not in st_job
 for j in (ops_job, st_job, test_job, pub_job):
     assert "persist-credentials: false" in j
+# 1(a)-(c): artifacts are checked against operate's job outputs; status runs before test; no upload overwrites
+assert not re.search(r"(?m)^\s*overwrite\s*:", wf), "no artifact upload may overwrite"
+for o in ("diff_sha256: ${{ steps.op.outputs.diff_sha256 }}", "meta_sha256: ${{ steps.op.outputs.meta_sha256 }}",
+          "status_sha256: ${{ steps.sh.outputs.status_sha256 }}", "status-hash ops/status"):
+    assert o in ops_job, o
+assert re.search(r"(?m)^    needs: \[operate, status\]", test_job), "test runs after status"
+assert "STATUS_SHA256: ${{ needs.operate.outputs.status_sha256 }}" in st_job and '"$STATUS_SHA256"' in st_job
+for j in (test_job, pub_job):
+    assert "DIFF_SHA256: ${{ needs.operate.outputs.diff_sha256 }}" in j and "META_SHA256: ${{ needs.operate.outputs.meta_sha256 }}" in j
+    assert '"$DIFF_SHA256" "$META_SHA256"' in j
+    assert "needs.operate.result == 'success'" in j
+assert "${{" not in "".join(l for l in wf.splitlines(True) if l.strip().startswith("run:")), "no expressions inside run lines"
 
 # ---- (e) live.py's import closure is computed with ast and denied, whatever the allowlist says
 cl = B.live_closure(WORK)
@@ -117,6 +129,39 @@ assert B.check_diff('diff --git "a/live.py" "b/live.py"\n')
 assert B.check_diff("diff --git a/img.png b/img.png\nGIT binary patch\n")
 assert B.check_diff("no diff at all")
 assert B.check_diff(d("tests/run_all.py"))
+# 2: strict sections: diff --git a/X b/X with the same X, ---/+++ exactly a/X and b/X, hunks counted
+assert B.check_diff(d("freshness.py", "check.py")), "different a/ and b/ names"
+assert B.check_diff("diff --git a/check.py b/check.py\n--- check.py\n+++ check.py\n@@ -1 +1 @@\n-x\n+y\n"), "no a/ b/ prefix"
+assert B.check_diff("diff --git a/check.py b/check.py\n--- a/check.py\n+++ b/marks.py\n@@ -1 +1 @@\n-x\n+y\n")
+assert B.check_diff("diff --git a/check.py b/check.py\n--- a/live.py\n+++ b/live.py\n@@ -1 +1 @@\n-x\n+y\n")
+assert B.check_diff("--- a/check.py\n+++ b/check.py\n@@ -1 +1 @@\n-x\n+y\n"), "no diff --git header"
+assert B.check_diff("junk\n" + d("check.py")), "text before the first header"
+assert B.check_diff(d("check.py") + "--- a/live.py\n+++ b/live.py\n@@ -1 +1 @@\n-x\n+y\n"), "a second file without a header"
+assert B.check_diff(d("check.py") + d("check.py")), "the same file twice"
+assert B.check_diff("diff --git a/check.py b/check.py\n--- a/check.py\n+++ b/check.py\n@@ -1,2 +1,2 @@\n-x\n+y\n"), "short hunk"
+assert B.check_diff("diff --git a/check.py b/check.py\n--- a/check.py\n+++ b/check.py\n@@ -1 +1 @@\n-x\n+y\n+z\n"), "long hunk"
+# a removed line that starts with "-- " is a hunk line, not a file header
+ok = "diff --git a/check.py b/check.py\n--- a/check.py\n+++ b/check.py\n@@ -1,2 +1,2 @@\n--- a/live.py\n+x\n \n"
+assert B.diff_paths(ok) == (["check.py"], []), B.diff_paths(ok)
+assert B.check_diff("diff --git a/check.py b/check.py\nindex 0123456..89abcde 100644\n--- a/check.py\n+++ b/check.py\n"
+                    "@@ -1 +1 @@\n-x\n+y\n\\ No newline at end of file\n") == []
+# 3: new files are refused outright
+assert any("new file" in p for p in B.check_diff("diff --git a/check.py b/check.py\nnew file mode 100644\n--- /dev/null\n+++ b/check.py\n@@ -0,0 +1 @@\n+x\n"))
+assert any("new file" in p for p in B.check_diff("diff --git a/marks.py b/marks.py\n--- /dev/null\n+++ b/marks.py\n@@ -0,0 +1 @@\n+x\n"))
+assert B.check_diff("diff --git a/marks.py b/marks.py\n--- a/marks.py\n+++ /dev/null\n@@ -1 +0,0 @@\n-x\n")
+# the review's scratch repository: a `--- tbcommon/config.py` diff that git applies at -p1 to the root config.py
+scr = os.path.join(OUT, "scratch_p1"); os.makedirs(os.path.join(scr, "tbcommon"))
+subprocess.run(["git", "init", "-q", scr], check=True)
+open(os.path.join(scr, "config.py"), "w").write("LIMIT = 1\n")
+open(os.path.join(scr, "tbcommon", "x.py"), "w").write("\n")
+p1 = "--- tbcommon/config.py\n+++ tbcommon/config.py\n@@ -1 +1 @@\n-LIMIT = 1\n+LIMIT = 9\n"
+open(os.path.join(OUT, "p1.diff"), "w").write(p1)
+r = subprocess.run(["git", "apply", "--check", os.path.join(OUT, "p1.diff")], cwd=scr, capture_output=True, text=True)
+assert r.returncode == 0, "git applies it to the root config.py at -p1: " + r.stderr
+assert B.check_diff(p1), "must be refused"
+p1g = "diff --git a/tbcommon/config.py b/tbcommon/config.py\n" + p1
+assert B.check_diff(p1g), "must be refused with a diff --git header too"
+assert B.check_diff("diff --git a/tbcommon/config.py b/tbcommon/config.py\n--- a/config.py\n+++ b/config.py\n@@ -1 +1 @@\n-LIMIT = 1\n+LIMIT = 9\n")
 assert B.extract_diff("CAUSE: x\n```diff\n" + d("check.py") + "```\n").startswith("diff --git a/check.py")
 
 # ---- key and token redaction
@@ -460,7 +505,7 @@ def commit_at(msg, when):
 
 GOOD = "CAUSE: division by zero in f\n```diff\ndiff --git a/freshness.py b/freshness.py\n--- a/freshness.py\n+++ b/freshness.py\n@@ -1,2 +1,2 @@\n def f():\n-    return 1 / 0\n+    return 1\n```\n"
 BAD = "CAUSE: x\n```diff\ndiff --git a/live.py b/live.py\n--- a/live.py\n+++ b/live.py\n@@ -1 +1 @@\n-X = 1\n+X = 2\n```\n"
-PRS, PR_CREATES, ALLCMDS = [], [], []
+PRS, PR_CREATES, ALLCMDS, FAIL_PR, OPEN_PR_HEADS = [], [], [], [], []
 
 
 def fix_run(cmd, cwd=None, env=None, timeout=300, input_text=None):
@@ -468,8 +513,13 @@ def fix_run(cmd, cwd=None, env=None, timeout=300, input_text=None):
     if cmd[0] == "gh":
         calls.append(list(cmd))
         if cmd[:3] == ["gh", "pr", "list"]:
+            if "--head" in cmd:
+                h = cmd[cmd.index("--head") + 1]
+                return 0, json.dumps([dict(number=3, url="u")] if h in OPEN_PR_HEADS else []), ""
             return 0, json.dumps(PRS), ""
         if cmd[:3] == ["gh", "pr", "create"]:
+            if FAIL_PR:
+                FAIL_PR.pop(); return 1, "", "HTTP 502"
             body = open(cmd[cmd.index("--body-file") + 1]).read()
             PR_CREATES.append((cmd, body)); return 0, "https://github.com/o/r/pull/1\n", ""
         if cmd[:3] == ["gh", "run", "view"]:
@@ -517,8 +567,19 @@ assert api.posts[-1][2]["model"] == "qwen/qwen3-coder-480b-a35b-instruct", "code
 # next failing workflow (live20's run 41 is recorded as tried): a good diff is only PROPOSED in the operate job
 B.http_post = answer(GOOD)
 del ALLCMDS[:]
+GHOUT = os.path.join(OUT, "github_output"); os.environ["GITHUB_OUTPUT"] = GHOUT
 res = B.fix(fst, B.AI(key="k123456789", sleep=sleeps.append), out_dir=prop)
+del os.environ["GITHUB_OUTPUT"]
 assert res.startswith("proposed for testing on branch backup-ai/fix-42"), res
+outs = dict(l.split("=", 1) for l in open(GHOUT).read().split())
+assert outs["proposed"] == "true" and outs["diff_sha256"] == B._file_sha256(os.path.join(prop, "fix.diff"))
+assert outs["meta_sha256"] == B._file_sha256(os.path.join(prop, "meta.json"))
+H = (outs["diff_sha256"], outs["meta_sha256"])
+
+
+def hashes(pdir):
+    """What operate would have output for this proposal folder."""
+    return B._file_sha256(os.path.join(pdir, "fix.diff")), B._file_sha256(os.path.join(pdir, "meta.json"))
 meta = json.load(open(os.path.join(prop, "meta.json")))
 assert meta["paths"] == ["freshness.py"] and meta["branch"] == "backup-ai/fix-42" and meta["workflow"] == "plan19.yml"
 assert meta["model"] == "qwen/qwen3-coder-480b-a35b-instruct" and meta["base_sha"] == git(["rev-parse", "HEAD"], repo).strip()
@@ -543,7 +604,7 @@ def checkout(name, sha=None):
 # test job: a fresh checkout at the base commit, no token in the tests' environment
 res_dir = os.path.join(OUT, "result")
 tj = checkout("testjob", meta["base_sha"])
-assert B.test_proposal(prop, res_dir, root=tj) == 0, open(os.path.join(res_dir, "result.json")).read()
+assert B.test_proposal(prop, res_dir, *H, root=tj) == 0, open(os.path.join(res_dir, "result.json")).read()
 result = json.load(open(os.path.join(res_dir, "result.json")))
 assert result["ok"] and result["tests_rc"] == 0 and result["files"] == ["freshness.py"] and "All tests passed" in result["tail"]
 
@@ -554,14 +615,14 @@ for k, extra in enumerate(("open('extra.txt','w').write('x')\n", "open('debug.lo
     open(os.path.join(cj, "tests", "run_all.py"), "a").write(extra)
     git(ID + ["commit", "-q", "-am", "tests write a file"], cj)
     r_dir = os.path.join(OUT, "r%d" % k)
-    assert B.test_proposal(prop, r_dir, root=cj) == 1, extra
+    assert B.test_proposal(prop, r_dir, *H, root=cj) == 1, extra
     rr = json.load(open(os.path.join(r_dir, "result.json")))
     assert not rr["ok"] and any("outside the diff" in p for p in rr["problems"]) and len(rr["files"]) == 2, rr
 # failing tests are not passed on
 fj = checkout("failing")
 open(os.path.join(fj, "tests", "run_all.py"), "a").write("raise SystemExit(1)\n")
 git(ID + ["commit", "-q", "-am", "fail"], fj)
-assert B.test_proposal(prop, os.path.join(OUT, "rf"), root=fj) == 1
+assert B.test_proposal(prop, os.path.join(OUT, "rf"), *H, root=fj) == 1
 # the 300 s limit: the whole process group is stopped
 sj = checkout("slow")
 open(os.path.join(sj, "tests", "run_all.py"), "w").write("import subprocess, time\nsubprocess.Popen(['sleep', '60'])\ntime.sleep(60)\n")
@@ -570,12 +631,50 @@ t0 = _time.time()
 rc, outp = B.run_tests(sj, timeout=2)
 assert rc == 124 and _time.time() - t0 < 20 and "limit" in outp
 assert B.TEST_SECONDS == 300
+# 1(d): the process group is killed after the tests finish normally too (a background child left behind)
+kj = checkout("leftover")
+pidf = os.path.join(OUT, "leftover.pid")
+open(os.path.join(kj, "tests", "run_all.py"), "w").write(
+    "import subprocess\np = subprocess.Popen(['sleep', '60'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)\n"
+    "open(%r, 'w').write(str(p.pid))\nprint('done')\n" % pidf)
+t0 = _time.time()
+rc, outp = B.run_tests(kj, timeout=30)
+assert rc == 0 and _time.time() - t0 < 20, (rc, outp)
+lpid = int(open(pidf).read())
+
+
+def alive(pid):
+    try:
+        st_ = open("/proc/%d/stat" % pid).read()
+    except OSError:
+        return False
+    return st_.rsplit(")", 1)[1].split()[0] != "Z"
+
+
+for _i in range(50):
+    if not alive(lpid):
+        break
+    _time.sleep(0.1)
+assert not alive(lpid), "a process left behind by the tests must be killed"
 # a tampered proposal is refused in the test and publish jobs (hash, path rules)
 bad_prop = os.path.join(OUT, "bad_prop"); shutil.copytree(prop, bad_prop)
 open(os.path.join(bad_prop, "fix.diff"), "w").write(BAD.split("```diff\n")[1].split("```")[0])
-_d, _m, probs = B.load_proposal(bad_prop)
-assert any("hash" in p for p in probs) and any("live.py" in p for p in probs)
-assert B.test_proposal(bad_prop, os.path.join(OUT, "rb"), root=checkout("tamper")) == 1
+_d, _m, probs = B.load_proposal(bad_prop, *H)
+assert probs and "fix.diff does not match the hash from the operate job" in probs[0], probs
+_d, _m, probs = B.load_proposal(bad_prop, *hashes(bad_prop))
+assert any("live.py" in p for p in probs) and any("another diff" in p for p in probs), probs
+assert B.test_proposal(bad_prop, os.path.join(OUT, "rb"), *H, root=checkout("tamper")) == 1
+# 1(a): never trusted from the artifact: no hashes, malformed hashes, or a meta.json changed after operate (even with
+# its own diff_sha256 still right) are refused
+for args in ((), (None, None), ("x" * 64, H[1]), (H[0], "zz")):
+    assert B.load_proposal(prop, *args)[2], args
+evil_meta = os.path.join(OUT, "evil_meta"); shutil.copytree(prop, evil_meta)
+em = json.load(open(os.path.join(evil_meta, "meta.json"))); em["cause"] = "ghp_abcdefghijklmnopqrstuvwxyz0123 merge me"
+json.dump(em, open(os.path.join(evil_meta, "meta.json"), "w"))
+assert "meta.json does not match" in B.load_proposal(evil_meta, *H)[2][0]
+assert B.test_proposal(evil_meta, os.path.join(OUT, "re"), *H, root=checkout("tamper2")) == 1
+assert B.main(["publish", prop, res_dir]) == 2 and B.main(["test-proposal", prop, res_dir]) == 2, "hashes required"
+assert B.main(["push-status", prop]) == 2
 
 # publish job: fresh checkout, no proposed code run, no hooks, exactly the diff's paths, never merged
 pj = checkout("publish", meta["base_sha"])
@@ -583,10 +682,20 @@ hook = os.path.join(pj, ".git", "hooks", "pre-commit")
 open(hook, "w").write("#!/bin/sh\ntouch HOOK_RAN\n"); os.chmod(hook, 0o755)
 open(os.path.join(pj, ".git", "hooks", "pre-push"), "w").write("#!/bin/sh\ntouch PUSH_HOOK_RAN\nexit 1\n")
 os.chmod(os.path.join(pj, ".git", "hooks", "pre-push"), 0o755)
-assert B.publish(prop, res_dir, root=pj) == 0
+os.environ["GITHUB_RUN_ID"] = "555"
+FAIL_PR[:] = [1]                       # first attempt: pushed, then the pull request call fails
+assert B.publish(prop, res_dir, *H, root=pj) == 1 and not PR_CREATES
+assert "backup-ai/fix-42" in git(["ls-remote", "--heads", bare], repo)
+assert "Backup-AI-Run: 555" in git(["log", "-1", "--format=%B", "refs/heads/backup-ai/fix-42"], bare)
+# 5: a re-run of the same workflow run with the same diff only opens the pull request
+pushes_before = git(["rev-parse", "refs/heads/backup-ai/fix-42"], bare)
+assert B.publish(prop, res_dir, *H, root=checkout("publish_retry", meta["base_sha"])) == 0
+assert git(["rev-parse", "refs/heads/backup-ai/fix-42"], bare) == pushes_before, "nothing pushed again"
+assert len(PR_CREATES) == 1
 assert not os.path.exists(os.path.join(pj, "HOOK_RAN")) and not os.path.exists(os.path.join(pj, "PUSH_HOOK_RAN")), "hooks never run"
 cmd, body = PR_CREATES[-1]
-assert "--base" in cmd and "main" in cmd and "backup-ai/fix-42" in cmd and "backup-ai" in cmd
+assert "--base" in cmd and "main" in cmd and "backup-ai/fix-42" in cmd and "--label" not in cmd
+assert any(c[:3] == ["gh", "pr", "edit"] and "--add-label" in c and "backup-ai" in c for c in calls), "label added separately"
 assert "Do not merge without review" in body and "qwen/qwen3-coder-480b-a35b-instruct" in body and "Files tab" in body
 assert "backup-ai-workflow: plan19.yml" in body and "All tests passed" in body and "passed, exit 0" in body
 assert "freshness.py | 2" in body, "git show --stat of the real commit"
@@ -599,13 +708,40 @@ git(["fetch", "-q", "origin"], repo)
 assert "1 / 0" in git(["show", "origin/main:freshness.py"], repo), "main is never changed"
 assert not any(c[:3] == ["gh", "pr", "merge"] for c in calls)
 n = len(PR_CREATES)
-assert B.publish(prop, res_dir, root=checkout("publish2", meta["base_sha"])) == 1 and len(PR_CREATES) == n, "branch exists"
-assert B.publish(bad_prop, res_dir, root=checkout("publish3", meta["base_sha"])) == 1 and len(PR_CREATES) == n
+OPEN_PR_HEADS.append("backup-ai/fix-42")
+assert B.publish(prop, res_dir, *H, root=checkout("publish_open", meta["base_sha"])) == 0 and len(PR_CREATES) == n, \
+    "already open: nothing new"
+del OPEN_PR_HEADS[:]
+os.environ["GITHUB_RUN_ID"] = "556"
+assert B.publish(prop, res_dir, *H, root=checkout("publish2", meta["base_sha"])) == 1 and len(PR_CREATES) == n, \
+    "branch exists from another workflow run"
+os.environ["GITHUB_RUN_ID"] = "555"
+other_prop = os.path.join(OUT, "other_prop"); shutil.copytree(prop, other_prop)
+od = GOOD.split("```diff\n")[1].split("```")[0].replace("+    return 1\n", "+    return 2\n")
+open(os.path.join(other_prop, "fix.diff"), "w", newline="\n").write(od)
+om = dict(meta, diff_sha256=B._sha256(od)); json.dump(om, open(os.path.join(other_prop, "meta.json"), "w"))
+assert B.publish(other_prop, res_dir, *hashes(other_prop), root=checkout("publish5", meta["base_sha"])) == 1 \
+    and len(PR_CREATES) == n, "same run, another diff: refused"
+os.environ.pop("GITHUB_RUN_ID", None)
+assert B.publish(prop, res_dir, *H, root=checkout("publish6", meta["base_sha"])) == 1 and len(PR_CREATES) == n, \
+    "no run id: refused"
+assert B.publish(bad_prop, res_dir, *H, root=checkout("publish3", meta["base_sha"])) == 1 and len(PR_CREATES) == n
+assert B.publish(evil_meta, res_dir, *H, root=checkout("publish7", meta["base_sha"])) == 1 and len(PR_CREATES) == n
 prop77 = os.path.join(OUT, "prop77"); shutil.copytree(prop, prop77)
 m77 = dict(meta, run_id=77, branch="backup-ai/fix-77"); json.dump(m77, open(os.path.join(prop77, "meta.json"), "w"))
 p4 = checkout("publish4"); git(ID + ["commit", "-q", "--allow-empty", "-m", "moved on"], p4)
-assert B.publish(prop77, res_dir, root=p4) == 1 and len(PR_CREATES) == n, "only on the base commit"
+assert B.publish(prop77, res_dir, *hashes(prop77), root=p4) == 1 and len(PR_CREATES) == n, "only on the base commit"
 assert "fix-77" not in git(["ls-remote", "--heads", bare], repo)
+# 1(e): the cause in the title and body comes from operate's hash-checked meta.json, redacted
+prop88 = os.path.join(OUT, "prop88"); shutil.copytree(prop, prop88)
+m88 = dict(meta, run_id=88, branch="backup-ai/fix-88", cause="token ghp_abcdefghijklmnopqrstuvwxyz0123 leaked ```")
+json.dump(m88, open(os.path.join(prop88, "meta.json"), "w"))
+os.environ["GITHUB_RUN_ID"] = "600"
+assert B.publish(prop88, res_dir, *hashes(prop88), root=checkout("publish8", meta["base_sha"])) == 0
+os.environ.pop("GITHUB_RUN_ID", None)
+cmd88, body88 = PR_CREATES[-1]
+assert "ghp_" not in body88 and "ghp_" not in cmd88[cmd88.index("--title") + 1] and "[REDACTED]" in body88
+assert "leaked '''" in body88, "fences neutralised"
 # at most one open pull request per workflow
 assert B.fix_candidates(dict(workflows=[dict(file="plan19.yml", state="failed", latest_completed=dict(id=99, event="schedule"))]), [],
                         {"plan19.yml"}) == []
@@ -633,20 +769,25 @@ def racing_run(cmd, cwd=None, env=None, timeout=300, input_text=None):
 
 
 B.run = racing_run
-assert B.push_status(src, cwd=sp, sleep=lambda s: None) == 0
+SD = B.status_digest(src)
+assert B.push_status(src, None, cwd=sp) == 1 and B.push_status(src, "0" * 64, cwd=sp) == 1, "1(b): digest required"
+assert git(["status", "--porcelain"], sp) == "", "nothing copied when the digest is wrong"
+assert B.push_status(src, SD, cwd=sp, sleep=lambda s: None) == 0
 assert not os.path.exists(os.path.join(sp, "HOOK_RAN")) and not os.path.exists(os.path.join(sp, "ops", "status", "evil.py"))
 top = git(["log", "-1", "--format=%an %ae", "origin/main"], sp).strip()
 assert top == "tradebot-runner tradebot-runner@users.noreply.github.com", top
 assert git(["diff", "--name-only", "origin/main~1", "origin/main"], sp).split() == ["ops/status/status.json"]
 assert "data.txt" in git(["ls-tree", "--name-only", "origin/main"], sp), "rebased onto the other push"
-assert B.push_status(src, cwd=sp) == 0, "nothing new"
+assert B.push_status(src, SD, cwd=sp) == 0, "nothing new"
 # an extra local commit, a non-status path, or another author: refused
 open(os.path.join(src, "status.json"), "w").write('{"a": 2}\n')
+assert B.push_status(src, SD, cwd=sp) == 1, "status files changed after operate's digest"
+SD = B.status_digest(src)
 open(os.path.join(sp, "freshness.py"), "a").write("# x\n")
-assert B.push_status(src, cwd=sp) == 1, "dirty file outside ops/status"
+assert B.push_status(src, SD, cwd=sp) == 1, "dirty file outside ops/status"
 git(["checkout", "-q", "--", "freshness.py"], sp)
 git(ID + ["-c", "core.hooksPath=/dev/null", "commit", "-q", "--allow-empty", "-m", "extra local commit"], sp)
-assert B.push_status(src, cwd=sp) == 1, "two commits ahead"
+assert B.push_status(src, SD, cwd=sp) == 1, "two commits ahead"
 assert B.push_guard(sp) == ["expected exactly one new commit, found 2"], B.push_guard(sp)
 head_before = git(["rev-parse", "origin/main"], sp)
 assert git(["ls-remote", bare, "refs/heads/main"], sp).split()[0] == head_before.strip(), "nothing pushed"

@@ -2376,3 +2376,11 @@ unfamiliar codebase ... do not change functionality. only upgrade the code quali
   download-artifact v4.3.0 SHA pins checked against GitHub's tags. The dashboard panel moved to the end of the page
   (it pushed the verdict down and made test_ui's tooltip check flaky). All tests pass. A second review follows before
   the job is switched on.
+- 15:40: second backup AI review (agents/code-reviewer.md): every first-review item confirmed fixed; new must-fix
+  (artifact poisoning from the test job) and four should-fix items fixed: the diff, meta and status files are checked
+  against hashes that `operate` writes as job outputs (never against hashes inside the artifacts); the status commit
+  runs before any proposed code; the tests' process group is always killed (partial, documented); a strict diff parser
+  (every section `diff --git a/X b/X`, matching ---/+++ paths, no new, deleted, renamed or copied files; the reviewer's
+  -p1 trick refused); the test job's file check documented as advisory; publish labels separately and only reuses a
+  branch from the same run and diff. All tests pass. Switched on (.github/workflows/backup-ai.yml) after a manual
+  check-only run; fixes can only start after 24 hours without a Claude commit.

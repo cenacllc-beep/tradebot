@@ -11,10 +11,14 @@
 #   operate  key + GitHub token (contents read, issues/actions write): check, report, rerun; a fix is only PROPOSED
 #            (diff + metadata uploaded as an artifact), never applied or run here.
 #   status   contents write, no key: commits ops/status/ to main (one runner commit, ops/status/ only, no hooks).
+#            Runs BEFORE test, and checks the status artifact against operate's status_sha256 output.
 #   test     permissions: {} and no secret: applies the proposed diff, runs the tests (300 s), and fails unless the
-#            changed files are exactly the diff's own files.
+#            changed files are exactly the diff's own files (advisory: the tested code could defeat that check).
 #   publish  contents + pull-requests write, runs nothing from the diff: fresh checkout, re-check, apply, stage the
 #            diff's paths only, commit without hooks, push backup-ai/fix-<run id>, open the pull request. Never merges.
+# Code run in test holds the runner's artifact credential and could upload artifacts of its own, so status, test and
+# publish check every downloaded artifact against hashes that operate wrote as job outputs (diff_sha256, meta_sha256,
+# status_sha256), never against hashes inside an artifact; no upload uses overwrite.
 name: Backup AI operator
 on:
   schedule:
@@ -43,6 +47,9 @@ jobs:
     outputs:
       proposed: ${{ steps.op.outputs.proposed }}
       sha: ${{ steps.op.outputs.sha }}
+      diff_sha256: ${{ steps.op.outputs.diff_sha256 }}
+      meta_sha256: ${{ steps.op.outputs.meta_sha256 }}
+      status_sha256: ${{ steps.sh.outputs.status_sha256 }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09   # v5.1.0
         timeout-minutes: 5
@@ -71,9 +78,15 @@ jobs:
           BACKUP_AI_PROPOSAL: ${{ runner.temp }}/proposal
         run: |
           case "$MODE" in check|report|rerun|fix|all) ;; *) echo "unknown mode $MODE"; exit 1 ;; esac
-          python ops/backup_ai.py "$MODE"
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-          if [ -f "$BACKUP_AI_PROPOSAL/fix.diff" ]; then echo "proposed=true" >> "$GITHUB_OUTPUT"; fi
+          python ops/backup_ai.py "$MODE"     # writes proposed, diff_sha256 and meta_sha256 itself
+      - name: Hash the status files (job output status_sha256)
+        id: sh
+        if: always()
+        timeout-minutes: 2
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python ops/backup_ai.py status-hash ops/status
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4.6.2
         if: always()
         with:
@@ -108,15 +121,16 @@ jobs:
         with:
           name: backup-ai-status
           path: ${{ runner.temp }}/status
-      - name: Save ops/status (one runner commit, ops/status/ only)
+      - name: Save ops/status (one runner commit, ops/status/ only, digest checked)
         timeout-minutes: 5
         env:
           PYTHONDONTWRITEBYTECODE: "1"
           GH_TOKEN: ${{ github.token }}
-        run: python3 ops/backup_ai.py push-status "$RUNNER_TEMP/status"
+          STATUS_SHA256: ${{ needs.operate.outputs.status_sha256 }}
+        run: python3 ops/backup_ai.py push-status "$RUNNER_TEMP/status" "$STATUS_SHA256"
   test:
-    needs: operate
-    if: needs.operate.outputs.proposed == 'true'
+    needs: [operate, status]     # after status, so code run here cannot reach the status artifact before it is used
+    if: always() && needs.operate.result == 'success' && needs.operate.outputs.proposed == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions: {}
@@ -142,7 +156,9 @@ jobs:
         env:
           PYTHONIOENCODING: utf-8
           PYTHONDONTWRITEBYTECODE: "1"
-        run: python ops/backup_ai.py test-proposal "$RUNNER_TEMP/proposal" "$RUNNER_TEMP/result"
+          DIFF_SHA256: ${{ needs.operate.outputs.diff_sha256 }}
+          META_SHA256: ${{ needs.operate.outputs.meta_sha256 }}
+        run: python ops/backup_ai.py test-proposal "$RUNNER_TEMP/proposal" "$RUNNER_TEMP/result" "$DIFF_SHA256" "$META_SHA256"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4.6.2
         if: always()
         with:
@@ -152,7 +168,7 @@ jobs:
           retention-days: 14
   publish:
     needs: [operate, test]
-    if: needs.operate.outputs.proposed == 'true' && needs.test.result == 'success'
+    if: always() && needs.operate.result == 'success' && needs.operate.outputs.proposed == 'true' && needs.test.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -180,4 +196,6 @@ jobs:
           PYTHONDONTWRITEBYTECODE: "1"
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-        run: python3 ops/backup_ai.py publish "$RUNNER_TEMP/proposal" "$RUNNER_TEMP/result"
+          DIFF_SHA256: ${{ needs.operate.outputs.diff_sha256 }}
+          META_SHA256: ${{ needs.operate.outputs.meta_sha256 }}
+        run: python3 ops/backup_ai.py publish "$RUNNER_TEMP/proposal" "$RUNNER_TEMP/result" "$DIFF_SHA256" "$META_SHA256"

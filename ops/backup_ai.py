@@ -3,9 +3,14 @@
 repository's own scheduled jobs when Claude is not around.
 
     python3 ops/backup_ai.py check | report | rerun | fix | all          (job "operate")
-    python3 ops/backup_ai.py push-status DIR                               (job "status")
-    python3 ops/backup_ai.py test-proposal DIR RESULT_DIR                  (job "test")
-    python3 ops/backup_ai.py publish DIR RESULT_DIR                        (job "publish")
+    python3 ops/backup_ai.py status-hash DIR                               (job "operate", output status_sha256)
+    python3 ops/backup_ai.py push-status DIR STATUS_SHA256                 (job "status")
+    python3 ops/backup_ai.py test-proposal DIR RESULT_DIR DIFF_SHA256 META_SHA256   (job "test")
+    python3 ops/backup_ai.py publish DIR RESULT_DIR DIFF_SHA256 META_SHA256         (job "publish")
+
+The hashes are job outputs of "operate" (written to GITHUB_OUTPUT by this file itself); the later jobs check the
+downloaded artifacts against them and never against hashes stored inside an artifact, because code run in "test" holds
+the runner's artifact credential and could upload artifacts of its own.
 
 check   deterministic, no AI: the latest runs on main of every workflow in .github/workflows against the schedule in
         its cron lines, and the age of the research data the jobs commit. Writes ops/status/status.json and status.md.
@@ -216,42 +221,112 @@ def protected(path):
     return None
 
 
+_HUNK = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@")
+_INDEX = re.compile(r"^index [0-9a-f]{7,64}\.\.[0-9a-f]{7,64}( 100644)?$")
+
+
+def _git_header_path(rest):
+    """X from the rest of a `diff --git a/X b/X` line, or None unless both sides name the same X."""
+    n = len(rest) - 5
+    if n < 2 or n % 2:
+        return None
+    x = rest[2:2 + n // 2]
+    return x if rest == "a/%s b/%s" % (x, x) else None
+
+
 def diff_paths(diff):
-    """(paths, problems): every path a unified diff could touch, and anything about it that is refused outright."""
+    """(paths, problems): the files a diff changes, and anything about it that is refused outright. Strict, so that
+    what this reads is what `git apply` (at -p1) does: every file section starts with `diff --git a/X b/X` (the same X
+    on both sides); its `---` / `+++` lines must be exactly `a/X` / `b/X` (`/dev/null` there means a new or deleted
+    file, refused); hunks are counted, so a `--- ` line inside a hunk is a removed line, and anything outside a hunk
+    other than these headers and `index` lines is refused. New, deleted, renamed and copied files, mode changes and
+    binary patches are refused."""
     paths, problems = [], []
-
-    def add(raw):
-        raw = raw.rstrip("\n").split("\t", 1)[0].strip()
-        if raw == "/dev/null" or not raw:
-            return
-        if raw.startswith('"'):
-            problems.append("quoted path in the diff: " + raw[:80]); return
-        if raw[:2] in ("a/", "b/"):
-            raw = raw[2:]
-        paths.append(raw)
-
-    for line in (diff or "").splitlines():
-        if line.startswith("diff --git "):
-            rest = line[len("diff --git "):]
-            if '"' in rest:
-                problems.append("quoted path in the diff"); continue
-            m = re.match(r"^a/(.+) b/(.+)$", rest)
-            if m:
-                add("a/" + m.group(1)); add("b/" + m.group(2))
+    cur, old_n, new_n, seen_minus, seen_plus = None, 0, 0, False, False
+    lines = (diff or "").split("\n")
+    if lines and lines[-1] == "":
+        lines.pop()
+    for line in lines:
+        if line.endswith("\r"):
+            problems.append("carriage return in the diff"); line = line[:-1]
+        if old_n > 0 or new_n > 0:                       # inside a hunk
+            c = line[:1]
+            if c in (" ", ""):
+                old_n -= 1; new_n -= 1
+            elif c == "-":
+                old_n -= 1
+            elif c == "+":
+                new_n -= 1
+            elif c == "\\":
+                continue
             else:
-                problems.append("unreadable diff header: " + rest[:80])
-        elif line.startswith("--- ") or line.startswith("+++ "):
-            add(line[4:])
-        elif line.startswith(("rename from ", "rename to ", "copy from ", "copy to ")):
-            add(line.split(" ", 2)[2])
-        elif line.startswith(("deleted file mode", "old mode", "new mode", "similarity index", "dissimilarity index")):
-            problems.append("deletes, renames or copies a file or changes a file mode: " + line.strip())
-        elif line.startswith("new file mode") and not line.strip().endswith(("100644",)):
-            problems.append("new file with an unusual mode: " + line.strip())
+                problems.append("malformed hunk (line counts do not match): " + line[:80])
+                old_n = new_n = 0
+                continue
+            if old_n < 0 or new_n < 0:
+                problems.append("malformed hunk (line counts do not match)")
+                old_n = new_n = 0
+            continue
+        if line.startswith("\\"):
+            continue
+        if line.startswith("diff --git "):
+            if cur is not None and not (seen_minus and seen_plus):
+                problems.append("file section without --- and +++ lines: " + cur[:80])
+            rest = line[len("diff --git "):]
+            if '"' in rest or "\t" in rest:
+                problems.append("quoted path in the diff"); cur = ""
+            else:
+                x = _git_header_path(rest)
+                if x is None:
+                    problems.append("diff --git header must name the same a/X and b/X: " + rest[:80]); cur = ""
+                else:
+                    cur = x
+                    if x in paths:
+                        problems.append("file appears twice in the diff: " + x[:80])
+                    paths.append(x)
+            seen_minus = seen_plus = False
+            continue
+        if cur is None:
+            if line.strip():
+                problems.append("text before the first diff --git header: " + line[:80])
+            continue
+        if line.startswith("--- "):
+            raw = line[4:]
+            if raw == "/dev/null":
+                problems.append("new file (--- /dev/null) refused: " + cur[:80])
+            elif raw != "a/" + cur:
+                problems.append("--- line does not name a/%s: %s" % (cur[:80], raw[:80]))
+            seen_minus = True
+        elif line.startswith("+++ "):
+            raw = line[4:]
+            if raw == "/dev/null":
+                problems.append("deleted file (+++ /dev/null) refused: " + cur[:80])
+            elif raw != "b/" + cur:
+                problems.append("+++ line does not name b/%s: %s" % (cur[:80], raw[:80]))
+            seen_plus = True
+        elif line.startswith("@@"):
+            m = _HUNK.match(line)
+            if not m or not (seen_minus and seen_plus):
+                problems.append("hunk without a valid header or before --- and +++: " + line[:80]); continue
+            old_n = int(m.group(2)) if m.group(2) is not None else 1
+            new_n = int(m.group(4)) if m.group(4) is not None else 1
+        elif line.startswith("new file mode"):
+            problems.append("new file refused: " + cur[:80])
+        elif line.startswith(("deleted file mode", "old mode", "new mode", "similarity index", "dissimilarity index",
+                              "rename from", "rename to", "copy from", "copy to")):
+            problems.append("deletes, renames or copies a file or changes a file mode: " + line.strip()[:80])
         elif line.startswith(("GIT binary patch", "Binary files")):
             problems.append("binary patch")
+        elif _INDEX.match(line) or not line.strip():
+            continue
+        else:
+            problems.append("unexpected line outside a hunk: " + line[:80])
+    if old_n > 0 or new_n > 0:
+        problems.append("the diff ends inside a hunk")
+    if cur is not None and not (seen_minus and seen_plus):
+        problems.append("file section without --- and +++ lines: " + (cur or "?")[:80])
     if not paths:
-        problems.append("the diff names no file")
+        problems.append("the diff has no diff --git header and names no file")
     return sorted(set(paths)), problems
 
 
@@ -954,9 +1029,15 @@ def extract_diff(text):
 
 
 def open_fix_workflows():
-    prs = gh_json(["pr", "list", "--state", "open", "--label", LABEL, "--json", "number,title,body,headRefName"], []) or []
+    """Workflows with an open fix pull request (found by the backup-ai/fix- branch or the label: the label is added in
+    a separate, non-fatal step, so it may be missing)."""
+    prs = gh_json(["pr", "list", "--state", "open", "--limit", "200", "--json", "number,title,body,headRefName,labels"],
+                  []) or []
     out = set()
     for p in prs:
+        labels = [(x or {}).get("name") for x in (p.get("labels") or []) if isinstance(x, dict)]
+        if not str(p.get("headRefName") or "").startswith("backup-ai/fix-") and LABEL not in labels:
+            continue
         m = re.search(r"backup-ai-workflow:\s*(\S+)", p.get("body") or "")
         if m:
             out.add(m.group(1))
@@ -1018,6 +1099,38 @@ def _sha256(text):
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
+def _file_sha256(path):
+    with open(path, "rb") as f:
+        return hashlib.sha256(f.read()).hexdigest()
+
+
+_HEX64 = re.compile(r"^[0-9a-f]{64}$")
+
+
+def gh_output(name, value):
+    """One job output (GITHUB_OUTPUT), written by this trusted job itself. Later jobs check artifacts against these
+    values, never against hashes stored inside an artifact (code run in `test` could replace an artifact)."""
+    path = os.environ.get("GITHUB_OUTPUT")
+    if not path:
+        return False
+    if not re.match(r"^[a-z_0-9]+$", name) or not re.match(r"^[A-Za-z0-9_./\-]*$", str(value)):
+        raise ValueError("refusing an odd job output")
+    with open(path, "a", encoding="utf-8", newline="\n") as f:
+        f.write("%s=%s\n" % (name, value))
+    return True
+
+
+def status_digest(folder):
+    """SHA-256 over the status files push-status copies (names matching STATUS_FILE_RE, regular files, not links):
+    name and content hash of each, in name order. The same set is hashed in `operate` and checked in `status`."""
+    h = hashlib.sha256()
+    for n in sorted(os.listdir(folder)) if os.path.isdir(folder) else []:
+        p = os.path.join(folder, n)
+        if STATUS_FILE_RE.match(n) and os.path.isfile(p) and not os.path.islink(p):
+            h.update(("%s\x00%s\n" % (n, _file_sha256(p))).encode("utf-8"))
+    return h.hexdigest()
+
+
 def _propose(c, ai, out_dir):
     log = failed_log(c["run_id"], 200)
     files = related_files(log)
@@ -1073,17 +1186,33 @@ def _propose(c, ai, out_dir):
         f.write(diff)
     with open(os.path.join(out_dir, "meta.json"), "w", encoding="utf-8", newline="\n") as f:
         json.dump(meta, f, indent=1, sort_keys=True)
+    # the binding hashes, as job outputs of this job (never trusted from the artifact itself)
+    gh_output("diff_sha256", _file_sha256(os.path.join(out_dir, "fix.diff")))
+    gh_output("meta_sha256", _file_sha256(os.path.join(out_dir, "meta.json")))
+    gh_output("proposed", "true")
     ensure_label()
     return "proposed for testing on branch %s" % branch, model
 
 
-def load_proposal(pdir):
-    """(diff, meta, problems): the proposal re-read and re-checked from scratch (path rules, hash, file set, branch)."""
+def load_proposal(pdir, diff_sha256=None, meta_sha256=None):
+    """(diff, meta, problems): the proposal re-read and re-checked from scratch. The raw bytes of fix.diff and
+    meta.json must match the hashes `operate` gave as job outputs (passed in on the command line); without both, or
+    with anything but 64 hex digits, it is refused. Then the path rules, the file set and the branch name."""
     problems = []
+    if not (isinstance(diff_sha256, str) and _HEX64.match(diff_sha256)
+            and isinstance(meta_sha256, str) and _HEX64.match(meta_sha256)):
+        return None, None, ["the expected hashes from the operate job are missing or malformed"]
     try:
-        with open(os.path.join(pdir, "fix.diff"), encoding="utf-8") as f:
+        dpath, mpath = os.path.join(pdir, "fix.diff"), os.path.join(pdir, "meta.json")
+        if os.path.islink(dpath) or os.path.islink(mpath):
+            return None, None, ["proposal files must not be links"]
+        if _file_sha256(dpath) != diff_sha256:
+            return None, None, ["fix.diff does not match the hash from the operate job"]
+        if _file_sha256(mpath) != meta_sha256:
+            return None, None, ["meta.json does not match the hash from the operate job"]
+        with open(dpath, encoding="utf-8", newline="") as f:
             diff = f.read()
-        with open(os.path.join(pdir, "meta.json"), encoding="utf-8") as f:
+        with open(mpath, encoding="utf-8") as f:
             meta = json.load(f)
     except (OSError, ValueError) as e:
         return None, None, ["proposal unreadable: %s" % type(e).__name__]
@@ -1091,8 +1220,8 @@ def load_proposal(pdir):
         return None, None, ["proposal metadata unreadable"]
     problems += check_diff(diff)
     paths, _p = diff_paths(diff)
-    if meta.get("diff_sha256") != _sha256(diff):
-        problems.append("the diff does not match its recorded hash")
+    if meta.get("diff_sha256") != diff_sha256:
+        problems.append("the metadata names another diff")
     if sorted(meta.get("paths") or []) != paths:
         problems.append("the diff's files do not match its metadata")
     if not re.match(r"^backup-ai/fix-\d+$", str(meta.get("branch") or "")) or \
@@ -1150,22 +1279,34 @@ def _test_env():
 
 
 def run_tests(cwd, timeout=None):
-    """(returncode, output) of tests/run_all.py with a hard time limit; the whole process group is killed at the
-    limit (124)."""
+    """(returncode, output) of tests/run_all.py with a hard time limit (124 at the limit). The tests run in their own
+    process group, which is killed both at the limit and after they finish, so a background process they left behind
+    cannot keep running (or rewrite files) after the changed-file check. Partial: a process that starts its own
+    session escapes the group; the binding check is publish's re-validation on a fresh checkout."""
     timeout = TEST_SECONDS if timeout is None else timeout
     p = subprocess.Popen([sys.executable, os.path.join("tests", "run_all.py")], cwd=cwd, env=_test_env(),
                          stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
                          start_new_session=True)
-    try:
-        out, _e = p.communicate(timeout=timeout)
-        return p.returncode, out.decode("utf-8", "replace")
-    except subprocess.TimeoutExpired:
+
+    def killgroup():
         try:
             os.killpg(p.pid, signal.SIGKILL)
         except OSError:
+            pass
+
+    try:
+        out, _e = p.communicate(timeout=timeout)
+        rc, text = p.returncode, out.decode("utf-8", "replace")
+    except subprocess.TimeoutExpired:
+        killgroup()
+        try:
             p.kill()
+        except OSError:
+            pass
         out, _e = p.communicate()
-        return 124, out.decode("utf-8", "replace") + "\n(tests stopped at the %d s limit)" % timeout
+        rc, text = 124, out.decode("utf-8", "replace") + "\n(tests stopped at the %d s limit)" % timeout
+    killgroup()                     # always: whatever the tests left running in their group
+    return rc, text
 
 
 def _write_result(rdir, res):
@@ -1174,16 +1315,17 @@ def _write_result(rdir, res):
         json.dump(res, f, indent=1, sort_keys=True)
 
 
-def test_proposal(pdir, rdir, root=None):
+def test_proposal(pdir, rdir, diff_sha256=None, meta_sha256=None, root=None):
     """Job "test" (no token, no secret): re-check, apply, run the tests, compare the changed files with the diff's.
-    Returns 0 only when the tests passed and nothing but the diff's own files changed."""
+    Returns 0 only when the tests passed and nothing but the diff's own files changed. The changed-file check is
+    advisory (the tested code runs in this job and could defeat it); publish's re-validation is the binding one."""
     root = root or ROOT
     res = dict(ok=False, tests_rc=None, tail="", files=[], expected=[], problems=[])
     try:
         if kill_present(root):
             res["problems"].append("KILL file present")
             return 1
-        diff, meta, problems = load_proposal(pdir)
+        diff, meta, problems = load_proposal(pdir, diff_sha256, meta_sha256)
         if problems:
             res["problems"] += problems
             return 1
@@ -1217,13 +1359,54 @@ def _fence(text):
     return (text or "").replace("```", "'''")
 
 
-def publish(pdir, rdir, root=None):
-    """Re-check the proposal, apply it to a fresh checkout, stage exactly its paths, commit without hooks, push the
-    branch and open the pull request. Never merges. Returns 0 on success."""
+def _trailers(msg):
+    out = {}
+    for line in (msg or "").splitlines():
+        m = re.match(r"^(Backup-AI-Run|Backup-AI-Diff-SHA256):\s*(\S+)\s*$", line)
+        if m:
+            out[m.group(1)] = m.group(2)
+    return out
+
+
+def _existing_branch_ok(root, branch, base_sha, run_id, diff_sha256):
+    """None when the remote branch is this same run's earlier push of this same diff (a re-run of the publish job after
+    a failure between push and pull request), else the reason to refuse. Checks: one commit, by the runner, on the
+    base commit, carrying this workflow run id and diff hash, with exactly the tree staged here."""
+    rc, _o, _e = run(["git"] + NOHOOKS + _auth_args() + ["fetch", "-q", "--no-tags", "origin",
+                      "+refs/heads/%s:refs/backup-ai/existing" % branch], cwd=root, timeout=180)
+    if rc != 0:
+        return "could not fetch the existing branch"
+    rc, info, _e = run(["git", "log", "-1", "--format=%P%x1f%an%x1f%ae%x1f%cn%x1f%ce%x1f%B", "refs/backup-ai/existing"],
+                       cwd=root, timeout=60)
+    parts = info.split("\x1f", 5) if rc == 0 else []
+    if len(parts) != 6:
+        return "could not read the existing branch"
+    parents, who, body = parts[0].split(), parts[1:5], parts[5]
+    if parents != [base_sha]:
+        return "the existing branch is not one commit on the base commit"
+    if who != [RUNNER_NAME, RUNNER_EMAIL, RUNNER_NAME, RUNNER_EMAIL]:
+        return "the existing branch's commit is not the runner's"
+    tr = _trailers(body)
+    if not run_id or tr.get("Backup-AI-Run") != str(run_id):
+        return "the existing branch comes from another workflow run"
+    if tr.get("Backup-AI-Diff-SHA256") != diff_sha256:
+        return "the existing branch holds another diff"
+    rc1, mine, _e = run(["git", "write-tree"], cwd=root, timeout=60)
+    rc2, theirs, _e = run(["git", "rev-parse", "refs/backup-ai/existing^{tree}"], cwd=root, timeout=60)
+    if rc1 != 0 or rc2 != 0 or mine.strip() != theirs.strip() or not mine.strip():
+        return "the existing branch's files differ from this diff applied to the base commit"
+    return None
+
+
+def publish(pdir, rdir, diff_sha256=None, meta_sha256=None, root=None):
+    """Re-check the proposal against the operate job's hashes, apply it to a fresh checkout, stage exactly its paths,
+    commit without hooks, push the branch and open the pull request. Never merges. Returns 0 on success.
+    Idempotent for a re-run of this job: a branch left by an earlier attempt of the SAME workflow run with the SAME
+    diff is reused (only the pull request is created); any other existing branch is refused."""
     root = root or ROOT
     if kill_present(root):
         print("publish: KILL file present"); return 1
-    diff, meta, problems = load_proposal(pdir)
+    diff, meta, problems = load_proposal(pdir, diff_sha256, meta_sha256)
     if problems:
         print("publish: refused: " + "; ".join(problems)[:600]); return 1
     try:
@@ -1234,9 +1417,9 @@ def publish(pdir, rdir, root=None):
     if not isinstance(result, dict):
         result = {}
     branch, paths = meta["branch"], sorted(meta["paths"])
-    rc, out, _ = run(["git"] + _auth_args() + ["ls-remote", "--heads", "origin", branch], timeout=60)
-    if rc != 0 or out.strip():
-        print("publish: branch %s exists or the remote could not be read" % branch); return 1
+    run_id = os.environ.get("GITHUB_RUN_ID") or ""
+    if run_id and not re.match(r"^\d+$", run_id):
+        run_id = ""
     rc, head, _ = run(["git", "rev-parse", "HEAD"], cwd=root, timeout=60)
     if rc != 0 or head.strip() != meta["base_sha"]:
         print("publish: the checkout is not the proposal's base commit"); return 1
@@ -1252,17 +1435,39 @@ def publish(pdir, rdir, root=None):
     rc2, staged, _e = run(["git", "diff", "--cached", "--no-renames", "--name-only", "-z"], cwd=root, timeout=60)
     if rc != 0 or rc2 != 0 or sorted(x for x in staged.split("\x00") if x) != paths:
         print("publish: refused: staged files differ from the diff's"); return 1
-    msg = "Backup AI fix proposal for %s (run %s)\n\nUnreviewed; do not merge without review." % (meta["workflow"], meta["run_id"])
-    rc, _o, err = run(["git"] + NOHOOKS + ["-c", "user.name=" + RUNNER_NAME, "-c", "user.email=" + RUNNER_EMAIL,
-                       "commit", "-q", "--no-verify", "-m", msg], cwd=root, timeout=120)
+    rc, out, _ = run(["git"] + _auth_args() + ["ls-remote", "--heads", "origin", branch], timeout=60, cwd=root)
     if rc != 0:
-        print("publish: commit failed"); return 1
-    rc, stat, _e = run(["git", "show", "--stat", "--format=commit %H%n%s", "HEAD"], cwd=root, timeout=60)
-    rc, _o, err = run(["git"] + NOHOOKS + _auth_args() + ["push", "-q", "origin", "HEAD:refs/heads/" + branch],
-                      cwd=root, timeout=180)
-    if rc != 0:
-        print("publish: push failed: " + redact(err)[:200]); return 1
+        print("publish: the remote could not be read"); return 1
+    if out.strip():
+        why = _existing_branch_ok(root, branch, meta["base_sha"], run_id, diff_sha256)
+        if why:
+            print("publish: branch %s exists: %s" % (branch, why)); return 1
+        rc, stat, _e = run(["git", "show", "--stat", "--format=commit %H%n%s", "refs/backup-ai/existing"], cwd=root,
+                           timeout=60)
+        print("publish: branch %s is this run's earlier push of the same diff; opening the pull request" % branch)
+    else:
+        msg = ("Backup AI fix proposal for %s (run %s)\n\nUnreviewed; do not merge without review.\n\n"
+               "Backup-AI-Run: %s\nBackup-AI-Diff-SHA256: %s\n" % (meta["workflow"], meta["run_id"], run_id or "none",
+                                                                   diff_sha256))
+        rc, _o, err = run(["git"] + NOHOOKS + ["-c", "user.name=" + RUNNER_NAME, "-c", "user.email=" + RUNNER_EMAIL,
+                           "commit", "-q", "--no-verify", "-m", msg], cwd=root, timeout=120)
+        if rc != 0:
+            print("publish: commit failed"); return 1
+        rc, stat, _e = run(["git", "show", "--stat", "--format=commit %H%n%s", "HEAD"], cwd=root, timeout=60)
+        rc, _o, err = run(["git"] + NOHOOKS + _auth_args() + ["push", "-q", "origin", "HEAD:refs/heads/" + branch],
+                          cwd=root, timeout=180)
+        if rc != 0:
+            print("publish: push failed: " + redact(err)[:200]); return 1
+    try:
+        prs = gh_json(["pr", "list", "--state", "open", "--head", branch, "--json", "number,url"], []) or []
+    except RuntimeError as e:
+        print("publish: could not list pull requests: " + redact(str(e))[:200]); return 1
+    if prs:
+        print("publish: pull request already open: %s" % (prs[0].get("url") or prs[0].get("number")))
+        _label_pr(branch)
+        return 0
     tests = "passed" if result.get("ok") else "NOT passed"
+    cause = redact(str(meta.get("cause") or "not stated"))[:200]       # from operate's hash-checked meta.json only
     body = ("<!-- backup-ai-workflow: %s -->\n**Do not merge without review.** Proposed by the backup AI operator "
             "(model %s) because Claude made no commit in the last 24 hours. It never merges anything itself.\n\n"
             "**Read the Files tab**: it shows the real change. Text below is redacted and may be cut short.\n\n"
@@ -1271,21 +1476,28 @@ def publish(pdir, rdir, root=None):
             "**Tests** (`python3 tests/run_all.py` in a job with no token or secret, %d s limit): %s, exit %s; "
             "files changed after the tests: %s\n```\n%s\n```\n\n"
             "Checked against the allowlist and the deny list in ops/backup_ai.py in each of the three jobs.\n"
-            % (meta["workflow"], _fence(str(meta.get("model"))), meta["run_id"], meta["workflow"],
-               _fence(str(meta.get("cause"))), _fence(stat.strip()), TEST_SECONDS, tests, result.get("tests_rc"),
+            % (meta["workflow"], _fence(redact(str(meta.get("model")))), meta["run_id"], meta["workflow"],
+               _fence(cause), _fence(stat.strip()), TEST_SECONDS, tests, _fence(str(result.get("tests_rc"))[:20]),
                _fence(", ".join(str(x) for x in (result.get("files") or [])))[:2000],
                _fence(str(result.get("tail") or ""))[-6000:]))
-    title = "Backup AI fix proposal: [%s] %s" % (meta["workflow"], str(meta.get("cause"))[:80])
+    title = "Backup AI fix proposal: [%s] %s" % (meta["workflow"], " ".join(cause.split())[:80])
     p = _body_file(body)
     try:
-        rc, out, err = gh(["pr", "create", "--base", "main", "--head", branch, "--title", title,
-                           "--body-file", p, "--label", LABEL])
+        rc, out, err = gh(["pr", "create", "--base", "main", "--head", branch, "--title", title, "--body-file", p])
     finally:
         os.unlink(p)
     if rc != 0:
         print("publish: pull request failed: " + redact(err)[:200]); return 1
     print("publish: pull request opened: " + out.strip())
+    _label_pr(branch)
     return 0
+
+
+def _label_pr(branch):
+    """The label in a separate, non-fatal call (the pull request matters, the label is a convenience)."""
+    rc, _o, err = gh(["pr", "edit", branch, "--add-label", LABEL])
+    if rc != 0:
+        print("publish: note: could not add the %s label: %s" % (LABEL, redact(err)[:200]))
 
 
 # ---------------------------------------------------------------------------------------------------------------
@@ -1314,10 +1526,15 @@ def push_guard(cwd):
     return out
 
 
-def push_status(src, cwd=None, tries=6, sleep=time.sleep):
-    """Copy the status files from src into ops/status/, commit them as the runner and push to main. Refuses anything
-    else changed, staged or committed. Returns 0 when pushed or nothing changed."""
+def push_status(src, expected_sha256=None, cwd=None, tries=6, sleep=time.sleep):
+    """Copy the status files from src into ops/status/, commit them as the runner and push to main. The downloaded
+    files must match the digest the operate job gave as a job output (status_digest). Refuses anything else changed,
+    staged or committed. Returns 0 when pushed or nothing changed."""
     cwd = cwd or ROOT
+    if not (isinstance(expected_sha256, str) and _HEX64.match(expected_sha256)):
+        print("push-status: refusing: the status digest from the operate job is missing or malformed"); return 1
+    if status_digest(src) != expected_sha256:
+        print("push-status: refusing: the status files do not match the operate job's digest"); return 1
     sdir = os.path.join(cwd, "ops", "status")
     rc, s, _e = run(["git", "status", "--porcelain", "-z", "--no-renames", "--untracked-files=all"], cwd=cwd, timeout=60)
     others = [r[3:] for r in s.split("\x00") if len(r) > 3 and not r[3:].startswith("ops/status/")]
@@ -1363,12 +1580,19 @@ def push_status(src, cwd=None, tries=6, sleep=time.sleep):
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     mode = argv[0] if argv else "all"
-    if mode == "push-status" and len(argv) == 2:
-        return push_status(argv[1])
-    if mode == "test-proposal" and len(argv) == 3:
-        return test_proposal(argv[1], argv[2])
-    if mode == "publish" and len(argv) == 3:
-        return publish(argv[1], argv[2])
+    if mode == "status-hash" and len(argv) == 2:
+        digest = status_digest(argv[1])
+        gh_output("status_sha256", digest)
+        print("status-hash: " + digest)
+        return 0
+    if mode == "push-status" and len(argv) == 3:
+        return push_status(argv[1], argv[2])
+    if mode == "test-proposal" and len(argv) == 5:
+        return test_proposal(argv[1], argv[2], argv[3], argv[4])
+    if mode == "publish" and len(argv) == 5:
+        return publish(argv[1], argv[2], argv[3], argv[4])
+    if mode in ("status-hash", "push-status", "test-proposal", "publish"):
+        print(__doc__); return 2
     if mode not in ("check", "report", "rerun", "fix", "all"):
         print(__doc__); return 2
     st = check()
