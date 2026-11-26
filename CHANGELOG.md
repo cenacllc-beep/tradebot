@@ -2,23 +2,6 @@
 
 (The original CHANGELOG was lost with the folder on 2026-10-13. Summary of the lost history, from the session record: v2 NWS-period rain estimator and version columns (Oct 12); dashboard.py added; exposure cap MAX_OPEN_PCT=0.15; v3 rain estimator with NWS hourly slices, station audit (Chicago rain corrected to O'Hare, 19 rain cities added), logging columns, gate = v3 rain only (Oct 13 ~00:00 local).)
 
-## 2026-11-26 (La Paz) - PLAN19 written and statistics-reviewed (not frozen)
-- research/PLAN19.md: forward paper test of resting bids at Kalshi's reference price on markets with liquidity
-  programs (quadratic fee type, closing by 2026-12-27), hourly samples Nov 28 - Dec 27 on GitHub, scored once from
-  Dec 29. Written before any of its data (user: "go").
-- Statistics review (agents/statistician.md, fresh agent), all must-fix items applied before any data: the reward
-  pool split between YES and NO (was counted twice); weight decay when the best bid moves up after the sample;
-  no overlapping fill windows, fixed seed (UTC epoch hour); long-dated markets scored out (marking at the bid was not
-  conservative), open positions valued by selling into the ladder minus the taker fee, not testable above 5%;
-  which verdict applies fixed before the first sample, no interim figures; fill floor 100 filled market-hour-sides
-  across 30 events. Should-fix applied: two-way day x event SE plus series; lowest-rate program on overlap; $1
-  minimum per market program (Kalshi help page re-cited 2026-11-26); queue = size at the quote price; capital-hours
-  defined; $25 illustration by allocation; rewards x 0.5 haircut; power corrected to 0.61 SD and made concrete from
-  PLAN5 L (about 8-9% of capital per hour detectable: the spread-alone verdict will almost surely not pass).
-- Waiting on the user before the freeze: whether his Kalshi account is eligible for liquidity rewards (US member, not
-  an IB/FCM customer, SSN on file); it must be on record before 2026-11-28 00:00 La Paz or the rewards figures are
-  reported only. No rule, threshold, lock or limit changed.
-
 ## 2026-10-13 midday (local) - rebuild after data loss
 - Found the project folder empty (modified 01:16), no paper.db, no backups, Python 3.8 stripped of its Lib folder (00:46). Searched user profile and Recycle Bin: nothing. User states they did not do it. Cause unknown.
 - Recreated from the session record: config.py (with MAX_OPEN_PCT=0.15), core.py (fresh schema, version/market_type/logging columns), kalshi.py, nws.py, weather.py (v3 rain, 33-city RAIN table, temperature unchanged), strategy.py (VERSION v3, exposure cap, v3-rain-only gate, stop-date line), main.py (scan/settle/report only), requirements.txt, CLAUDE.md.
@@ -2255,3 +2238,20 @@ unfamiliar codebase ... do not change functionality. only upgrade the code quali
 - User (21:43): "go" to PLAN19 (resting orders on markets that pay Kalshi's liquidity rewards). research/probe19.py +
   cloud/workflows/probe19.yml count, on GitHub's runner (Kalshi public GETs only), which series carry an active
   liquidity program now, their reward totals, target sizes, discount factors and fee types. Counts only.
+
+## 2026-11-26 (La Paz) - PLAN19 written and statistics-reviewed (not frozen)
+- research/PLAN19.md: forward paper test of resting bids at Kalshi's reference price on markets with liquidity
+  programs (quadratic fee type, closing by 2026-12-27), hourly samples Nov 28 - Dec 27 on GitHub, scored once from
+  Dec 29. Written before any of its data (user: "go").
+- Statistics review (agents/statistician.md, fresh agent), all must-fix items applied before any data: the reward
+  pool split between YES and NO (was counted twice); weight decay when the best bid moves up after the sample;
+  no overlapping fill windows, fixed seed (UTC epoch hour); long-dated markets scored out (marking at the bid was not
+  conservative), open positions valued by selling into the ladder minus the taker fee, not testable above 5%;
+  which verdict applies fixed before the first sample, no interim figures; fill floor 100 filled market-hour-sides
+  across 30 events. Should-fix applied: two-way day x event SE plus series; lowest-rate program on overlap; $1
+  minimum per market program (Kalshi help page re-cited 2026-11-26); queue = size at the quote price; capital-hours
+  defined; $25 illustration by allocation; rewards x 0.5 haircut; power corrected to 0.61 SD and made concrete from
+  PLAN5 L (about 8-9% of capital per hour detectable: the spread-alone verdict will almost surely not pass).
+- Waiting on the user before the freeze: whether his Kalshi account is eligible for liquidity rewards (US member, not
+  an IB/FCM customer, SSN on file); it must be on record before 2026-11-28 00:00 La Paz or the rewards figures are
+  reported only. No rule, threshold, lock or limit changed.
