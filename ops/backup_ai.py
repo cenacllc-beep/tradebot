@@ -708,29 +708,35 @@ def status_md(st, report_text=None):
 # ---------------------------------------------------------------------------------------------------------------
 # The NVIDIA API: model choice, calls, budget
 PREFERENCES = {
+    # Ids seen in NVIDIA's catalogue for this key on 2026-11-26 come first (gemma-3 was listed but answered 404 on chat);
+    # the older ids stay as fall-backs. Nothing is trusted until the API lists it, and a listed id that answers 404/403
+    # on chat is skipped for the next one.
     # a small, fast instruct model for the routine summary
-    "check-summary": dict(ids=["meta/llama-3.1-8b-instruct", "meta/llama-3.2-3b-instruct",
-                               "mistralai/mistral-7b-instruct-v0.3", "google/gemma-2-9b-it",
-                               "microsoft/phi-3-mini-128k-instruct", "nvidia/llama-3.1-nemotron-nano-8b-v1"],
-                          pattern=r"(llama-3\.\d+-(1b|3b|8b)-instruct|mistral-7b-instruct|gemma-\d+-\d+b-it|phi-3|phi-4-mini|nemotron-nano)"),
+    "check-summary": dict(ids=["nvidia/nemotron-3.5-lightning-30b-a3b", "nvidia/nemotron-3.5-bolt-e4b", "z-ai/glm-5.3-flash",
+                               "minimaxai/minimax-m3.1-flash", "google/gemma-3-12b-it", "google/gemma-3-4b-it",
+                               "meta/llama-3.1-8b-instruct", "meta/llama-3.2-3b-instruct",
+                               "mistralai/mistral-7b-instruct-v0.3", "nvidia/llama-3.1-nemotron-nano-8b-v1"],
+                          pattern=r"(nemotron-[\d.]+-(lightning|bolt|nano)|glm-[\d.]+-flash|minimax-.*flash|llama-3\.\d+-(1b|3b|8b)-instruct|mistral-7b-instruct|gemma-\d+-\d+b-it|phi-4-mini)"),
     # a strong reasoning model for failure analysis
-    "diagnose": dict(ids=["deepseek-ai/deepseek-r1", "nvidia/llama-3.3-nemotron-super-49b-v1.5",
-                          "nvidia/llama-3.3-nemotron-super-49b-v1", "nvidia/llama-3.1-nemotron-ultra-253b-v1",
-                          "qwen/qwq-32b", "meta/llama-3.3-70b-instruct", "meta/llama-3.1-405b-instruct"],
-                     pattern=r"(deepseek-r1|nemotron-(super|ultra)|qwq|qwen3-235b|llama-3\.\d+-(70b|405b)-instruct)"),
-    # a code-specialised model for diff writing
-    "code-fix": dict(ids=["qwen/qwen3-coder-480b-a35b-instruct", "qwen/qwen2.5-coder-32b-instruct",
-                          "mistralai/codestral-22b-instruct-v0.1", "deepseek-ai/deepseek-coder-6.7b-instruct",
-                          "meta/codellama-70b"],
-                     pattern=r"(coder|codestral|codellama|starcoder|codegemma)"),
+    "diagnose": dict(ids=["moonshotai/kimi-k3.1-pro", "nvidia/nemotron-3-ultra-550b-a55b", "mistralai/mistral-large-4-1t-a52b",
+                          "stepfun-ai/step-5-preview", "nvidia/nemotron-3.5-lightning-30b-a3b",
+                          "deepseek-ai/deepseek-r1", "nvidia/llama-3.3-nemotron-super-49b-v1.5", "qwen/qwq-32b",
+                          "meta/llama-3.3-70b-instruct"],
+                     pattern=r"(kimi|nemotron-[\d.]+-(ultra|super)|mistral-large|step-\d|deepseek-r1|qwq|llama-3\.\d+-(70b|405b)-instruct)"),
+    # a code-specialised model for diff writing (starcoder2 is a completion model, not chat, so it is not used)
+    "code-fix": dict(ids=["poolside/laguna-xs-2.1", "moonshotai/kimi-k3.1-pro", "mistralai/mistral-large-4-1t-a52b",
+                          "nvidia/nemotron-3-ultra-550b-a55b", "qwen/qwen3-coder-480b-a35b-instruct",
+                          "qwen/qwen2.5-coder-32b-instruct", "mistralai/codestral-22b-instruct-v0.1"],
+                     pattern=r"(laguna|coder-.*instruct|codestral)"),
 }
+NOT_CHAT = re.compile(r"(embed|guard|safety|clip|detector|translate|retriever|pii|calibration|starcoder|reward|parse)", re.I)
 MAX_TOKENS = {"check-summary": 1200, "diagnose": 2000, "code-fix": 3000}
 
 
 def candidates(task, available):
     """Every listed id that fits a task, best first: the preferred ids in order, then the family matches (sorted)."""
     pref = PREFERENCES[task]
-    avail = [a for a in (available or []) if isinstance(a, str)]
+    avail = [a for a in (available or []) if isinstance(a, str) and not NOT_CHAT.search(a)]
     out = [m for m in pref["ids"] if m in avail]
     pat = re.compile(pref["pattern"], re.I)
     out += [m for m in sorted(avail) if pat.search(m) and m not in out]
@@ -738,18 +744,9 @@ def candidates(task, available):
 
 
 def pick(task, available):
-    """The model id for a task from the ids the API lists: the first preferred id that is listed, else the first listed
-    id matching the tier's family pattern, else None. Nothing is trusted until the API lists it."""
-    pref = PREFERENCES[task]
-    avail = [a for a in (available or []) if isinstance(a, str)]
-    for mid in pref["ids"]:
-        if mid in avail:
-            return mid
-    pat = re.compile(pref["pattern"], re.I)
-    for mid in sorted(avail):
-        if pat.search(mid):
-            return mid
-    return None
+    """The first candidate for a task (see candidates()), or None. Nothing is trusted until the API lists it."""
+    c = candidates(task, available)
+    return c[0] if c else None
 
 
 def http_get(url, headers, timeout):
@@ -836,9 +833,9 @@ class AI(object):
         cands = candidates(task, self.models())
         if not cands:
             raise RuntimeError("no model for %s is listed by the API" % task)
-        # The catalogue lists some models that this key cannot call (HTTP 404 or 403 on chat): try the next one, up to 3.
+        # The catalogue lists some models that this key cannot call (HTTP 404 or 403 on chat): try the next one, up to 4.
         text = None; model = None; err = None
-        for model in cands[:3]:
+        for model in cands[:4]:
             if self.calls >= self.max_calls:
                 break
             self.calls += 1

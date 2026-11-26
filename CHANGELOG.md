@@ -2414,3 +2414,9 @@ unfamiliar codebase ... do not change functionality. only upgrade the code quali
   green (0 problems), but NVIDIA answered HTTP 404, so no AI report. NVIDIA's catalogue lists models that a given key
   cannot call; ops/backup_ai.py now tries up to 3 listed candidates for a task when chat answers 404/403/400/422, and
   its error names the endpoint path (never the key). Tests added; all pass.
+- 19:30: diagnosis run: NVIDIA lists 30 models for this key (nemotron 3/3.5, kimi k3.1, mistral-large-4, glm-5.3-flash,
+  minimax-m3.1-flash, gemma-3, laguna, step-5 and non-chat embed/guard/safety models); the old preferences matched
+  only gemma-3, which answered 404 on chat. ops/backup_ai.py: preferences rewritten for this catalogue (summary:
+  nemotron-3.5-lightning/bolt, glm/minimax flash; diagnose: kimi-k3.1-pro, nemotron-3-ultra, mistral-large-4; code:
+  laguna, kimi, mistral-large), non-chat models excluded, up to 4 candidates tried; failed reports record the models
+  tried and the listed ids. Tests updated; all pass.

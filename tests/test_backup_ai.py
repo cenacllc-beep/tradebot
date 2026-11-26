@@ -274,10 +274,17 @@ ALL = ["meta/llama-3.1-8b-instruct", "deepseek-ai/deepseek-r1", "qwen/qwen2.5-co
 assert B.pick("check-summary", ALL) == "meta/llama-3.1-8b-instruct"
 assert B.pick("diagnose", ALL) == "deepseek-ai/deepseek-r1"
 assert B.pick("code-fix", ALL) == "qwen/qwen2.5-coder-32b-instruct"
-FAM = ["acme/llama-3.2-1b-instruct", "nvidia/llama-3.9-nemotron-super-70b-v9", "bigcode/starcoder2-15b", "x/embed"]
+FAM = ["acme/llama-3.2-1b-instruct", "nvidia/nemotron-9.9-super-70b", "acme/coder-9b-instruct", "bigcode/starcoder2-15b", "x/embed"]
 assert B.pick("check-summary", FAM) == "acme/llama-3.2-1b-instruct"
-assert B.pick("diagnose", FAM) == "nvidia/llama-3.9-nemotron-super-70b-v9"
-assert B.pick("code-fix", FAM) == "bigcode/starcoder2-15b"
+assert B.pick("diagnose", FAM) == "nvidia/nemotron-9.9-super-70b"
+assert B.pick("code-fix", FAM) == "acme/coder-9b-instruct"   # starcoder2 is a completion model: never picked
+# the catalogue this key listed on 2026-11-26: chat models only, preferred ones first
+CAT = ["bigcode/starcoder2-15b", "google/gemma-3-12b-it", "nvidia/nemotron-3.5-lightning-30b-a3b", "moonshotai/kimi-k3.1-pro",
+       "poolside/laguna-xs-2.1", "nvidia/nemotron-3.5-content-safety", "nvidia/llama-3.1-nemoguard-8b-topic-control"]
+assert B.pick("check-summary", CAT) == "nvidia/nemotron-3.5-lightning-30b-a3b"
+assert B.pick("diagnose", CAT) == "moonshotai/kimi-k3.1-pro"
+assert B.pick("code-fix", CAT) == "poolside/laguna-xs-2.1"
+assert not any(B.NOT_CHAT.search(m) is None for m in ["nvidia/nemotron-3.5-content-safety", "nvidia/nvclip", "snowflake/arctic-embed-l"])
 for task in ("check-summary", "diagnose", "code-fix"):
     assert B.pick(task, ["nvidia/nv-embed-v1", "x/rerank"]) is None and B.pick(task, []) is None
     assert B.PREFERENCES[task]["ids"]
