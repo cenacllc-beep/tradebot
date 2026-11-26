@@ -1,0 +1,129 @@
+# PLAN20 (research only, research/PLAN20.md): cheap sides (1-10c) of every Kalshi 15-minute series. A descriptive map
+# of June-July 2026, one ridge logistic model fitted once on June-July, scored once on August-October (four group tests;
+# BTC/ETH descriptive only). Started by hand only (workflow_dispatch), one stage per run. Public data only: Kalshi's
+# public API (read-only GETs; already approved). It never places, changes or cancels an order, never touches trial/,
+# paper.db or live.db, never reads a market closing on or after 2026-11-01 La Paz, and commits only
+# research/results/plan20* and research/data/plan20/ (it refuses to commit anything else; research/data/ is ignored by
+# the repository's .gitignore, so the day files are added with -f). series runs once and first; freeze runs once and
+# needs the committed series table; every other stage refuses until research/results/plan20_identity.json is committed
+# and unchanged; map refuses if a map was ever committed; fit refuses if a model was ever committed; score refuses if a
+# result was ever committed. Only the fit installs a package: numpy, pinned, on the runner only.
+# Runtime: one candle request per market (about 96 a day per series), so the download needs several 300-minute runs;
+# each run saves whole La Paz days only and the next run continues. August-October downloads only after the fit.
+name: PLAN20 cheap sides, all 15-minute series (research)
+on:
+  workflow_dispatch:
+    inputs:
+      stage:
+        description: "series (once, first) | freeze (once) | download | map (once) | fit (once) | score (once) | status"
+        required: true
+        type: choice
+        options: [status, series, freeze, download, map, fit, score]
+      max_days:
+        description: "download only: at most this many series-days in this run (empty = no limit)"
+        required: false
+        default: ""
+concurrency:
+  group: tradebot-plan20
+  cancel-in-progress: false
+permissions:
+  contents: write
+jobs:
+  stage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09   # v5.1.0
+        with:
+          ref: main
+          fetch-depth: 0   # full history: the once-only guards look for any earlier commit of a file
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1   # v6.3.0
+        with:
+          python-version: "3.12"
+      - name: Refuse a second series table
+        if: inputs.stage == 'series'
+        run: |
+          if git log --oneline -- research/results/plan20_series.json | grep -q .; then
+            echo "research/results/plan20_series.json was committed once: the series table is written once"; exit 1
+          fi
+      - name: Refuse freeze when the code is already frozen, or without the committed series table
+        if: inputs.stage == 'freeze'
+        run: |
+          if git ls-files --error-unmatch research/results/plan20_identity.json >/dev/null 2>&1; then
+            echo "already frozen: research/results/plan20_identity.json is committed; it is stored once"; exit 1
+          fi
+          f=research/results/plan20_series.json
+          git ls-files --error-unmatch "$f" >/dev/null 2>&1 || { echo "$f is not committed: run the series stage first"; exit 1; }
+          git diff --quiet HEAD -- "$f" || { echo "$f differs from the commit: stopping"; exit 1; }
+      - name: Refuse every later stage unless the identity record and the series table are committed and unchanged
+        if: inputs.stage != 'freeze' && inputs.stage != 'series' && inputs.stage != 'status'
+        run: |
+          for f in research/results/plan20_identity.json research/results/plan20_series.json; do
+            git ls-files --error-unmatch "$f" >/dev/null 2>&1 || { echo "$f is not committed: run series and freeze first"; exit 1; }
+            git diff --quiet HEAD -- "$f" || { echo "$f differs from the commit: stopping"; exit 1; }
+          done
+      - name: Refuse a second map
+        if: inputs.stage == 'map'
+        run: |
+          for f in research/results/plan20_map.md research/results/plan20_map.json research/results/plan20_map_sha256.json; do
+            if git log --oneline -- "$f" | grep -q .; then echo "$f was committed once: the map is written once"; exit 1; fi
+          done
+      - name: Refuse a second fit, or a fit before the map
+        if: inputs.stage == 'fit'
+        run: |
+          if git log --oneline -- research/results/plan20_model.json | grep -q .; then echo "the model was committed once: fitted once"; exit 1; fi
+          for f in research/results/plan20_map.md research/results/plan20_map.json research/results/plan20_map_sha256.json; do
+            git ls-files --error-unmatch "$f" >/dev/null 2>&1 || { echo "$f is not committed: run map first"; exit 1; }
+            git diff --quiet HEAD -- "$f" || { echo "$f differs from the commit: stopping"; exit 1; }
+          done
+      - name: Refuse a second score, or a score before the model
+        if: inputs.stage == 'score'
+        run: |
+          f=research/results/plan20_model.json
+          git ls-files --error-unmatch "$f" >/dev/null 2>&1 || { echo "no committed model: run fit first"; exit 1; }
+          git diff --quiet HEAD -- "$f" || { echo "$f differs from the commit: stopping"; exit 1; }
+          for f in research/results/plan20_result.json research/results/plan20_result.md; do
+            if git log --oneline -- "$f" | grep -q .; then echo "$f was committed once: the plan is scored once"; exit 1; fi
+          done
+      - name: Install the pinned package (fit only, runner only)
+        if: inputs.stage == 'fit'
+        run: python -m pip install --disable-pip-version-check "numpy==2.3.4"
+      - name: Run the stage
+        env:
+          TZ: UTC
+          PYTHONIOENCODING: utf-8
+          STAGE: ${{ inputs.stage }}
+          MAX_DAYS: ${{ inputs.max_days }}
+        run: |
+          extra=""
+          if [ -n "$MAX_DAYS" ]; then
+            case "$MAX_DAYS" in (*[!0-9]*) echo "max_days must be a whole number"; exit 1;; esac
+            extra="--max-days $MAX_DAYS"
+          fi
+          case "$STAGE" in
+            download) python research/plan20.py download --budget-minutes 300 $extra ;;
+            series|freeze|map|fit|score|status) python research/plan20.py "$STAGE" ;;
+            *) echo "unknown stage $STAGE"; exit 1 ;;
+          esac
+      - name: Save research/results/plan20* and research/data/plan20/ in the repository (and nothing else)
+        if: always() && inputs.stage != 'status'
+        run: |
+          others=$(git status --porcelain --untracked-files=all | grep -v -E '^.. "?research/(results/plan20|data/plan20/)' || true)
+          if [ -n "$others" ]; then echo "refusing to commit: files outside research/results/plan20* and research/data/plan20/ changed:"; echo "$others"; exit 1; fi
+          big=$(find research/results research/data -path 'research/results/plan20*' -type f -size +50M -o -path 'research/data/plan20/*' -type f -size +50M)
+          if [ -n "$big" ]; then echo "refusing to commit files over 50 MB:"; echo "$big"; exit 1; fi
+          find research/results research/data -path 'research/results/plan20*' -name '*.tmp' -type f -delete -o -path 'research/data/plan20/*' -name '*.tmp' -type f -delete
+          git config user.name "tradebot-runner"
+          git config user.email "tradebot-runner@users.noreply.github.com"
+          git add -A -- 'research/results/plan20*'
+          if [ -d research/data/plan20 ]; then git add -A -f -- research/data/plan20; fi
+          git diff --cached --name-only | grep -v -E '^research/(results/plan20|data/plan20/)' && { echo "refusing: staged files outside research/results/plan20* and research/data/plan20/"; exit 1; }
+          git commit -m "PLAN20 $STAGE $(date -u +%FT%H:%MZ)" || { echo "nothing new"; exit 0; }
+          for i in 1 2 3 4 5 6; do
+            git push origin HEAD:main && exit 0
+            sleep $((i * 10))
+            git pull --rebase origin main || { git rebase --abort 2>/dev/null || true; }
+          done
+          exit 1
+        env:
+          STAGE: ${{ inputs.stage }}
