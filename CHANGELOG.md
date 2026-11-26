@@ -2392,3 +2392,5 @@ unfamiliar codebase ... do not change functionality. only upgrade the code quali
     lists switched-off workflows as "disabled" instead of flagging them.
   - ops/backup_ai.py: a run in progress under 6 hours counts as running (live20 was reported stale while its 5.5-hour
     run was working); a finished run's age is counted from its end (updatedAt). All tests pass.
+- 15:33 (r95b): dashboard.py with the Backup AI panel at the end of the page copied to the PC (the PC copy matched
+  r95; the afternoon settle had finished at 14:52). The 16:20 hourly run rebuilds dashboard.html.
