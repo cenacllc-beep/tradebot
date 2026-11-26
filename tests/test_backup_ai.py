@@ -435,9 +435,9 @@ GH["live20.yml"] = [runrec(13)]
 B.check()
 del calls[:]
 st, text = B.report(B.AI(key="k123456789", sleep=sleeps.append))
-assert st["issue"] == "close" and st["ai"]["task"] == "check-summary" and st["ai"]["model"] == "meta/llama-3.1-8b-instruct"
+assert st["issue"] == "close" and st["ai"]["used"] is False and "green" in st["ai"]["note"] and "green" in st["report_text"]   # all green: no model call
 assert any(c[:3] == ["gh", "issue", "close"] and "5" in c for c in calls)
-assert json.load(open(os.path.join(B.STATUS_DIR, "status.json")))["ai"]["model"] == "meta/llama-3.1-8b-instruct"
+assert json.load(open(os.path.join(B.STATUS_DIR, "status.json")))["ai"]["used"] is False
 
 def failing_issue_run(cmd, cwd=None, env=None, timeout=300, input_text=None):
     if cmd[:3] in (["gh", "issue", "create"], ["gh", "issue", "edit"], ["gh", "issue", "close"]):

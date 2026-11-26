@@ -2424,3 +2424,7 @@ unfamiliar codebase ... do not change functionality. only upgrade the code quali
   its token budget thinking. ops/backup_ai.py: an empty answer (or an unfinished <think> block) counts as a failure and
   the next candidate is tried; token budgets raised (4,000 / 6,000 / 8,000) and one request may take 150 s (the run's
   6-minute model budget is unchanged). Test added; all pass.
+- 20:00: first AI report worked (nemotron-3.5-lightning-30b-a3b, 23:5x UTC) but misread healthy rows (called the
+  5.5-hour live20 run "over its limit", manual-only plans "forgotten"). ops/backup_ai.py: when everything is green no
+  model is called (a plain all-green line instead); when something is wrong the model sees only the failed or stale
+  rows and is told the rest is healthy and not to invent problems. Tests updated; all pass.

@@ -967,11 +967,17 @@ def report(ai=None):
         text = "NVIDIA_API_KEY is missing, so there is no AI report: the table above is the non-AI status check. " \
                "Add the key as a repository secret named NVIDIA_API_KEY."
         st["ai"] = dict(used=False, task=None, model=None, note="key missing")
+    elif not st["problems"]:
+        # all green: no model call (nothing to diagnose, and a summary of healthy rows only invites misreadings)
+        text = "All checks are green: every scheduled job ran on time or is running, and every data feed is fresh. " \
+               "Manual-only and disabled jobs are expected to be idle."
+        st["ai"] = dict(used=False, task=None, model=None, note="all green: no AI call needed")
     else:
-        task = "diagnose" if st["problems"] else "check-summary"
+        task = "diagnose"
         prompt = ("Status of the project's GitHub Actions jobs (JSON):\n%s\n\nLast lines of each failed run's log:\n%s\n\n"
-                  "Write a short plain-English report: what works, what failed or is stale, the likely cause, and one "
-                  "suggested next step for each problem. The user's PC is not visible from here; say so if a problem "
+                  "Only the rows listed are problems; every other job and data feed is healthy, and 'manual-only' or "
+                  "'disabled' jobs are idle on purpose. Write a short plain-English report: for each listed problem, "
+                  "the likely cause and one suggested next step. Do not invent problems that are not listed. The user's PC is not visible from here; say so if a problem "
                   "may be on the PC." % (json.dumps(_brief(st), indent=1)[:20000],
                                          "\n\n".join("== %s\n%s" % (k, v) for k, v in logs.items())[:24000] or "(none)"))
         try:
@@ -991,10 +997,12 @@ def report(ai=None):
 
 
 def _brief(st):
+    """Only what is wrong, so the model cannot misread healthy rows (it called a running 5.5-hour job "over its limit"
+    and manual-only plans "forgotten" when everything was green, 2026-11-26)."""
     return dict(generated_at=st["generated_at"], problems=st["problems"],
-                workflows=[dict(file=w["file"], state=w["state"], age_minutes=w["age_minutes"],
-                                limit_minutes=w["limit_minutes"], problem=w["problem"]) for w in st["workflows"]],
-                data=st["data"])
+                workflows=[dict(file=w["file"], state=w["state"], problem=w["problem"])
+                           for w in st["workflows"] if w["state"] in ("failed", "stale")],
+                data=[d for d in st["data"] if d.get("state") == "stale"])
 
 
 # ---------------------------------------------------------------------------------------------------------------
