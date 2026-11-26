@@ -569,6 +569,18 @@ def _run_summary(r):
                 url=r.get("url"), branch=r.get("headBranch"), title=redact(r.get("displayTitle") or "")[:120])
 
 
+RUN_MAX_MINUTES = 360   # GitHub stops any job after 6 hours
+
+
+def _since_end(run, t, age):
+    """Minutes since a finished run ended (updatedAt), else since it was created; None when unknown."""
+    if run.get("status") == "completed":
+        ended = parse_time(run.get("updatedAt"))
+        if ended:
+            return int((t - ended).total_seconds() // 60)
+    return age
+
+
 def judge_workflow(wf, runs, t):
     """One status.json workflow row from the workflow's file facts and its newest runs on main (newest first)."""
     gap = max_gap_minutes(wf["crons"]) if wf["crons"] else None
@@ -596,11 +608,14 @@ def judge_workflow(wf, runs, t):
     if last and last.get("conclusion") in FAILED:
         row["state"] = "failed"
         row["problem"] = "latest finished run %s (%s)" % (last.get("conclusion"), last.get("url") or last.get("databaseId"))
-    elif lim is not None and age is not None and age > lim:
+    elif latest.get("status") != "completed" and age is not None and age <= RUN_MAX_MINUTES:
+        row["state"] = "running"    # a long-looping job (live20, plan19) is working, not stale (2026-11-26)
+    elif lim is not None and _since_end(latest, t, age) is not None and _since_end(latest, t, age) > lim:
         row["state"] = "stale"
-        row["problem"] = "no run for %.1f h (schedule allows %.1f h)" % (age / 60.0, lim / 60.0)
+        row["problem"] = "no run for %.1f h (schedule allows %.1f h)" % (_since_end(latest, t, age) / 60.0, lim / 60.0)
     elif latest.get("status") != "completed":
-        row["state"] = "running"
+        row["state"] = "stale"
+        row["problem"] = "a run has been in progress for %.1f h (longer than any job may run)" % (age / 60.0)
     else:
         row["state"] = "ok" if lim is not None else "manual-only"
     return row
@@ -640,7 +655,7 @@ def check():
     for wf in read_workflows():
         try:
             runs = gh_json(["run", "list", "--workflow", wf["file"], "--branch", "main", "--limit", "5", "--json",
-                            "databaseId,status,conclusion,createdAt,event,attempt,url,headBranch,displayTitle"], [])
+                            "databaseId,status,conclusion,createdAt,updatedAt,event,attempt,url,headBranch,displayTitle"], [])
         except RuntimeError as e:
             st["errors"].append(redact(str(e))); runs = None
         st["workflows"].append(judge_workflow(wf, runs, t))
