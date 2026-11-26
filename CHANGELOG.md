@@ -2210,3 +2210,14 @@ unfamiliar codebase ... do not change functionality. only upgrade the code quali
   covers G only; R was close to inert (penalty 10.2 on a 3-5 minute window), so the shift detector was barely tested;
   all four GARCH fits sit at alpha + beta ~ 1 (time-of-day volatility ignored, a stated limit); A1 could not have
   changed the result (the integrated formula is the limit of the original; agreement to about 6e-6 bp^2).
+
+## 2026-11-25 21:10 (La Paz) - PLAN5 test L scored once (research only)
+- The PC's copy (research\data\lip, SECONDARY) was staged and merged into the repository's copy: 444 hours added
+  (5,837 sample rows and fill records, 2 results). Then `lip.py score` ran once.
+- Verdict (spread alone, the verdict that applies; the account's reward eligibility was never confirmed): NOT TESTABLE.
+  11 qualifying days, below the pre-set minimum of 15 (Kalshi listed no liquidity program on daily weather markets
+  from Nov 5). 7,829 sampled market-hours, 12,961 paper contracts filled in 57 events; headline -0.37% of capital per
+  hour (t -0.09, i.e. nothing either way); prices moved against the filled side by about 1.2-1.4% within 5 minutes of
+  a fill (adverse selection). Not testable means the test could not tell; it cannot be rescued (PLAN5 rules).
+- The hourly sampling workflow (plan5-lip.yml) is disabled. The PC's run.bat still calls lip.py in the hourly job
+  (it samples nothing after Nov 20); removing those two lines waits for the user's word.
