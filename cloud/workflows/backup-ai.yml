@@ -1,0 +1,81 @@
+# Backup AI operator (ops/backup_ai.py, ops/README.md; approved by the user 2026-11-26 13:40). Every 3 hours it checks
+# the latest run of every workflow here and the age of the research data the jobs commit, asks a model on NVIDIA's
+# hosted API (integrate.api.nvidia.com; key only from the repository secret NVIDIA_API_KEY) for a plain-English report,
+# keeps ONE GitHub issue labelled backup-ai open while anything is wrong (GitHub e-mails it), re-runs an allowlisted
+# failed research or paper-logging run once, and, only when Claude has made no commit for 24 hours, proposes a fix as a
+# pull request for review. It never merges, never runs live.py, never touches paper.db, live.db or keys, and commits
+# only ops/status/** on main (it refuses to commit anything else). Without the secret it does the non-AI check only.
+# Advice only: it changes no rule, limit or lock. The PC is not reachable from here.
+name: Backup AI operator
+on:
+  schedule:
+    - cron: "37 */3 * * *"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "check | report | rerun | fix | all"
+        required: true
+        default: all
+        type: choice
+        options: [all, check, report, rerun, fix]
+concurrency:
+  group: tradebot-backup-ai   # its own group: never cancels or queues behind a scan, settle or plan
+  cancel-in-progress: false
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+  actions: write
+jobs:
+  operate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09   # v5.1.0
+        timeout-minutes: 5
+        with:
+          ref: main
+          fetch-depth: 0          # history: data freshness and the "Claude committed in 24 hours" check
+          filter: blob:none       # history without old file contents (the data folders are large)
+          persist-credentials: false   # no token on disk: the tests of a fix proposal run its code
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1   # v6.3.0
+        timeout-minutes: 3
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --disable-pip-version-check requests==2.32.3
+        timeout-minutes: 3
+      - name: Operate (check, report, rerun, fix)
+        timeout-minutes: 15
+        env:
+          TZ: America/La_Paz
+          PYTHONIOENCODING: utf-8
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+          MODE: ${{ inputs.mode || 'all' }}
+        run: |
+          case "$MODE" in check|report|rerun|fix|all) ;; *) echo "unknown mode $MODE"; exit 1 ;; esac
+          python ops/backup_ai.py "$MODE"
+      - name: Save ops/status (and nothing else)
+        if: always()
+        timeout-minutes: 5
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git checkout -q main 2>/dev/null || true
+          others=$(git status --porcelain --untracked-files=all | grep -v -E '^.. "?ops/status/' || true)
+          if [ -n "$others" ]; then echo "refusing to commit: files outside ops/status changed:"; echo "$others"; exit 1; fi
+          find ops/status -name '*.tmp' -type f -delete 2>/dev/null || true
+          git config user.name "tradebot-runner"
+          git config user.email "tradebot-runner@users.noreply.github.com"
+          [ -d ops/status ] || { echo "no status written"; exit 0; }
+          git add -A -- ops/status
+          git diff --cached --name-only | grep -v -E '^ops/status/' && { echo "refusing: staged files outside ops/status"; exit 1; }
+          git commit -q -m "Backup AI status $(date -u +%FT%H:%MZ)" || { echo "nothing new"; exit 0; }
+          auth="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
+          for i in 1 2 3 4 5 6; do
+            git -c http.https://github.com/.extraheader="$auth" push -q origin HEAD:main && exit 0
+            sleep $((i * 10))
+            git -c http.https://github.com/.extraheader="$auth" pull -q --rebase origin main || { git rebase --abort 2>/dev/null || true; }
+          done
+          exit 1
