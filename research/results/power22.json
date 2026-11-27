@@ -1,0 +1,59 @@
+{
+ "assets": {
+  "BTC": {
+   "coverage": {
+    "comp_days": 93,
+    "comp_days_missing": [],
+    "comp_minutes": 133903,
+    "comp_minutes_expected": 133920,
+    "days_with_96_windows": 79,
+    "kalshi_days": 92,
+    "kalshi_days_missing": [],
+    "no_coinbase": 88,
+    "no_mid": 28,
+    "no_result": 0,
+    "rows": 34712,
+    "rows_possible": 34828,
+    "s0_checked": 8707,
+    "s0_matches_spot_close": 8707,
+    "windows": 8707
+   },
+   "days": 92,
+   "detectable_stage2": 0.002599505046043925,
+   "sd_day_means": 0.0070224930006315914,
+   "se": 0.0007321455066233026,
+   "stage2_days": 59,
+   "stage2_se": 0.0009142507161226849,
+   "stage2_t": 2.001717484145227
+  },
+  "ETH": {
+   "coverage": {
+    "comp_days": 93,
+    "comp_days_missing": [],
+    "comp_minutes": 133902,
+    "comp_minutes_expected": 133920,
+    "days_with_96_windows": 79,
+    "kalshi_days": 92,
+    "kalshi_days_missing": [],
+    "no_coinbase": 89,
+    "no_mid": 28,
+    "no_result": 0,
+    "rows": 34711,
+    "rows_possible": 34828,
+    "s0_checked": 8707,
+    "s0_matches_spot_close": 8707,
+    "windows": 8707
+   },
+   "days": 92,
+   "detectable_stage2": 0.002376952920325191,
+   "sd_day_means": 0.006421274415765231,
+   "se": 0.0006694641361514862,
+   "stage2_days": 59,
+   "stage2_se": 0.0008359787232975015,
+   "stage2_t": 2.001717484145227
+  }
+ },
+ "model": "plan15.rw_prob with plan15.sigma_from of the 60 Coinbase returns before the open; S_0 = Coinbase close at the open; mid = plan15.mid_of(plan15.quote(w, k)); k = 2, 5, 10, 13",
+ "period": "windows closing 2026-06-01 to 2026-08-31",
+ "plan": "research/PLAN22.md section 7 (POWER22)"
+}

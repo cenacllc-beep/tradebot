@@ -131,6 +131,13 @@ financial advice.
 - **Q-A:** the detectable Brier difference is filled in here from POWER22 (section 7) before the freeze, as 2.84 x its
   measured SE. If that is implausibly large (bigger than any gain a volatility input could make, e.g. above 0.005), the
   plan says so here: Q-A then has almost no power, and its result can only be "no edge shown".
+  **Measured (POWER22, run 2026-11-26 23:20 La Paz; research/results/power22.md):** SD of day means of Brier(RW) -
+  Brier(mid) over 92 Jun-Aug days: BTC 0.00702, ETH 0.00642 (34,712 and 34,711 rows; the mean was not computed for
+  display). Stage 2 (59 days, 2.5%, t 2.002): detectable at 80% power about 0.0026 (BTC) and 0.0024 (ETH); stage 1 on
+  about 61 Sep-Oct days is similar at its first Holm level and about 0.0021 at its last. Below the 0.005 line, so Q-A
+  is not declared powerless, but a Brier gain of 0.0024-0.0026 over Kalshi's mid is large for a volatility input
+  alone; read Q-A as able to see only a big accuracy gain. (Measured with PLAN15's realized SD, not DVOL; the stage
+  results restate power with the observed SEs.)
 - **End to end:** a true edge at the stage 2 80% line passes stage 1 with somewhat more than 80% (looser level) and
   stage 2 with about 80%, so about 65-70% overall before the further checks; taking the largest of four p's lowers this
   further, perhaps to 50-60%. A false lead passes both at most about 10% x 2.5% = 0.25% per test.
