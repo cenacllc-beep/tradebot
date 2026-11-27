@@ -2468,3 +2468,14 @@ unfamiliar codebase ... do not change functionality. only upgrade the code quali
 - Started: PLAN21 (walk-forward engine) and PLAN22 (Deribit implied volatility) as plans written before any of their
   data, each to be statistics-reviewed and frozen before code; attribution.py (descriptive report, code review);
   research/plan11.py built to the frozen PLAN11.md (code review before its first download).
+
+## 2026-11-26 (late evening, La Paz) - PLAN21 frozen; attribution.py built
+- research/PLAN21.md (walk-forward learning engine: monthly fit and freeze, 0.5% screen, 2.5% confirmation month with
+  Holm, 42-day paper stage; one e-process per candidate, at most 6 at a time and 12 in all; false promotion at most about
+  2%). Statistics-reviewed three times (first review: 11 findings; second: 5; final re-check: one text correction,
+  days to cross at 3 or fewer bets a day are slow and unreliable rather than "never"; exact noncentral-t powers). All
+  applied. **Frozen. SHA-256 6bc9db27688b4f961c4d0cc2f0427c1aba1c47d9118af1678b37a19b0d9ca448.** Its code
+  (research/plan21.py) is written, code-reviewed and frozen before the first freeze date. Research and paper only;
+  never real money directly. Expected result: no edge shown.
+- attribution.py (descriptive win/loss attribution; read-only; `run attribution`, also after learn.py in the settle
+  step; dashboard section "Win/loss attribution"; tests/test_attribution.py). Code review pending; not deployed to the PC.

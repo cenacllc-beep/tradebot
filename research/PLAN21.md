@@ -2,8 +2,8 @@
 
 Written 2026-11-26 (La Paz) at the user's request for a system that "learns from wins and losses" and detects winning
 patterns, before any of its numbers were computed and before any outcome was read for it. Revised the same day after
-its statistics review (agents/statistician.md; section 11). Frozen before the first freeze date; its SHA-256 then goes
-into CHANGELOG.md. Research and paper only. Not financial advice.
+its statistics review (agents/statistician.md; section 11). Frozen 2026-11-26 after a second review and a final
+re-check; its SHA-256 is in CHANGELOG.md. Changes only through an amendment the user approves. Research and paper only. Not financial advice.
 
 ## 0. The question, what "learning" means here, and the honest prior
 - Question: if we keep proposing models, fit each one only on the past, freeze it and judge it on the next month's
@@ -114,8 +114,8 @@ All read-only. Anything read before a freeze may be used for that freeze's fit o
 - **False-promotion bound:** at most 24 months x 6 slots = 144 screens; with no real edge the chance that any test
   passes both screen and confirmation is at most 144 x 0.005 x 0.025 = about 1.8% (plus section 5's e-processes, at
   most 0.15%), before the paper stage. **Two-stage power:** a true edge of 3.5 standard errors in each month passes
-  the screen (t line 2.756 at 29 degrees of freedom) about 77% of the time and the confirmation about 94%, about 0.72
-  together; requiring every check (bootstrap, placebo, bound, floors) lowers both further.
+  the screen (t line 2.756 at 29 degrees of freedom) about 77% of the time (exact noncentral t 0.765) and the
+  confirmation about 92%, about 0.71 together; requiring every check (bootstrap, placebo, bound, floors) lowers both further.
 - **E-process per candidate (catches small edges that build up over months):** a betting martingale on the candidate's
   scored day values x_d, in date order across all its scored months: W = product of (1 + lambda x_d). Units: dollars
   per contract (15-minute: the day-mean profit per contract after fees) or Brier units (rain: day mean of
@@ -131,8 +131,9 @@ All read-only. Anything read before a freeze may be used for that freeze's fit o
     crosses; if the candidate then fails confirmation, any new e-process for it uses up another of the 12. So at most
     12 x 0.005 x 0.025 = 0.15% is added to the false-promotion bound. No online-FDR method.
   - **Days to cross (median growth, before data):** for a true 2c edge on 3c contracts, about 64 scored days at 100
-    bets a day, 72 at 30, 106 at 10; at 3 or fewer bets a day the fixed fraction is too large and W is expected to
-    shrink, so it would not cross within the programme. A smaller edge takes longer still.
+    bets a day, 72 at 30, 103 at 10 (simulated median 99); at 3 or fewer bets a day it crosses slowly and unreliably
+    (about 60%, 23% and 5% within 24 months at 3, 2 and 1 bets a day). A smaller edge takes longer still.
+  - Days of a month whose test reads "not testable" still enter the e-process (all scored days count).
 
 ## 6. Promotion (never directly to real money)
 - After confirmation, a 15-minute candidate runs a **42-day forward paper stage** as PLAN20 section 5 (its frozen rule
@@ -173,7 +174,7 @@ Where code and text differ, the text wins, by a dated amendment before any numbe
 ## 11. Review (2026-11-26)
 1. (High) A single 0.0174% level gave almost no power: now a 0.5% screen, a 2.5% confirmation month (Holm) and a
    42-day paper stage, with the false-promotion bound and two-stage power stated (sections 0, 5, 6).
-2. (High) Small persistent edges were invisible month by month: an e-process per candidate (fraction 0.2, 0.5% each,
+2. (High) Small persistent edges were invisible month by month: an e-process per candidate (fraction 0.2 [superseded by the second review, item 1], 0.5% each,
    at most 6 at a time and 12 in all, Ville's inequality); crossing counts as a screen pass only (section 5).
 3. (High) S3/S4 overlapped PLAN7-9: no fit, score or figure until their final looks; S4 gets a mid-only control and a
    B test as PLAN8 (section 3).
@@ -181,7 +182,7 @@ Where code and text differ, the text wins, by a dated amendment before any numbe
 5. (Medium) 20,000 draws kept; the exact Poisson-binomial bound leads; Monte Carlo resolution stated (section 5).
 6. (Medium) Slots recorded in freezes.jsonl; retirement from the next freeze; at most 2 successors per idea (1, 4).
 7. (Medium-low) At most 2 registrations a month; breakdowns labelled exploratory in the report (section 4).
-8. (Medium-low) v3 model_versions pinned via plan7_versions.json; rain by market day; S1's series listed ("other"
+8. (Medium-low) v3 model_versions pinned via plan7_versions.json [superseded by the second review, item 3: versions written literally]; rain by market day; S1's series listed ("other"
    excluded); outcome-dependent drops reported and counted against floors (sections 2, 3).
 9. (Low) Fit cutoffs use the bot's own recorded settle time; strikes noted as not independent (sections 1, 4).
 10-11. (Low) BTC/ETH exclusion kept; honest paragraph on what refitting is and is not, and on clustering (0, 8).
@@ -189,7 +190,7 @@ Where code and text differ, the text wins, by a dated amendment before any numbe
 ### Second review (2026-11-26)
 1. E-process: units stated (dollars per contract; Brier units for rain); x capped at 1 from above only, with an
    assertion that 1 + lambda x >= 0 and no clipping; lambda = 0.5 / L (15-minute) and 0.5 / mean 2|m - q| (rain);
-   days to cross for a 2c edge stated, including "never" at 3 or fewer bets a day (section 5).
+   days to cross for a 2c edge stated, at 3 or fewer bets a day slow and unreliable (corrected at the final re-check) (section 5).
 2. Each e-process counts once and ends on crossing; a new one after a failed confirmation uses another of the 12;
    tied to the 0.15% bound (section 5).
 3. Rain data checked read-only in trial/paper.db (2026-11-26): allowed model_versions written literally, strategy
@@ -198,3 +199,10 @@ Where code and text differ, the text wins, by a dated amendment before any numbe
 4. Confirmation uses every check and floor at 2.5%; "not testable" means not confirmed; it takes a slot first (5).
 5. Notes added: SD 17c at 3c and 30c at 10c; screen power about 0.77 and two-stage about 0.72 at the t line 2.756;
    S4's e-process uses test A; rain loses about one market day a month at each freeze (sections 5, 8).
+
+### Final re-check (2026-11-26)
+Verdict: valid e-process (nonnegative supermartingale under the null; bounds hold for 15-minute and rain), one crossing
+and 12 in all consistent, rain rows confirmed (two allowed versions; all 943 obs rows join within 0.001 s), confirmation
+rules consistent. Corrected: days to cross at 3 or fewer bets a day (slow and unreliable, not "never"); exact
+noncentral-t powers (0.765 screen, 0.92 confirmation, about 0.71 together); earlier items marked superseded; scored days
+of a "not testable" month enter the e-process. Frozen after these text corrections.
