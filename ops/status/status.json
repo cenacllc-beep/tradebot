@@ -1,21 +1,21 @@
 {
  "ai": {
-  "model": "nvidia/nemotron-3.5-lightning-30b-a3b",
-  "note": null,
-  "task": "check-summary",
-  "used": true
+  "model": null,
+  "note": "all green: no AI call needed",
+  "task": null,
+  "used": false
  },
  "data": [
   {
-   "age_hours": 1.8,
+   "age_hours": 0.3,
    "limit_hours": 6,
-   "newest_commit_at": "2026-11-26T21:30:45Z",
+   "newest_commit_at": "2026-11-27T03:30:18Z",
    "path": "research/data/live20",
    "problem": null,
    "state": "ok"
   },
   {
-   "age_hours": 19.7,
+   "age_hours": 24.2,
    "limit_hours": 3,
    "newest_commit_at": "2026-11-26T03:34:50Z",
    "path": "research/data/plan19",
@@ -23,7 +23,7 @@
    "state": "inactive"
   },
   {
-   "age_hours": 3.8,
+   "age_hours": 8.2,
    "limit_hours": null,
    "newest_commit_at": "2026-11-26T19:32:10Z",
    "path": "research/data/plan20",
@@ -31,30 +31,30 @@
    "state": "info"
   },
   {
-   "age_hours": 3.8,
+   "age_hours": 0.5,
    "limit_hours": null,
-   "newest_commit_at": "2026-11-26T19:32:10Z",
+   "newest_commit_at": "2026-11-27T03:17:56Z",
    "path": "research/results",
    "problem": null,
    "state": "info"
   },
   {
-   "age_hours": 21.2,
+   "age_hours": 1.8,
    "limit_hours": 30,
-   "newest_commit_at": "2026-11-26T02:04:37Z",
+   "newest_commit_at": "2026-11-27T01:57:54Z",
    "path": "trial",
    "problem": null,
    "state": "ok"
   }
  ],
  "errors": [],
- "generated_at": "2026-11-26T23:19:03Z",
- "generated_at_la_paz": "2026-11-26 19:19",
+ "generated_at": "2026-11-27T03:45:41Z",
+ "generated_at_la_paz": "2026-11-26 23:45",
  "issue": "none",
  "key_present": true,
  "note": "Reads GitHub only; the PC is not reachable from here.",
  "problems": [],
- "report_text": "**Status Report**\n\n**What works:**  \n- `backup-ai.yml` just started (age\u202f0\u202fmin, limit\u202f360\u202fmin).  \n- `live20.yml`, `tradebot-scan.yml`, `tradebot-settle.yml`, `trial-scan-backstop.yml` and `trial` data are all `ok` and within their time limits.  \n- `research/data/live20` is fresh (1.8\u202fh old, 6\u202fh limit).  \n\n**Stale or over limit:**  \n- `live20.yml`: running 433\u202fmin vs 180\u202fmin limit \u2192 likely exceeded allocated time; may be stuck or auto\u2011cancel didn\u2019t trigger. *Next step:* monitor the run to completion; no PC involvement.  \n- `plan19.yml`: manual\u2011only for ~6.7\u202fdays \u2192 designed for manual trigger or forgotten. *Next step:* use the GitHub Actions UI to trigger manually if needed.  \n- `research/data/plan19`: 19.7\u202fh old, limit 3\u202fh, state `inactive` \u2192 data window exceeded, marked inactive. *Next step:* refresh or re\u2011run the data pull when ready.  \n- `plan5-lip.yml`: `disabled` \u2192 intentionally off. *Next step:* re\u2011enable via repository settings if required.  \n- `plan10,15,16,17,18,probe18.yml`: manual\u2011only for 7\u201313\u202fdays \u2192 likely waiting for a manual start or paused. *Next step:* trigger manually via the GitHub UI or review the intended schedule.  \n\n**Note:** All issues are within the GitHub repository/Actions; the user\u2019s local PC is not involved.",
+ "report_text": "All checks are green: every scheduled job ran on time or is running, and every data feed is fresh. Manual-only and disabled jobs are expected to be idle.",
  "repository": "cenacllc-beep/tradebot",
  "schema": 1,
  "workflows": [
@@ -66,23 +66,23 @@
     "attempt": 1,
     "branch": "main",
     "conclusion": null,
-    "created_at": "2026-11-26T23:18:44Z",
-    "event": "workflow_dispatch",
-    "id": 45910176226,
+    "created_at": "2026-11-27T03:45:34Z",
+    "event": "schedule",
+    "id": 45936021685,
     "status": "in_progress",
     "title": "Backup AI operator",
-    "url": "https://github.com/cenacllc-beep/tradebot/actions/runs/45910176226"
+    "url": "https://github.com/cenacllc-beep/tradebot/actions/runs/45936021685"
    },
    "latest_completed": {
     "attempt": 1,
     "branch": "main",
     "conclusion": "success",
-    "created_at": "2026-11-26T23:13:33Z",
+    "created_at": "2026-11-26T23:18:44Z",
     "event": "workflow_dispatch",
-    "id": 45909652394,
+    "id": 45910176226,
     "status": "completed",
     "title": "Backup AI operator",
-    "url": "https://github.com/cenacllc-beep/tradebot/actions/runs/45909652394"
+    "url": "https://github.com/cenacllc-beep/tradebot/actions/runs/45910176226"
    },
    "limit_minutes": 360,
    "name": "Backup AI operator",
@@ -93,19 +93,19 @@
    "state": "running"
   },
   {
-   "age_minutes": 433,
+   "age_minutes": 165,
    "expected_max_gap_minutes": 60,
    "file": "live20.yml",
    "latest": {
     "attempt": 1,
     "branch": "main",
-    "conclusion": "success",
-    "created_at": "2026-11-26T16:05:54Z",
+    "conclusion": null,
+    "created_at": "2026-11-27T00:59:59Z",
     "event": "schedule",
-    "id": 45855524121,
-    "status": "completed",
+    "id": 45919985647,
+    "status": "in_progress",
     "title": "PLAN20 forward logger (research)",
-    "url": "https://github.com/cenacllc-beep/tradebot/actions/runs/45855524121"
+    "url": "https://github.com/cenacllc-beep/tradebot/actions/runs/45919985647"
    },
    "latest_completed": {
     "attempt": 1,
@@ -124,10 +124,10 @@
    "schedule": [
     "7 * * * *"
    ],
-   "state": "ok"
+   "state": "running"
   },
   {
-   "age_minutes": 18573,
+   "age_minutes": 18839,
    "expected_max_gap_minutes": null,
    "file": "plan10.yml",
    "latest": {
@@ -159,7 +159,7 @@
    "state": "manual-only"
   },
   {
-   "age_minutes": 11376,
+   "age_minutes": 11642,
    "expected_max_gap_minutes": null,
    "file": "plan15.yml",
    "latest": {
@@ -191,7 +191,7 @@
    "state": "manual-only"
   },
   {
-   "age_minutes": 10800,
+   "age_minutes": 11067,
    "expected_max_gap_minutes": null,
    "file": "plan16.yml",
    "latest": {
@@ -223,7 +223,7 @@
    "state": "manual-only"
   },
   {
-   "age_minutes": 10799,
+   "age_minutes": 11066,
    "expected_max_gap_minutes": null,
    "file": "plan17.yml",
    "latest": {
@@ -255,7 +255,7 @@
    "state": "manual-only"
   },
   {
-   "age_minutes": 9619,
+   "age_minutes": 9886,
    "expected_max_gap_minutes": null,
    "file": "plan18.yml",
    "latest": {
@@ -287,30 +287,30 @@
    "state": "manual-only"
   },
   {
-   "age_minutes": 231,
+   "age_minutes": 58,
    "expected_max_gap_minutes": 60,
    "file": "plan19.yml",
    "latest": {
     "attempt": 1,
     "branch": "main",
     "conclusion": null,
-    "created_at": "2026-11-26T19:27:34Z",
-    "event": "workflow_dispatch",
-    "id": 45883796248,
+    "created_at": "2026-11-27T02:46:56Z",
+    "event": "schedule",
+    "id": 45930341775,
     "status": "in_progress",
     "title": "PLAN19 hourly sample (research)",
-    "url": "https://github.com/cenacllc-beep/tradebot/actions/runs/45883796248"
+    "url": "https://github.com/cenacllc-beep/tradebot/actions/runs/45930341775"
    },
    "latest_completed": {
     "attempt": 1,
     "branch": "main",
     "conclusion": "success",
-    "created_at": "2026-11-26T13:10:06Z",
-    "event": "schedule",
-    "id": 45826507946,
+    "created_at": "2026-11-26T19:27:34Z",
+    "event": "workflow_dispatch",
+    "id": 45883796248,
     "status": "completed",
     "title": "PLAN19 hourly sample (research)",
-    "url": "https://github.com/cenacllc-beep/tradebot/actions/runs/45826507946"
+    "url": "https://github.com/cenacllc-beep/tradebot/actions/runs/45883796248"
    },
    "limit_minutes": 180,
    "name": "PLAN19 hourly sample (research)",
@@ -321,36 +321,36 @@
    "state": "running"
   },
   {
-   "age_minutes": 432,
+   "age_minutes": 226,
    "expected_max_gap_minutes": null,
    "file": "plan20.yml",
    "latest": {
     "attempt": 1,
     "branch": "main",
-    "conclusion": "success",
-    "created_at": "2026-11-26T16:06:41Z",
+    "conclusion": null,
+    "created_at": "2026-11-26T23:58:54Z",
     "event": "workflow_dispatch",
-    "id": 45855645641,
-    "status": "completed",
+    "id": 45914040409,
+    "status": "in_progress",
     "title": "PLAN20 cheap sides, all 15-minute series (research)",
-    "url": "https://github.com/cenacllc-beep/tradebot/actions/runs/45855645641"
+    "url": "https://github.com/cenacllc-beep/tradebot/actions/runs/45914040409"
    },
    "latest_completed": {
     "attempt": 1,
     "branch": "main",
     "conclusion": "success",
-    "created_at": "2026-11-26T16:06:41Z",
+    "created_at": "2026-11-26T23:57:18Z",
     "event": "workflow_dispatch",
-    "id": 45855645641,
+    "id": 45913900147,
     "status": "completed",
     "title": "PLAN20 cheap sides, all 15-minute series (research)",
-    "url": "https://github.com/cenacllc-beep/tradebot/actions/runs/45855645641"
+    "url": "https://github.com/cenacllc-beep/tradebot/actions/runs/45913900147"
    },
    "limit_minutes": null,
    "name": "PLAN20 cheap sides, all 15-minute series (research)",
    "problem": null,
    "schedule": [],
-   "state": "manual-only"
+   "state": "running"
   },
   {
    "age_minutes": null,
@@ -367,7 +367,7 @@
    "state": "disabled"
   },
   {
-   "age_minutes": 11443,
+   "age_minutes": 11709,
    "expected_max_gap_minutes": null,
    "file": "probe18.yml",
    "latest": {
@@ -399,7 +399,7 @@
    "state": "manual-only"
   },
   {
-   "age_minutes": 1271,
+   "age_minutes": 1538,
    "expected_max_gap_minutes": null,
    "file": "probe19.yml",
    "latest": {
@@ -431,30 +431,30 @@
    "state": "manual-only"
   },
   {
-   "age_minutes": 557,
+   "age_minutes": 110,
    "expected_max_gap_minutes": 1230,
    "file": "tradebot-scan.yml",
    "latest": {
     "attempt": 1,
     "branch": "main",
     "conclusion": "success",
-    "created_at": "2026-11-26T14:01:54Z",
-    "event": "schedule",
-    "id": 45834914536,
+    "created_at": "2026-11-27T01:55:33Z",
+    "event": "workflow_dispatch",
+    "id": 45925327668,
     "status": "completed",
     "title": "tradebot evening scan (trial)",
-    "url": "https://github.com/cenacllc-beep/tradebot/actions/runs/45834914536"
+    "url": "https://github.com/cenacllc-beep/tradebot/actions/runs/45925327668"
    },
    "latest_completed": {
     "attempt": 1,
     "branch": "main",
     "conclusion": "success",
-    "created_at": "2026-11-26T14:01:54Z",
-    "event": "schedule",
-    "id": 45834914536,
+    "created_at": "2026-11-27T01:55:33Z",
+    "event": "workflow_dispatch",
+    "id": 45925327668,
     "status": "completed",
     "title": "tradebot evening scan (trial)",
-    "url": "https://github.com/cenacllc-beep/tradebot/actions/runs/45834914536"
+    "url": "https://github.com/cenacllc-beep/tradebot/actions/runs/45925327668"
    },
    "limit_minutes": 1590,
    "name": "tradebot evening scan (trial)",
@@ -467,30 +467,30 @@
    "state": "ok"
   },
   {
-   "age_minutes": 1282,
+   "age_minutes": 110,
    "expected_max_gap_minutes": 1200,
    "file": "tradebot-settle.yml",
    "latest": {
     "attempt": 1,
     "branch": "main",
     "conclusion": "success",
-    "created_at": "2026-11-26T01:56:22Z",
+    "created_at": "2026-11-27T01:54:53Z",
     "event": "schedule",
-    "id": 45739074057,
+    "id": 45925264145,
     "status": "completed",
     "title": "tradebot afternoon settle (trial)",
-    "url": "https://github.com/cenacllc-beep/tradebot/actions/runs/45739074057"
+    "url": "https://github.com/cenacllc-beep/tradebot/actions/runs/45925264145"
    },
    "latest_completed": {
     "attempt": 1,
     "branch": "main",
     "conclusion": "success",
-    "created_at": "2026-11-26T01:56:22Z",
+    "created_at": "2026-11-27T01:54:53Z",
     "event": "schedule",
-    "id": 45739074057,
+    "id": 45925264145,
     "status": "completed",
     "title": "tradebot afternoon settle (trial)",
-    "url": "https://github.com/cenacllc-beep/tradebot/actions/runs/45739074057"
+    "url": "https://github.com/cenacllc-beep/tradebot/actions/runs/45925264145"
    },
    "limit_minutes": 1560,
    "name": "tradebot afternoon settle (trial)",
@@ -501,30 +501,30 @@
    "state": "ok"
   },
   {
-   "age_minutes": 572,
+   "age_minutes": 110,
    "expected_max_gap_minutes": 1260,
    "file": "trial-scan-backstop.yml",
    "latest": {
     "attempt": 1,
     "branch": "main",
     "conclusion": "success",
-    "created_at": "2026-11-26T13:46:49Z",
-    "event": "schedule",
-    "id": 45832467187,
+    "created_at": "2026-11-27T01:55:15Z",
+    "event": "workflow_run",
+    "id": 45925300634,
     "status": "completed",
     "title": "trial scan backstop",
-    "url": "https://github.com/cenacllc-beep/tradebot/actions/runs/45832467187"
+    "url": "https://github.com/cenacllc-beep/tradebot/actions/runs/45925300634"
    },
    "latest_completed": {
     "attempt": 1,
     "branch": "main",
     "conclusion": "success",
-    "created_at": "2026-11-26T13:46:49Z",
-    "event": "schedule",
-    "id": 45832467187,
+    "created_at": "2026-11-27T01:55:15Z",
+    "event": "workflow_run",
+    "id": 45925300634,
     "status": "completed",
     "title": "trial scan backstop",
-    "url": "https://github.com/cenacllc-beep/tradebot/actions/runs/45832467187"
+    "url": "https://github.com/cenacllc-beep/tradebot/actions/runs/45925300634"
    },
    "limit_minutes": 1620,
    "name": "trial scan backstop",
