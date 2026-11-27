@@ -1,0 +1,132 @@
+# PLAN11 (research only, research/PLAN11.md, frozen 2026-11-12): radar and the airport rain gauge during the market day,
+# against Kalshi's price at that moment, replayed on every settled KXRAIN market of market days 2026-07-15..2026-11-10.
+# Started by hand only (workflow_dispatch), one stage per run. Public data only: Kalshi's public API (read-only GETs)
+# and the Iowa Environmental Mesonet (its N0Q radar mosaic archive and METAR archive; approved by the user 2026-11-11).
+# It never places, changes or cancels an order, never touches trial/, paper.db or live.db, and commits only
+# research/results/plan11* and research/data/plan11/ (it refuses to commit anything else; research/data/ is ignored by
+# the repository's .gitignore, so the data files are added with -f). Radar frames are decoded in memory and reduced to
+# per-station readings at once; no frame is ever stored or committed.
+# Order (plan section 8): freeze (once) -> probe (once; a failed probe stops the plan until an amendment) -> markets
+# (once) -> download (as many runs as needed; resumable, 300-minute budget) -> signals (once, only when every download is
+# complete) -> score (once). Pillow and numpy, pinned, are installed on the runner only, for the stages that read radar
+# frames (probe reads only the PNG header with the standard library, so only download installs them).
+# Switched on only after the code review: until then this file lives in cloud/workflows only.
+name: PLAN11 radar and gauge vs the intraday price (research)
+on:
+  workflow_dispatch:
+    inputs:
+      stage:
+        description: "freeze (once) | probe (once) | markets (once) | download | signals (once) | score (once) | status"
+        required: true
+        type: choice
+        options: [status, freeze, probe, markets, download, signals, score]
+      only:
+        description: "download only: candles | gauge | radar (empty = all three, in that order)"
+        required: false
+        default: ""
+concurrency:
+  group: tradebot-plan11
+  cancel-in-progress: false
+permissions:
+  contents: write
+jobs:
+  stage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09   # v5.1.0
+        with:
+          ref: main
+          fetch-depth: 0   # full history: the once-only guards look for any earlier commit of a file
+          filter: blob:none   # commits and trees only; file contents are fetched when checked out or read
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1   # v6.3.0
+        with:
+          python-version: "3.12"
+      - name: Refuse a second freeze
+        if: inputs.stage == 'freeze'
+        run: |
+          if git log --oneline -- research/results/plan11_identity.json | grep -q .; then
+            echo "already frozen: research/results/plan11_identity.json was committed once; it is stored once"; exit 1
+          fi
+      - name: Refuse every later stage unless the identity record is committed and unchanged
+        if: inputs.stage != 'freeze' && inputs.stage != 'status'
+        run: |
+          f=research/results/plan11_identity.json
+          git ls-files --error-unmatch "$f" >/dev/null 2>&1 || { echo "$f is not committed: run freeze first"; exit 1; }
+          git diff --quiet HEAD -- "$f" || { echo "$f differs from the commit: stopping"; exit 1; }
+      - name: Refuse a second probe
+        if: inputs.stage == 'probe'
+        run: |
+          if git log --oneline -- research/results/plan11_probe.json | grep -q .; then
+            echo "research/results/plan11_probe.json was committed once: the probe runs once"; exit 1
+          fi
+      - name: Refuse any stage after the probe unless the probe is committed and unchanged
+        if: inputs.stage == 'markets' || inputs.stage == 'download' || inputs.stage == 'signals' || inputs.stage == 'score'
+        run: |
+          f=research/results/plan11_probe.json
+          git ls-files --error-unmatch "$f" >/dev/null 2>&1 || { echo "$f is not committed: run probe first"; exit 1; }
+          git diff --quiet HEAD -- "$f" || { echo "$f differs from the commit: stopping"; exit 1; }
+      - name: Refuse a second market list
+        if: inputs.stage == 'markets'
+        run: |
+          if git log --oneline -- research/data/plan11/markets.json.gz | grep -q .; then
+            echo "research/data/plan11/markets.json.gz was committed once: the markets are listed once"; exit 1
+          fi
+      - name: Refuse a second signals file, or one after a score
+        if: inputs.stage == 'signals'
+        run: |
+          for f in research/results/plan11_signals.json research/results/plan11_result.json research/results/plan11_result.md; do
+            if git log --oneline -- "$f" | grep -q .; then echo "$f was committed once: signals are worked out once, before the score"; exit 1; fi
+          done
+      - name: Refuse a second score, or a score before the signals
+        if: inputs.stage == 'score'
+        run: |
+          f=research/results/plan11_signals.json
+          git ls-files --error-unmatch "$f" >/dev/null 2>&1 || { echo "$f is not committed: run signals first"; exit 1; }
+          git diff --quiet HEAD -- "$f" || { echo "$f differs from the commit: stopping"; exit 1; }
+          for f in research/results/plan11_result.json research/results/plan11_result.md; do
+            if git log --oneline -- "$f" | grep -q .; then echo "$f was committed once: the plan is scored once"; exit 1; fi
+          done
+      - name: Install the pinned packages (download only, runner only)
+        if: inputs.stage == 'download'
+        run: python -m pip install --disable-pip-version-check "numpy==2.3.4" "pillow==11.3.0"
+      - name: Run the stage
+        env:
+          TZ: UTC
+          PYTHONIOENCODING: utf-8
+          STAGE: ${{ inputs.stage }}
+          ONLY: ${{ inputs.only }}
+        run: |
+          extra=""
+          if [ -n "$ONLY" ]; then
+            case "$ONLY" in (candles|gauge|radar) extra="--only $ONLY";; (*) echo "only must be candles, gauge or radar"; exit 1;; esac
+          fi
+          case "$STAGE" in
+            download) python research/plan11.py download --budget-minutes 300 $extra ;;
+            freeze|probe|markets|signals|score|status) python research/plan11.py "$STAGE" ;;
+            *) echo "unknown stage $STAGE"; exit 1 ;;
+          esac
+      - name: Save research/results/plan11* and research/data/plan11/ in the repository (and nothing else)
+        if: always() && inputs.stage != 'status'
+        run: |
+          others=$(git status --porcelain --untracked-files=all | grep -v -E '^.. "?research/(results/plan11|data/plan11/)' || true)
+          if [ -n "$others" ]; then echo "refusing to commit: files outside research/results/plan11* and research/data/plan11/ changed:"; echo "$others"; exit 1; fi
+          big=$(find research/results research/data -path 'research/results/plan11*' -type f -size +50M -o -path 'research/data/plan11/*' -type f -size +50M)
+          if [ -n "$big" ]; then echo "refusing to commit files over 50 MB:"; echo "$big"; exit 1; fi
+          png=$(find research/data/plan11 research/results -path '*plan11*' -type f \( -name '*.png' -o -name '*.wld' \) 2>/dev/null || true)
+          if [ -n "$png" ]; then echo "refusing to commit radar frames:"; echo "$png"; exit 1; fi
+          find research/results research/data -path 'research/results/plan11*' -name '*.tmp' -type f -delete -o -path 'research/data/plan11/*' -name '*.tmp' -type f -delete
+          git config user.name "tradebot-runner"
+          git config user.email "tradebot-runner@users.noreply.github.com"
+          git add -A -- 'research/results/plan11*'
+          if [ -d research/data/plan11 ]; then git add -A -f -- research/data/plan11; fi
+          git diff --cached --name-only | grep -v -E '^research/(results/plan11|data/plan11/)' && { echo "refusing: staged files outside research/results/plan11* and research/data/plan11/"; exit 1; }
+          git commit -m "PLAN11 $STAGE $(date -u +%FT%H:%MZ)" || { echo "nothing new"; exit 0; }
+          for i in 1 2 3 4 5 6; do
+            git push origin HEAD:main && exit 0
+            sleep $((i * 10))
+            git pull --rebase origin main || { git rebase --abort 2>/dev/null || true; }
+          done
+          exit 1
+        env:
+          STAGE: ${{ inputs.stage }}

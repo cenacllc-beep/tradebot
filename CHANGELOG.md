@@ -2479,3 +2479,24 @@ unfamiliar codebase ... do not change functionality. only upgrade the code quali
   never real money directly. Expected result: no edge shown.
 - attribution.py (descriptive win/loss attribution; read-only; `run attribution`, also after learn.py in the settle
   step; dashboard section "Win/loss attribution"; tests/test_attribution.py). Code-reviewed (no blockers; 10 findings, all fixed: bot/mixed/you grouping and env shown, the bet-level model labelled the 50/50 blend with a raw-v3 Brier row, scalar/void kept so net matches the ledger, absolute results path, pooled rolling gap stated, zero-contract and dateless rows skipped, atomic md write, escaping tested, luck SE marked not clustered). All tests passed. Not yet deployed to the PC.
+
+## 2026-11-27 (about 00:30 La Paz) - research/plan11.py built to the frozen PLAN11.md (not yet switched on)
+- research/plan11.py, tests/test_plan11.py, cloud/workflows/plan11.yml (no .github copy: the job is not active).
+  PLAN11.md unchanged (SHA-256 244f408a67232fd78f01aa759e9ccc7ced7e986fa6ef79c0618b165a04dbe3f6, as r83). Stages:
+  freeze, probe, markets, download, signals, score (once), status. Network: GETs only, IEM (mesonet.agron.iastate.edu,
+  at most one request a second) and Kalshi's public API, User-Agent tradebot-paper-research/1.0; never an order, never
+  live.py, never paper.db. Pillow/numpy pinned on the runner only (approved 2026-11-11).
+- Independent code review: no safety blocker; findings fixed: METAR routine/special request checked by the probe before
+  any download; West Palm Beach merges DJT and PBI; signals and score refuse if their file was ever committed
+  (git history); download retry wait capped at 300 s and redirects off the allowed hosts refused, with transport tests;
+  price-lookup docstring corrected; the PC copies the result to Documents\tradebot_backups after the score (section 8);
+  the rain-day share computed per day.
+- **Reading of "loses its radar frames" (PLAN11 section 5), the user's choice 2026-11-26 before any download:** a market
+  loses radar only when none of its decision times has a usable t-10 frame (RADAR_LOSS_READING = "t10"). The strict
+  count (any needed frame missing) is reported as a descriptive figure. Other stated readings are listed in the module
+  docstring (pixel centres from the .wld, inclusive caps, strictly after the day start, COR reports dropped, a lost gauge
+  blocks R and P, untestable rules keep their Holm place last, KPBI counted as KDJT).
+- Known consequence of the frozen Holm order, told to the user: if G has the smallest p and fails its win-rate bound, R
+  and P cannot pass that run.
+- Next: copy the workflow to .github/workflows and run the probe stage first; the bulk download (about 6-17 GB over
+  2-3 runs, about 30 MB kept) starts only if the probe confirms the radar grid and the METAR format.

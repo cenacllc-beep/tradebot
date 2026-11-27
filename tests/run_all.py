@@ -40,6 +40,7 @@ TESTS=[("test_fix.py",[],"daily loss stop, migration, clear margin, single-look 
        ("test_plan8.py",[],"PLAN8: the price with the airport forecast mixed in, fitted once on past data, looks at 60 and 110 days"),
        ("test_plan9.py",[],"PLAN9: v3's hourly chances in 6-hour blocks, vs the price and vs v3, looks at 60 and 110 days"),
        ("test_plan10.py",[],"PLAN10: HRRR features on synthetic grids, fit once, holdout after the model, scored once"),
+       ("test_plan11.py",[],"PLAN11: radar and gauge vs the intraday price on fake frames, METAR and candles; delays, rules, scored once"),
        ("test_plan15.py",[],"PLAN15: 15-minute BTC/ETH markets, random walk and frozen logistic models vs the price, scored once"),
        ("test_plan16.py",[],"PLAN16: four rules for the 15-minute markets on synthetic data, scored once, never an order"),
        ("test_live15.py",[],"PLAN15F: live paper bets on the 15-minute markets, fake Kalshi/Coinbase, never an order"),
