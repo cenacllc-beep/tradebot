@@ -24,9 +24,11 @@ into CHANGELOG.md. Research and paper only. Not financial advice.
 - **Freeze (once per candidate and month):** the nominal freeze time is M's 1st at 00:00; the job runs from 00:10 and
   retries hourly until the 2nd 23:59, else the candidate sits out M ("missed freeze", counted). Fit data are rows whose
   result the bot itself had recorded before the nominal freeze time: live20's results.json with settled_ts earlier, and
-  for rain the trial/paper.db as committed to the repository at or before that time. The fitted model (coefficients,
-  scaling, fit rows' count and hash, code hash) is written to research/results/plan21/models/YYYY-MM/<id>.json; its
-  SHA-256 and **the list of tests holding M's scored slots** are appended to research/results/plan21/freezes.jsonl.
+  for rain market_results.recorded_ts earlier, read from trial/paper.db as committed at or before that time. The fitted
+  model (coefficients, scaling, fit rows' count and hash, code hash) is written to
+  research/results/plan21/models/YYYY-MM/<id>.json; its SHA-256, the repository commit SHA read, the allowed rain
+  model_versions (section 2) and **the list of tests holding M's scored slots** go into
+  research/results/plan21/freezes.jsonl.
 - **Scored markets:** those whose first decision moment (section 2) is after the nominal freeze time and whose
   close (rain: whose market day) falls inside M. Nothing settled before the freeze is scored; nothing from M is fitted
   on for M.
@@ -42,9 +44,13 @@ All read-only. Anything read before a freeze may be used for that freeze's fit o
   snap-*.jsonl.gz (ts, minute, ticker, series, event, open, close, yes_bid, yes_ask, no_bid, no_ask, last, volume, oi)
   only to count gaps. Asset groups from research/results/plan20_series.json.
 - **Rain (GitHub's trial copy, trial/paper.db, opened read-only through tbcommon/db.py; never the PC's paper.db):**
-  table obs, version "v3", market_type rain: ticker, ts (log time), fc (v3), mid, result; only rows whose decision
-  ledger row (audit.py) carries a model_version listed in research/results/plan7_versions.json when this plan is frozen
-  (rows without one are left out and counted; a new v3 version never counts without an amendment). Table v4_obs:
+  table obs, version "v3", market_type rain: ticker, ts (log time), fc (v3), mid; the result and its time from
+  market_results (ticker, result, recorded_ts). **Join:** an obs row's decision row is the earliest row of table
+  decisions with the same ticker and strategy_id "forecast_alpha.rain.v3", and it counts only if that row's ts is within
+  5 seconds of obs.ts (seen read-only 2026-11-26: all 943 rain obs rows matched within 0.001 s) and its model_version is
+  one of exactly **"v3@ecb9ddc276bf" and "v3@eca51ea91f19"** (the two seen 2026-11-26; "v3" rows belong to
+  maker_spread.rain.v3 and never count). Each freeze record lists the allowed strings; a new version never counts
+  without a dated amendment. Rows that fail the join are left out and counted. Table v4_obs:
   ticker, ts, fc (airport forecast), mid, bid, ask, result, start_ts; only rows logged 00:50-01:30 UTC. Day = the
   market day (tbcommon market_day).
 - **PLAN19's samples** (research/data/plan19/): not used. PLAN19 shows no figures before its score and stops sampling
@@ -80,8 +86,8 @@ All read-only. Anything read before a freeze may be used for that freeze's fit o
   itself**; nothing in them can pass.
 - An idea from it (or from the user) becomes a candidate only by an entry appended to
   **research/plan21_candidates.json**: id (never reused), registered (La Paz time), origin, first month, data and
-  fields, fit window and procedure, rule, statistic, floors, placebo, e-process settings (section 5), and the SHA-256 of the
-  definition. It must be registered by the 25th of the month before its first scored month, statistics-reviewed, and
+  fields, fit window and procedure, rule, statistic, floors, placebo, e-process settings (section 5), and the SHA-256
+  of the definition. It must be registered by the 25th of the month before its first scored month, statistics-reviewed, and
   recorded in CHANGELOG.md with the file's new SHA-256. **At most 2 new registrations a month.** An idea from month k's
   report (published on the 8th of k+1) is first scored in month k+2 at the earliest.
 - Entries are append-only and never edited. A candidate changes only by being **retired** and **superseded** by a new
@@ -101,19 +107,32 @@ All read-only. Anything read before a freeze may be used for that freeze's fit o
      Monte Carlo resolution: one draw is 0.005% of p, and the standard error of a p near 0.5% is about 0.05%;
   4. floors: 300 bets (rain: 300 markets) and 20 days with a bet in the month, else "not testable".
 - **Stage 2, confirmation month:** the first whole month whose freeze comes after the screening pass is recorded
-  (normally k+2), new data only, the candidate's own procedure, at **2.5% one-sided**, Holm across candidates confirming
-  in the same month. **Stage 3:** a PLAN20-style 42-day forward paper stage (section 6).
+  (normally k+2), new data only, the candidate's own procedure, every check and floor of stage 1 at **2.5% one-sided**,
+  Holm across candidates confirming in the same month. A "not testable" confirmation month means **not confirmed**. A
+  confirming candidate takes one of the 6 slots, ahead of every other. **Stage 3:** a PLAN20-style 42-day forward paper
+  stage (section 6).
 - **False-promotion bound:** at most 24 months x 6 slots = 144 screens; with no real edge the chance that any test
   passes both screen and confirmation is at most 144 x 0.005 x 0.025 = about 1.8% (plus section 5's e-processes, at
-  most 0.15%), before the paper stage. **Two-stage power:** a true edge of 3.5 standard errors (in each month) passes
-  the screen about 82% of the time and the confirmation about 94%, about 0.77 together.
-- **E-process per candidate (catches small edges that build up over months):** for each candidate, a betting
-  martingale on its scored day values x_d (15-minute: day-mean profit per contract; rain: Brier(mid) - Brier(q)), each
-  clipped to [-1, 1], in date order across all its scored months: W = product of (1 + 0.2 x x_d), the betting fraction
-  fixed at 0.2. Under no edge (each day's expected x at most 0 given the past) W is a nonnegative supermartingale, so
-  by Ville's inequality it ever reaches 200 = 1/0.005 with chance at most 0.5%. It is read once a month at the score.
-  At most 6 e-process slots at a time and at most 12 in the whole programme (the first candidates given one). Reaching
-  200 counts like a screening pass: it still needs the confirmation month and the paper stage. No online-FDR method.
+  most 0.15%), before the paper stage. **Two-stage power:** a true edge of 3.5 standard errors in each month passes
+  the screen (t line 2.756 at 29 degrees of freedom) about 77% of the time and the confirmation about 94%, about 0.72
+  together; requiring every check (bootstrap, placebo, bound, floors) lowers both further.
+- **E-process per candidate (catches small edges that build up over months):** a betting martingale on the candidate's
+  scored day values x_d, in date order across all its scored months: W = product of (1 + lambda x_d). Units: dollars
+  per contract (15-minute: the day-mean profit per contract after fees) or Brier units (rain: day mean of
+  Brier(mid) - Brier(q)). x_d is capped at 1 from above only; the code asserts 1 + lambda x_d >= 0 and never clips
+  from below (a failed assertion stops the candidate's e-process, reported).
+  - 15-minute: lambda = 0.5 / L, with L the largest possible loss per contract in the candidate's price band (top ask
+    plus the largest fee per contract; about 0.11 for 1-10c cheap sides), fixed in the registry entry.
+  - Rain: lambda_d = 0.5 / (the day mean of 2|m - q|), known before the outcome, since Brier(mid) - Brier(q) >=
+    -2|m - q| for each market; a day where that mean is 0 is skipped. S4's e-process uses test A (S4 vs the mid).
+  - Under no edge (each day's expected x at most 0 given the past) W is a nonnegative supermartingale, so by Ville's
+    inequality it ever reaches 200 = 1/0.005 with chance at most 0.5%. Read once a month at the score.
+  - At most 6 at a time and 12 in the whole programme. Each counts as a screening pass **once** and ends when it
+    crosses; if the candidate then fails confirmation, any new e-process for it uses up another of the 12. So at most
+    12 x 0.005 x 0.025 = 0.15% is added to the false-promotion bound. No online-FDR method.
+  - **Days to cross (median growth, before data):** for a true 2c edge on 3c contracts, about 64 scored days at 100
+    bets a day, 72 at 30, 106 at 10; at 3 or fewer bets a day the fixed fraction is too large and W is expected to
+    shrink, so it would not cross within the programme. A smaller edge takes longer still.
 
 ## 6. Promotion (never directly to real money)
 - After confirmation, a 15-minute candidate runs a **42-day forward paper stage** as PLAN20 section 5 (its frozen rule
@@ -130,10 +149,13 @@ All read-only. Anything read before a freeze may be used for that freeze's fit o
   dashboard section "Learning engine (PLAN21)" shows the same, read-only. Before a score only counts appear.
 
 ## 8. Power (stated before the data; ignores clustering, so real thresholds are higher)
-At 0.5% one-sided with 80% power a monthly screen needs about 3.4 standard errors (normal) or 3.6 (t, 30 day means):
-- cheap sides (1-10c; one bet's SD about 17c): 300 bets 3.4c, 1,000 bets 1.8c, 3,000 bets 1.1c a contract;
+At 0.5% one-sided with 80% power a monthly screen needs about 3.4 standard errors (normal) or 3.6 (t line 2.756, 30
+day means):
+- cheap sides (one bet's SD about 17c at 3c, about 30c at 10c; figures at 17c, so 10c bets need about 1.8 times
+  more): 300 bets 3.4c, 1,000 bets 1.8c, 3,000 bets 1.1c a contract;
 - 50c contracts (SD about 50c): 300 bets 9.9c, 1,000 bets 5.4c, 3,000 bets 3.1c;
-- rain accuracy: about 0.66 day-level SDs of Brier(q) - Brier(mid) over 30 market days.
+- rain accuracy: about 0.66 day-level SDs of Brier(q) - Brier(mid) over 30 market days. Rain loses about one market
+  day a month at each freeze (markets logged before the freeze but closing after it are neither fitted nor scored).
 The 50c fee is about 1.75c and cheap sides carry a documented long-shot bias, so even a real edge must be large to show.
 
 ## 9. Operations
@@ -163,3 +185,16 @@ Where code and text differ, the text wins, by a dated amendment before any numbe
    excluded); outcome-dependent drops reported and counted against floors (sections 2, 3).
 9. (Low) Fit cutoffs use the bot's own recorded settle time; strikes noted as not independent (sections 1, 4).
 10-11. (Low) BTC/ETH exclusion kept; honest paragraph on what refitting is and is not, and on clustering (0, 8).
+
+### Second review (2026-11-26)
+1. E-process: units stated (dollars per contract; Brier units for rain); x capped at 1 from above only, with an
+   assertion that 1 + lambda x >= 0 and no clipping; lambda = 0.5 / L (15-minute) and 0.5 / mean 2|m - q| (rain);
+   days to cross for a 2c edge stated, including "never" at 3 or fewer bets a day (section 5).
+2. Each e-process counts once and ends on crossing; a new one after a failed confirmation uses another of the 12;
+   tied to the 0.15% bound (section 5).
+3. Rain data checked read-only in trial/paper.db (2026-11-26): allowed model_versions written literally, strategy
+   forecast_alpha.rain.v3 (the review's "forward_alpha" is "forecast_alpha" in the table), the obs-decision join
+   stated; fit cutoff on market_results.recorded_ts; the commit SHA goes into freezes.jsonl (sections 1, 2).
+4. Confirmation uses every check and floor at 2.5%; "not testable" means not confirmed; it takes a slot first (5).
+5. Notes added: SD 17c at 3c and 30c at 10c; screen power about 0.77 and two-stage about 0.72 at the t line 2.756;
+   S4's e-process uses test A; rain loses about one market day a month at each freeze (sections 5, 8).
