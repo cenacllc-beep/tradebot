@@ -79,8 +79,8 @@ All read-only. Anything read before a freeze may be used for that freeze's fit o
   move, hour band, group, city and forecast-price gap. **The report labels these breakdowns "exploratory" in the report
   itself**; nothing in them can pass.
 - An idea from it (or from the user) becomes a candidate only by an entry appended to
-  **research/plan21_candidates.json**: id (never reused), registered (La Paz time), origin, first month, data and fields,
-  fit window and procedure, rule, statistic, floors, placebo, e-process settings (section 5), and the SHA-256 of the
+  **research/plan21_candidates.json**: id (never reused), registered (La Paz time), origin, first month, data and
+  fields, fit window and procedure, rule, statistic, floors, placebo, e-process settings (section 5), and the SHA-256 of the
   definition. It must be registered by the 25th of the month before its first scored month, statistics-reviewed, and
   recorded in CHANGELOG.md with the file's new SHA-256. **At most 2 new registrations a month.** An idea from month k's
   report (published on the 8th of k+1) is first scored in month k+2 at the earliest.
