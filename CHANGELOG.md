@@ -2448,3 +2448,15 @@ unfamiliar codebase ... do not change functionality. only upgrade the code quali
   the map's hash and the series table's. August-October download starts now; the score runs once after it.
 - From the freeze on, live20's paper replay writes forward paper bets with this model (stage_c false: descriptive
   until a group passes).
+
+## 2026-11-26 20:45 (La Paz) - audit of the research, detection and calibration system (docs/AUDIT_2026-11-26.md)
+- User: "investigate/ audit our research, detection and calibration system to ensure the system is learning in
+  real-time and making accurate, intelligent suggestions". Read-only analysis of copies of the PC's paper.db, live15.db
+  and logs, plus the GitHub jobs. Every job current; models are frozen and judged at pre-registered looks on purpose;
+  Kalshi's price is better calibrated than v3 (Brier 0.0595 vs 0.0725) and the airport forecast (0.0550 vs 0.0683).
+- registry.py (dashboard control center, display only): v3's entry records the stored gate look (not passed);
+  PLAN5 L retired (not testable); PLAN7-PLAN20 added with their real states (PLAN11 and PLAN14 frozen but never
+  implemented, PLAN10 waiting for its PC score). No entry can enable trading; tests pass. Deployed to the PC after the
+  scan window (scheduled), since strategy.py logs the registry's states during the scan.
+- Noted, not changed: PLAN7's daily "unreadable; moved aside" line is printed for a day file that does not exist yet
+  (nothing is moved or lost); research/plan7.py is frozen and pinned by PLAN8.
