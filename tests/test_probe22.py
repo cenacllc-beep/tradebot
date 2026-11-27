@@ -379,5 +379,6 @@ wf = open(os.path.join(WORK, "cloud", "workflows", "probe22.yml"), encoding="utf
 assert "workflow_dispatch" in wf and "schedule" not in wf and "pip install" not in wf
 assert "f=research/results/probe22.json" in wf and "git diff --quiet HEAD -- \"$f\"" in wf and "research/results/probe22" in wf
 assert "actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09" in wf and "actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1" in wf
-assert not os.path.exists(os.path.join(WORK, ".github", "workflows", "probe22.yml"))
+_gh = os.path.join(WORK, ".github", "workflows", "probe22.yml")   # switched on after the code review: must equal the cloud copy
+assert not os.path.exists(_gh) or open(_gh, "rb").read() == open(os.path.join(WORK, "cloud", "workflows", "probe22.yml"), "rb").read()
 print("All PROBE22 checks passed.")
