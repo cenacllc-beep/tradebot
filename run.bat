@@ -8,6 +8,8 @@ rem                  PLAN8's and PLAN9's status lines (research, read-only on pa
 rem   run report     Brier scores, trades and the gate, shadow results, then refresh dashboard.html
 rem   run dashboard  current prices of open paper trades (marks.py), rebuild dashboard.html and open it
 rem                  (add --no-open to skip the browser)
+rem   run dashboard live  the dashboard on this PC only (127.0.0.1): Kalshi's account figures are read every 2 minutes
+rem                  (live.py snapshot, read-only) and the page refreshes itself; stops when the window closes or after 12 h
 rem   run watch      dashboard_live.html: prices and the page refresh every 5 minutes until you close the window
 rem   run marks      current prices of open paper trades, then rebuild dashboard.html (no browser)
 rem   run hourly     read-only research and prices, then rebuild dashboard.html (scheduled hourly)
@@ -61,7 +63,7 @@ if /i "%~1"=="attribution" goto attribution
 if /i "%~1"=="kill" goto kill
 if /i "%~1"=="unkill" goto unkill
 if /i "%~1"=="settings" goto settings
-echo Usage: run scan ^| run settle ^| run report ^| run dashboard ^| run watch ^| run marks ^| run hourly ^| run structure ^| run discover ^| run freshness ^| run ohlc ^| run micro ^| run combo ^| run backup ^| run check ^| run export ^| run test ^| run live ^| run learn ^| run attribution ^| run kill ^| run unkill ^| run settings
+echo Usage: run scan ^| run settle ^| run report ^| run dashboard ^| run dashboard live ^| run watch ^| run marks ^| run hourly ^| run structure ^| run discover ^| run freshness ^| run ohlc ^| run micro ^| run combo ^| run backup ^| run check ^| run export ^| run test ^| run live ^| run learn ^| run attribution ^| run kill ^| run unkill ^| run settings
 exit /b 1
 
 :scan
@@ -134,8 +136,14 @@ exit /b 0
 
 :dashboard
 "%PY%" marks.py
+if /i "%~2"=="live" goto dashlive
 "%PY%" dashboard.py %2
 exit /b 0
+
+:dashlive
+rem Read-only: dashboard_server.py runs only "live.py snapshot" (Kalshi GETs, live.db read-only) and rebuilds the page.
+"%PY%" dashboard_server.py
+exit /b %errorlevel%
 
 :marks
 "%PY%" marks.py

@@ -48,7 +48,7 @@ def capture(tree, out):
     for t in SCENARIOS:
         d = os.path.join(out, t)
         env = dict(os.environ, PAPER_DB=os.path.join(d, "paper.db"), TRADEBOT_OFFSITE_BACKUPS=os.path.join(d, "offsite"),
-                   PYTHONHASHSEED="0", PYTHONIOENCODING="utf-8")
+                   PYTHONHASHSEED="0", PYTHONIOENCODING="utf-8", TRADEBOT_PC_REPORT="")   # never the PC's real report
         with open(os.path.join(out, t + ".stdout"), "w", encoding="utf-8") as f:
             rc = subprocess.run([sys.executable, os.path.join(tree, "tests", "test_%s.py" % t), tree, d],
                                 stdout=f, stderr=subprocess.STDOUT, env=env).returncode

@@ -729,9 +729,37 @@ def account_snapshot(cl,c,env,t=None):
                 days=SNAPSHOT_DAYS)
 def _write_json(path,obj):
     os.makedirs(os.path.dirname(path),exist_ok=True)
-    tmp=path+".tmp"
+    tmp=path+".%d.tmp"%os.getpid()   # one temp file per process: the hourly job and `run dashboard live` can overlap
     with open(tmp,"w",encoding="utf-8") as f: json.dump(obj,f)
-    os.replace(tmp,path)
+    for k in range(3):   # Windows refuses a replace while another process has the file open; try again shortly
+        try: os.replace(tmp,path); return
+        except PermissionError:
+            if k==2:
+                try: os.remove(tmp)
+                except OSError: pass
+                raise
+            time.sleep(0.2)
+HISTORY_MAX=2*1024*1024   # account_history.jsonl rolls over to account_history.1.jsonl above about 2 MB
+def _append_history(row,path=None):
+    """One {ts,env,cash,portfolio_value,ok} line appended to logs\\account_history.jsonl (next to account.json) for the
+    dashboard's account chart (2026-11-27). Append only; a line whose ts is already there is skipped; any failure is
+    ignored, so it never affects the snapshot or anything else. Over HISTORY_MAX bytes the file is renamed to
+    account_history.1.jsonl (replacing the older one) first, so it never grows without bound."""
+    try:
+        path=path or os.path.join(os.path.dirname(ACCOUNT_JSON),"account_history.jsonl")
+        os.makedirs(os.path.dirname(path),exist_ok=True); lead=""
+        if os.path.exists(path) and os.path.getsize(path)>HISTORY_MAX:
+            os.replace(path,os.path.splitext(path)[0]+".1.jsonl")
+        if os.path.exists(path):
+            with open(path,"rb") as f:
+                f.seek(0,2); f.seek(max(0,f.tell()-65536)); tail=f.read()
+            if tail and not tail.endswith(b"\n"): lead="\n"   # a line cut short by a crash stays on its own; readers skip it
+            for l in tail.splitlines():
+                try:
+                    if json.loads(l).get("ts")==row["ts"]: return
+                except (ValueError,AttributeError): pass
+        with open(path,"a",encoding="utf-8") as f: f.write(lead+json.dumps(row,separators=(",",":"))+"\n")
+    except Exception: pass
 def snapshot(path=None):
     """Write logs\\account.json (read-only on Kalshi and on live.db). A failed read keeps the last good snapshot and adds
     the error and its time, so the dashboard shows both the last known account and that it is stale."""
@@ -753,8 +781,11 @@ def snapshot(path=None):
         old.update(env=env,ok=False,error=safe("%s: %s"%(type(e).__name__,e))[:300],error_ts=now())
         try: _write_json(path,old)
         except OSError: pass
+        _append_history(dict(ts=old["error_ts"],env=env,cash=None,portfolio_value=None,ok=False),os.path.join(os.path.dirname(path),"account_history.jsonl"))
         return print("live (%s): account snapshot failed (%s); the dashboard keeps the last one"%(env,safe(e)))
-    _write_json(path,snap)
+    try: _write_json(path,snap)
+    except OSError as e: print("live (%s): account.json could not be written (%s)"%(env,safe(e)))
+    _append_history(dict(ts=snap["ts"],env=env,cash=snap["cash"],portfolio_value=snap["portfolio_value"],ok=True),os.path.join(os.path.dirname(path),"account_history.jsonl"))
     man=sum(1 for x in snap["fills"] if not x["bot"])
     print("live (%s): account snapshot: cash $%.2f, %d open position%s, %d fill%s in %d days (%d not by the bot)"%(
         env,snap["cash"],len(snap["positions"]),"" if len(snap["positions"])==1 else "s",len(snap["fills"]),

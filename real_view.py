@@ -9,9 +9,15 @@ the page and the bot cannot disagree; a test checks that.
 What it shows: the account's state (locked / unlocked / trial ended / kill switch), the bot's value with the room left
 before the daily stop and the 25% end rule, a value chart with a marker at every real order (hover or tap: what was
 bought, at what price, and how it settled), a calendar of market days, the order list (with skipped copies and why),
-and paper vs real on the same markets."""
+and paper vs real on the same markets.
+
+Since 2026-11-27 (the user: the panel showed the bot's $26.37 while the real account held about $9.47) the headline is
+Kalshi's own account total (cash + positions, from live.py's snapshot, logs/account.json) and the chart plots that total
+over time from logs/account_history.jsonl (one line per snapshot); the bot's own value stays as a labelled second figure.
+Without a real-exchange snapshot the panel falls back to the bot's value, with a note."""
 import html
 import json
+import math
 from datetime import datetime, timedelta, timezone
 
 STAKE = 25.0          # live.STAKE: the user's own money, the base of the value, the daily stop and the end rule
@@ -55,6 +61,9 @@ CSS = """
 .real .rcal .h{font-size:11px;opacity:.6;text-align:center}
 .real .rcal .d{border-radius:6px;padding:4px;min-height:44px;font-size:11px;background:rgba(127,127,127,.08);outline:none}
 .real .rcal .d b{display:block;font-size:12px}.real .rcal .d.won{background:rgba(40,160,90,.18)}.real .rcal .d.lost{background:rgba(220,60,60,.16)}
+.real .rv-sub .acct-v{font-size:26px}
+.real .rv-k{margin:6px 0 2px;font-size:14px}.real .rv-b{margin:2px 0;font-size:14px}
+.real .rv-b b{font-variant-numeric:tabular-nums}
 .real .rcal .d.open{background:rgba(59,125,221,.16)}.real .rcal .d.none{opacity:.45}
 """
 
@@ -270,6 +279,7 @@ def value_at(d, t):
 
 def static_svg(d):
     """The chart without JavaScript (all time, markers with their text), replaced by the interactive one."""
+    what = d.get("what") or "The bot's real-money value"
     W, H, PT, PB, PR = 720, 220, 22, 26, 10
     start, now = d["t0"], d["now"]
     pts = [[start, value_at(d, start)]] + [[t, value_at(d, t)] for t, _ in d["steps"] if start < t <= now] + [[now, value_at(d, now)]]
@@ -285,14 +295,14 @@ def static_svg(d):
         if start <= m["t"] <= now:
             g.append('<g class="mk %s" tabindex=0 data-tip="%s"><title>%s</title><circle cx=%.1f cy=%.1f r=6 /></g>' % (
                 m["kind"], e(m["tip"]), e(m["tip"]), X(m["t"]), Y(value_at(d, m["t"]))))
-    return '<svg viewBox="0 0 %d %d" class=%s role=img aria-label="The bot\'s real-money value since the first order">%s</svg>' % (W, H, tone, "".join(g))
+    return '<svg viewBox="0 0 %d %d" class=%s role=img aria-label="%s">%s</svg>' % (W, H, tone, e(what + ", " + (d.get("all") or "since the first real order").lower()), "".join(g))
 
 
 JS = r"""
 (function(){var el=document.getElementById('rv-data');if(!el)return;
 var D=JSON.parse(el.textContent),rng='ALL';
 var RANGES={'1D':86400,'1W':7*86400,'1M':30*86400,'ALL':0};
-var PER={'1D':'Past 24 hours','1W':'Past week','1M':'Past month','ALL':'Since the first real order'};
+var PER={'1D':'Past 24 hours','1W':'Past week','1M':'Past month','ALL':D.all||'Since the first real order'};
 var TZ='America/La_Paz';
 function $(i){return document.getElementById(i)}
 function money(x){return (x<-0.004?'−$':'$')+Math.abs(x).toFixed(2)}
@@ -323,7 +333,7 @@ function draw(){
   for(var j=1;j<pts.length;j++){d+=' H'+X(pts[j][0]).toFixed(1)+' V'+Y(pts[j][1]).toFixed(1)}
   var cls=tone(cur-base);
   var s=sv('svg',{viewBox:'0 0 '+W+' '+H,role:'img',tabindex:'0','class':cls,
-    'aria-label':"The bot's real-money value: "+money(cur)+' now, '+signed(cur-base)+' '+PER[rng].toLowerCase()+'. Drag or use the arrow keys to read past values; the markers are the bets.'});
+    'aria-label':(D.what||"The bot's real-money value")+': '+money(cur)+' now, '+signed(cur-base)+' '+PER[rng].toLowerCase()+'. Drag or use the arrow keys to read past values; the markers are the bets.'});
   s.appendChild(sv('line',{'class':'bl',x1:0,x2:W,y1:Y(base),y2:Y(base)}));
   s.appendChild(sv('path',{'class':'ln',d:d}));
   var xh=sv('line',{'class':'xh',x1:0,x2:0,y1:4,y2:H-PB+6,visibility:'hidden'});s.appendChild(xh);
@@ -362,31 +372,134 @@ var rt;window.addEventListener('resize',function(){clearTimeout(rt);rt=setTimeou
 """
 
 
-def chart(orders, events, now):
-    """The value panel: headline, chart (interactive with JavaScript, a static drawing without), ranges, legend."""
-    d = chart_data(orders, events, now)
-    if d is None:
-        return '<p class=note>No real orders yet. The first ones appear here after an evening scan copies a paper trade.</p>'
-    v0, v1 = value_at(d, d["t0"]), value_at(d, now)
+BOT = dict(what="The bot's real-money value", all="Since the first real order",
+           note='The bot&#8217;s value: your $25 plus the net of settled bets, as live.py counts it for its stops. It moves only when '
+                'Kalshi settles a bet.')
+ACCT = dict(what="The Kalshi account's total", all="Since the first saved reading",
+            note='Kalshi&#8217;s own total: cash plus open positions as Kalshi marks them, one point per reading. It includes trades '
+                 'made outside the bot; the markers are the bot&#8217;s own bets.')
+NO_ORDERS = '<p class=note>No real orders yet. The first ones appear here after an evening scan copies a paper trade.</p>'
+KEEP_ALL = 48 * 3600   # account readings: all of the last 48 hours, one an hour before that (as the paper chart's marks)
+
+
+def _finite(v):
+    try:
+        v = float(v)
+    except (TypeError, ValueError):
+        return None
+    return v if math.isfinite(v) else None
+
+
+def kalshi_now(acct):
+    """Kalshi's own account total from live.py's snapshot (logs/account.json): dict(total, cash, pv, ts, ok, error), or
+    None without a real-exchange snapshot that has a cash figure (none yet, demo, or damaged)."""
+    if not isinstance(acct, dict) or acct.get("env") != "prod":   # a missing env is not taken as the real exchange
+        return None
+    cash, ts = _finite(acct.get("cash")), _finite(acct.get("ts"))
+    if cash is None or not ts:
+        return None
+    pv = _finite(acct.get("portfolio_value"))
+    return dict(total=cash + (pv or 0.0), cash=cash, pv=pv, ts=ts, ok=bool(acct.get("ok")), error=acct.get("error"))
+
+
+def account_points(history, k, now):
+    """[[ts, total]] oldest first: the good real-exchange readings in logs/account_history.jsonl plus the snapshot itself,
+    one per ts, none in the future or after the snapshot; older than 48 hours, one an hour. Bad or demo lines are skipped."""
+    by = {}
+    for r in history or []:
+        if not isinstance(r, dict) or r.get("ok") is not True or r.get("env") != "prod":
+            continue
+        t, c = _finite(r.get("ts")), _finite(r.get("cash"))
+        if not t or c is None or t > now + 60 or (k and t > k["ts"]):   # never past the snapshot: the headline is its total
+            continue
+        by[t] = c + (_finite(r.get("portfolio_value")) or 0.0)
+    if k and k["ts"] <= now + 60:
+        by.setdefault(k["ts"], k["total"])
+    out, hours = [], set()
+    for t in sorted(by):
+        if t < now - KEEP_ALL:
+            h = int(t // 3600)
+            if h in hours:
+                continue
+            hours.add(h)
+        out.append([t, by[t]])
+    return out
+
+
+def account_data(pts, orders, events, now):
+    """The account chart's data, in chart_data's shape (start + steps), with the bot's bet markers on it."""
+    bot = chart_data(orders, events, now)
+    steps = [[pts[i][0], pts[i][1] - pts[i - 1][1]] for i in range(1, len(pts))]
+    return dict(t0=pts[0][0], first=pts[0][0], now=max(now, pts[-1][0]), start=pts[0][1], steps=steps,
+                markers=bot["markers"] if bot else [], what=ACCT["what"], all=ACCT["all"])
+
+
+def account_head(k, orders, events, now):
+    """Under the headline: what the total is made of, when it was read (and whether that is stale), the bot's own value
+    as a labelled second figure, and why the two differ."""
+    v = value_track(orders, events)[0]
+    read = when(k["ts"])
+    out = ['<p class=rv-k>Kalshi account total: cash %s + positions %s, read %s <span class=note>(Kalshi&#8217;s own figures, '
+           'real exchange; Kalshi&#8217;s portfolio value is taken to exclude cash, to be confirmed against the Kalshi app)</span></p>' % (e(usd(k["cash"])), "not reported" if k["pv"] is None else e(usd(k["pv"])), e(read))]
+    if not k["ok"]:
+        out.append('<p class=neg>%s</p>' % e("The last read failed (%s); these figures are from %s." % (k["error"] or "no reason given", read)))
+    elif now - k["ts"] > STALE_SECONDS:
+        out.append('<p class=neg>This reading is over two hours old: the hourly job may not have run.</p>')
+    out.append('<p class=rv-b><b>The bot&#8217;s own value: %s</b> <span class=note>your $25 plus the net of the bot&#8217;s settled '
+               'bets (live.db); live.py&#8217;s daily loss stop and 25%% end rule use this figure, not Kalshi&#8217;s total.</span></p>' % e(usd(v)))
+    diff = k["total"] - v
+    if abs(diff) >= 0.005:
+        out.append('<p class=note>The two differ by %s: trades made outside the bot (in the Kalshi app or elsewhere), deposits and '
+                   'withdrawals, and the current marks of open positions count only in Kalshi&#8217;s total.</p>' % e(usd(abs(diff))))
+    return "".join(out)
+
+
+def _value_chart(d, mode, sub=""):
+    """Headline, `sub` (extra lines under it), chart (interactive with JavaScript, a static drawing without), ranges, legend."""
+    d = dict(d, what=mode["what"], all=mode["all"])
+    v0, v1 = value_at(d, d["t0"]), value_at(d, d["now"])
     ch = v1 - v0
     js = json.dumps(d, separators=(",", ":"), allow_nan=False).replace("&", "\\u0026").replace("<", "\\u003c").replace(">", "\\u003e")
     tone = "up" if ch > 0.004 else "down" if ch < -0.004 else "flat"
     first = datetime.fromtimestamp(d["first"], TZ).strftime("%b %d").replace(" 0", " ")
+    line = '<span><i style="background:var(--ink2,#666);border-radius:2px;height:3px;vertical-align:3px"></i>Line: Kalshi account total</span>' if mode is ACCT else ""
     return ('<p class=acct-v id=rv-v>%s</p>'
             '<p class="acct-d %s" id=rv-d><span class=arr aria-hidden=true>%s</span><span class=sr id=rv-sg>%s </span>'
-            '<span id=rv-dv>$%.2f (%.2f%%)</span> <span class=per id=rv-per>Since the first real order (%s) \u00b7 from %s</span></p>'
+            '<span id=rv-dv>$%.2f (%.2f%%)</span> <span class=per id=rv-per>%s (%s) \u00b7 from %s</span></p>%s'
             '<div class="acct-chart rv-static %s" id=rv-chart>%s</div>'
             '<div class="rrng %s" id=rv-rng role=group aria-label="Time range for the real-money chart" hidden>%s</div>'
-            '<p class=rleg><span><i style="background:#3b7ddd"></i>Bets placed</span><span><i style="background:var(--good,#0ca30c)"></i>Settled, net won</span>'
+            '<p class=rleg>%s<span><i style="background:#3b7ddd"></i>Bets placed</span><span><i style="background:var(--good,#0ca30c)"></i>Settled, net won</span>'
             '<span><i style="background:var(--bad,#d03b3b)"></i>Settled, net lost</span></p>'
-            '<p class=note>The bot&#8217;s value: your $25 plus the net of settled bets, as live.py counts it for its stops. It moves only when '
-            'Kalshi settles a bet.<span class=rv-js hidden> Drag across the chart (or use the arrow keys) to read past values; hover over or tap a marker to see the bets.</span></p>'
+            '<p class=note>%s<span class=rv-js hidden> Drag across the chart (or use the arrow keys) to read past values; hover over or tap a marker to see the bets.</span></p>'
             '<script type="application/json" id=rv-data>%s</script>') % (
         usd(v1), "pos" if ch > 0.004 else "neg" if ch < -0.004 else "", "\u25b2" if ch > 0.004 else "\u25bc" if ch < -0.004 else "",
-        "up" if ch > 0.004 else "down" if ch < -0.004 else "no change", abs(ch), abs(ch) / v0 * 100 if v0 else 0.0, first, usd(v0),
-        tone, static_svg(d), tone,
+        "up" if ch > 0.004 else "down" if ch < -0.004 else "no change", abs(ch), abs(ch) / v0 * 100 if v0 else 0.0, e(mode["all"]), first, usd(v0),
+        sub, tone, static_svg(d), tone,
         "".join('<button type=button data-r="%s" aria-pressed=%s>%s</button>' % (r, "true" if r == "ALL" else "false", r)
-                for r in ("1D", "1W", "1M", "ALL")), js)
+                for r in ("1D", "1W", "1M", "ALL")), line, mode["note"], js)
+
+
+def chart(orders, events, now, account=None, history=None):
+    """The value panel. Headline: Kalshi's own account total when a real-exchange snapshot exists (chart: that total over
+    time from the saved readings, once there are two); otherwise the bot's own value, as before, with a note."""
+    k = kalshi_now(account)
+    d = chart_data(orders, events, now)
+    if k is None:
+        demo = isinstance(account, dict) and account.get("env") not in (None, "prod")   # named another exchange
+        why = ("the last account snapshot is of the %s exchange (fake money)" % e(account.get("env")) if demo else
+               "there is no usable account snapshot yet (<code>.\\run live snapshot</code> takes one)")
+        note = '<p class=note>Kalshi&#8217;s own account total is not shown here: %s. The figures below are the bot&#8217;s own value.</p>' % why
+        return note + (_value_chart(d, BOT) if d else NO_ORDERS)
+    head = account_head(k, orders, events, now)
+    pts = account_points(history, k, now)
+    if len(pts) >= 2:
+        return _value_chart(account_data(pts, orders, events, now), ACCT, head)
+    out = ['<p class=acct-v>%s</p>' % e(usd(k["total"])), head,
+           '<p class=note>The account chart starts once two readings are saved (one per snapshot). Until then the chart below is '
+           'the bot&#8217;s own value.</p>']
+    if d:
+        out.append('<h3>The bot&#8217;s own value over time</h3><div class=rv-sub>%s</div>' % _value_chart(d, BOT))
+    return "".join(out)
 
 
 def calendar(orders, now):
@@ -540,7 +653,7 @@ def _account_block(acct, now, table):
     return "".join(out)
 
 
-def section(orders, events, paper, now, killed, stop_date, table, account=None):
+def section(orders, events, paper, now, killed, stop_date, table, account=None, history=None):
     """The whole real-money panel. table(headers, rows, empty, num=...) is dashboard.table."""
     today = datetime.fromtimestamp(now, TZ).date()
     lab, cls, sent = state(events, killed, today, stop_date, orders, now)
@@ -549,10 +662,11 @@ def section(orders, events, paper, now, killed, stop_date, table, account=None):
     pv, pt, rt = paper_vs_real(orders, paper)
     head = ('<section class="panel real acct" id=real aria-labelledby=real-h><div class=rv-top><h2 id=real-h>Real money on Kalshi</h2>'
             '<span class="rstate %s">%s</span></div>') % (cls, e(lab))
-    body = [head, chart(orders, events, now), tiles(orders, events, now),
+    body = [head, chart(orders, events, now, account, history), tiles(orders, events, now),
             '<p class=note>%s Orders come only from live.py, which copies the paper bot&#8217;s rain bets after each evening scan, '
-            'within your limits. The chart and tiles above count the bot&#8217;s own bets (live.db); the account below is '
-            'Kalshi&#8217;s own figures, read every hour.</p>' % e(sent), account_block(account, now, table), calendar(orders, now),
+            'within your limits. The headline and chart are Kalshi&#8217;s own figures when a real-exchange snapshot exists; the tiles '
+            'count only the bot&#8217;s own bets (live.db). Kalshi&#8217;s figures are read every hour, after each scan and settle, and '
+            'every 2 minutes while <code>.\\run dashboard live</code> is open.</p>' % e(sent), account_block(account, now, table), calendar(orders, now),
             '<h3>Real orders</h3>',
             table(["Market day", "City", "Bet", "Contracts", "Limit price", "Cost incl. fee", "Result", "P&amp;L"], rows,
                   "No real orders yet.", num=(3, 4, 5, 7)),

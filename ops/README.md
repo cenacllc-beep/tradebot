@@ -84,6 +84,70 @@ temperature 0.2, limited retries on 429 and 5xx. Job limits: operate 30 min (its
   it is a summary, not proof.
 - A fix proposal is a suggestion from a model; read the diff and the test result before merging, or ask Claude.
 
+## When Claude is unavailable
+Claude's three daily cloud tasks (the 3:21 PM afternoon report, the 9:25 PM evening report and the 11:41 PM late-night
+scan check) stop when Claude hits its usage limit. The GitHub backup AI above cannot replace them: it cannot see the
+PC's `logs\tasks.log`, and the PC's data must never go to the public repository. So the PC writes its own report
+(added 2026-11-27):
+
+| When | What runs | What it writes |
+|---|---|---|
+| End of the afternoon settle and of the evening job | `jobs.py` runs `ops/pc_report.py settle` / `evening` after the job's done line | `logs\report_latest.md` and `logs\reports\YYYY-MM-DD-<job>.md` (newest 30 kept) |
+| Hourly job at 11:20 PM and 12:20 AM | `ops/pc_report.py latenight` first | a report only when tonight's scan is missing or still waiting (before 1 AM) |
+
+- **Facts, always:** read only from the latest block of that job in `logs\tasks.log`: trades settled, markets logged
+  and paper trades opened, the Brier line, the gate verdict exactly as stored (GATE LOOK), the FRESHNESS line, the
+  Kalshi demo and prod lines, and every problem line from a narrow list (KILL SWITCH, TRADES BLOCKED, AUDIT failures,
+  JOB LOCK, WAITING FOR NETWORK, backup and scan failures, unknown order outcomes, unreadable settles, a stale
+  FRESHNESS, a non-zero exit, tonight's scan missing). Per-market errors that are retried (an estimator timeout, a
+  price-history miss, one failed scan try) are not problems and raise no toast. It never opens paper.db or live.db,
+  never imports live.py and runs nothing that trades.
+- **Which job a line belongs to:** jobs.py writes `----- <job> step: <args>` before each step and
+  `----- <job> step end (exit N)` after it; lines between them belong to that job even when another job starts
+  meanwhile (an hourly job during the evening scan or its retry pause, or during the afternoon settle). jobs.py's own
+  lines (network waits, JOB LOCK, scan retries) are attributed by their text. Logs from before the markers fall back to
+  the most recently started job.
+- **The plain report is written first.** Then, only if you ticked the box on `.\run settings` (below), the AI wording
+  is tried within this script's own budget: at most 3 model calls and 150 s, in a thread with a join timeout; the report
+  is rewritten when that ends. The `Wording:` and `AI budget:` lines say what happened.
+- **What goes to NVIDIA:** only the job's status lines (counts, Brier, clear margin, the stored gate verdict, the
+  freshness line, problem lines), through `ops/backup_ai.py`'s own client and model picker (`check-summary`). Never sent:
+  the Kalshi demo and prod lines, the real-money trial line, settled P&L, the LEARNING profit line, any line with a dollar
+  figure (an account problem is sent only as "A Kalshi account problem"), and anything that looks like a key, token or
+  e-mail address. Those stay in the report's facts on the PC.
+- **The AI text is checked.** It is used only if every number in it, with its sign, appears in what was sent (dates,
+  times, exit codes, tickers and version tags do not count), it does not call the day clear while there are problems,
+  and it names every problem. Otherwise, with no key, or on an API failure or timeout, the plain summary is used. The
+  deterministic problem list always comes first, above any AI text, and every fact follows below it.
+- **Telling you:** every report shows in the dashboard's "Latest report" panel (under the header). When it shows a
+  problem, Windows shows a toast (PowerShell's built-in notifications; never waited for, failures ignored). Jobs that run
+  while you are signed out (Task Scheduler's S4U logon) cannot show a toast: the dashboard still has the report.
+- **Never in the way:** the step runs in its own process after the job's done line, outside the job lock, stopped after
+  4 minutes; whatever happens is one `PC REPORT:` line in the log. It never changes the job's exit code, its lock or a
+  scan.
+- **The phone page is not updated.** It is a claude.ai page that only Claude can refresh; when Claude is back, its
+  reports resume and it can read `logs\reports\` for the days it missed.
+
+### Keeping the NVIDIA key on the PC (opt-in)
+`.\run settings` has a checkbox, unticked by default, whose text says exactly what is sent. Unticked, nothing is kept on
+the PC. Ticked, `ops/pc_key.py`:
+- encrypts the key with Windows DPAPI in **machine scope** (CryptProtectData with CRYPTPROTECT_LOCAL_MACHINE and a fixed
+  extra input). User scope usually fails in the signed-out (S4U) scheduled runs, which have no loaded user profile;
+- writes it to `%USERPROFILE%\.tradebot\nvidia.key`, outside the project folder (a path inside it, also through a
+  link, is refused);
+- cuts the file's NTFS permissions to your account only (`icacls <file> /inheritance:r /grant:r <you>:(F)`, a fixed
+  argument list), reads them back, and deletes the file if anything else is listed. They are checked again before every
+  use.
+
+**Trade-off:** in machine scope, any process running as an administrator (or SYSTEM) on this PC could decrypt the file.
+The file permissions keep other, non-administrator users out. A missing file, a file that cannot be decrypted and a
+file whose permissions are wrong each show their own reason on the report's `Wording:` line. "Remove the key from this
+PC" deletes the file. The key is never written to the project folder, a log, a report or a page.
+
+**To confirm on the PC:** this was tested only with a fake DPAPI and a fake icacls. After ticking the box, check that
+one real scheduled run (the afternoon settle or the evening job, signed out) writes `Wording: AI` in
+`logs\report_latest.md`; if it shows a key reason instead, the PC reports still work in plain text.
+
 ## Limits
 - It sees GitHub only. The PC (its scheduled tasks, paper.db, live.py, the Kalshi account) is not reachable from here.
 - GitHub starts scheduled runs late or not at all, this job included.

@@ -31,6 +31,9 @@ api.elections.kalshi.com. Nothing retried it, so the market day was lost. So eac
   does not fall asleep again before Wi-Fi is back. Never during a long network wait.
 - **Stops waiting before Windows' time limit** for the task (BUDGET_S: evening 5.5 of 6 hours, settle 2.5 of 3,
   hourly 1.5 of 2). A step whose lock is still busy then does not run, and the log says so.
+- **Writes the PC's own report** (since 2026-11-27): after the settle and evening jobs' done line, ops/pc_report.py
+  (logs\\report_latest.md, a toast when something needs a look); between 11 PM and 1 AM the hourly job first runs its
+  late-night scan check. Its own process, at most 4 minutes, never changes an exit code, a lock or a scan.
 
 The steps themselves are unchanged: run.bat settle, scan, report and hourly. Nothing here changes a threshold, the
 model, the gate, the kill switch or live.py's locks. Python 3.8+, standard library only."""
@@ -53,6 +56,7 @@ HOURLY_LOCK_WAIT_S = 10 * 60          # if a settle or scan is running, the rese
 WINDOW_CLOSED = 103                   # internal: the window closed while a scan waited for the lock (run.bat can exit 3: backup.py)
 BUDGET_S = dict(evening=5.5 * 3600, settle=2.5 * 3600, hourly=1.5 * 3600)   # under each task's limit (6, 3, 2 hours)
 _deadline = [None]                    # wall-clock end of this job's waits, set by main()
+_job = [None]                         # this job's name, set by main(): the step markers name it (2026-11-27)
 
 
 def remaining():
@@ -201,16 +205,24 @@ def step(args, wait=joblock.WAIT_S, guard=None, busy_ok=False):
             say("Scan not run: the scan window closed while another job held the lock.")
             return WINDOW_CLOSED
         joblock._owner(args)
-        with awake(STEP_AWAKE_S):   # a scan or settle half done when the laptop dozes off would be lost
-            p = subprocess.Popen(joblock.command(args), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, cwd=HERE)
-            for line in p.stdout:   # bytes in the console's own encoding, appended as they are
-                log_bytes(line)
-                try:
-                    sys.stdout.buffer.write(line)
-                    sys.stdout.flush()
-                except Exception:
-                    pass
-            return p.wait()
+        # step markers (2026-11-27): every line between them is this job's step output, even when another job's start
+        # line falls in between, so ops/pc_report.py attributes it to the right job
+        say("----- %s step: %s" % (_job[0] or "job", " ".join(args)))
+        rc = None
+        try:
+            with awake(STEP_AWAKE_S):   # a scan or settle half done when the laptop dozes off would be lost
+                p = subprocess.Popen(joblock.command(args), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, cwd=HERE)
+                for line in p.stdout:   # bytes in the console's own encoding, appended as they are
+                    log_bytes(line)
+                    try:
+                        sys.stdout.buffer.write(line)
+                        sys.stdout.flush()
+                    except Exception:
+                        pass
+                rc = p.wait()
+                return rc
+        finally:
+            say("----- %s step end (exit %s)" % (_job[0] or "job", rc if rc is not None else "none"))
     finally:
         joblock.release(fh)
 
@@ -316,7 +328,43 @@ def apply_settings(applied=APPLIED, ps1=os.path.join(HERE, "tasks", "install_sch
         return False
 
 
-def hourly(run=step, net=wait_for_network, settings=apply_settings):
+# ---------- the PC's own report (added 2026-11-27; ops/README.md "When Claude is unavailable") ----------
+REPORT_JOBS = ("evening", "settle")
+REPORT_TIMEOUT_S = 4 * 60
+
+
+def pc_report(mode, runner=subprocess.run, log=None):
+    """A separate final step: ops/pc_report.py writes logs\\report_latest.md from logs\\tasks.log (and, with a problem,
+    shows a Windows toast). It runs in its own process after the job's done line, outside the job lock, stopped after
+    REPORT_TIMEOUT_S. Whatever happens is one log line: it never changes the job's exit code, its lock or a scan."""
+    try:
+        r = runner([sys.executable, os.path.join(HERE, "ops", "pc_report.py"), mode, "--log", log or LOG], cwd=HERE,
+                   stdin=subprocess.DEVNULL, capture_output=True, text=True, encoding="utf-8", errors="replace",
+                   timeout=REPORT_TIMEOUT_S)
+        out = ((r.stdout or "").strip().splitlines() or [""])[-1]
+        if r.returncode == 0:
+            say("PC REPORT: %s" % out[:300])
+        else:
+            say("PC REPORT: not written (exit %s): %s" % (r.returncode, ((r.stderr or "").strip().splitlines() or [""])[-1][:300]))
+    except BaseException as ex:   # a timeout, a missing file, anything: logged, never raised
+        try:
+            say("PC REPORT: not written (%s)" % type(ex).__name__)
+        except BaseException:
+            pass
+
+
+def late_night(report=pc_report, clock=time.time):
+    """11 PM to 1 AM only: the late-night scan check (tonight's scan missing or still waiting). Never raises."""
+    try:
+        h = time.localtime(clock()).tm_hour
+        if h >= 23 or h < 1:
+            report("latenight")
+    except BaseException:
+        pass
+
+
+def hourly(run=step, net=wait_for_network, settings=apply_settings, late=late_night):
+    late()
     settings()
     net(lambda s: s < HOURLY_NET_WAIT_S)
     # read-only research, under the lock too; it skips an hour rather than wait long for a settle or scan
@@ -331,6 +379,7 @@ def main(argv):
         print(__doc__)
         return 2
     job = argv[0]
+    _job[0] = job
     _deadline[0] = time.time() + BUDGET_S.get(job, 3600)
     try:
         say("===== %s %s" % (stamp(), job))
@@ -347,6 +396,11 @@ def main(argv):
             say("===== %s %s done (exit %s)" % (stamp(), job, rc))
         except Exception:
             say("===== no-time %s done (exit %s)" % (job, rc))
+    if job in REPORT_JOBS:   # after the done line, so the report reads the whole block; rc is already fixed
+        try:
+            pc_report(job)
+        except BaseException:
+            pass
     return rc
 
 

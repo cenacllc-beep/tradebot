@@ -68,6 +68,47 @@ assert code == 200 and "Saved" in body and KEY not in body and done.is_set()
 assert sum(1 for l in open(log) if l.startswith("['secret'")) == n + 1   # exactly one save
 srv.shutdown()
 
+# the opt-in box (2026-11-27): unticked by default; ticked, the key is also kept on this PC with DPAPI (fake here),
+# outside the folder; "Remove the key from this PC" deletes it; the key is never on the page
+sys.path.insert(0, os.path.join(WORK, "ops"))
+import pc_key as K
+class FakeDPAPI(object):
+    def protect(self, b): return b"FAKEDPAPI" + bytes(x ^ 0x5A for x in b)
+    def unprotect(self, b): return bytes(x ^ 0x5A for x in b[9:])
+KP = os.path.join(OUT, "home", ".tradebot", "nvidia.key")
+class Store(object):   # pc_key with a fake DPAPI and a key file under OUT
+    def supported(self): return True
+    def exists(self): return K.exists(KP)
+    def store(self, k): return K.store(k, dpapi=FakeDPAPI(), path=KP)
+    def remove(self): return K.remove(KP)
+assert not K.supported() and S.PCKEY is not None   # off Windows the real store is not offered
+body = S.page("t", status=(True, "ok"))
+assert 'type=checkbox name=keep value=1 style="width:auto" disabled' in body and "checked" not in body
+assert "Remove the key from this PC" in body and "No key is kept on this PC. (Keeping one here needs Windows.)" in body
+done2 = threading.Event()
+srv = S.Server(("127.0.0.1", 0), S.make_handler(tok, done2, keystore=Store()))
+threading.Thread(target=srv.serve_forever, daemon=True).start()
+base = "http://127.0.0.1:%d" % srv.server_address[1]
+code, body = req("/%s/" % tok)
+import html as _html
+assert code == 200 and _html.escape(S.KEEP_LABEL) in body and "checked" not in body
+assert "saved on this PC only if you tick the box" in body and "not saved on this PC" not in body   # the label follows the box
+assert "never sends money figures, Kalshi account lines" in S.KEEP_LABEL and "status" in S.KEEP_LABEL
+assert 'name=keep value=1 style="width:auto" >' in body and "No key is kept on this PC." in body
+n = sum(1 for l in open(log) if l.startswith("['secret'"))
+code, body = req("/%s/key" % tok, b"key=" + KEY.encode())   # box unticked: GitHub only, nothing kept here
+assert code == 200 and not os.path.exists(KP) and sum(1 for l in open(log) if l.startswith("['secret'")) == n + 1
+done2.clear()
+code, body = req("/%s/key" % tok, b"key=" + KEY.encode() + b"&keep=1", origin=base)
+assert code == 200 and "Saved" in body and "Kept on this PC" in body and KEY not in body and done2.is_set(), body
+assert os.path.exists(KP) and KEY.encode() not in open(KP, "rb").read() and K.load(dpapi=FakeDPAPI(), path=KP) == KEY
+assert "A key is kept on this PC" in body
+code, body = req("/%s/remove" % tok, b"remove=1", origin="http://evil.example")
+assert code == 403 and os.path.exists(KP)
+code, body = req("/%s/remove" % tok, b"remove=1", origin=base)
+assert code == 200 and "Removed the key from this PC" in body and not os.path.exists(KP) and "No key is kept on this PC." in body
+srv.shutdown()
+
 # no key file anywhere in the work tree, and the module never touches the trading files
 src = open(os.path.join(WORK, "settings.py")).read()
 for bad in ("live.py", "paper.db", "live.db", "/portfolio", "import live", ".kalshi"):

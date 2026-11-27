@@ -284,6 +284,27 @@ def read_account():
     try:
         with open(p,encoding="utf-8") as f: return json.load(f)
     except (OSError,ValueError): return None
+def read_account_history(most_bytes=4*1024*1024,folder=None):
+    """live.py's account readings (logs/account_history.jsonl: one {ts,env,cash,portfolio_value,ok} line per snapshot),
+    read from the end: at most `most_bytes`, the first partial line dropped; the rolled-over account_history.1.jsonl is
+    read too when the current file is shorter than that. Damaged lines are skipped; missing files give []."""
+    d=folder or os.path.join(os.path.dirname(os.path.abspath(__file__)),"logs"); out=[]; left=most_bytes
+    for name in ("account_history.jsonl","account_history.1.jsonl"):
+        if left<=0: break
+        try:
+            with open(os.path.join(d,name),"rb") as f:
+                f.seek(0,2); n=f.tell(); f.seek(max(0,n-left)); raw=f.read()
+        except OSError: continue
+        left-=len(raw); lines=raw.splitlines()
+        if n>len(raw) and lines: lines=lines[1:]   # started mid-line
+        rows=[]
+        for l in lines:
+            try:
+                r=json.loads(l)
+                if isinstance(r,dict): rows.append(r)
+            except ValueError: pass
+        out=rows+out   # the older file's lines go first
+    return out
 def real_section(D,tr,now):
     """The real-money panel (real_view.py) from read_db()'s live.db rows, or "" when there is no prod activity; an
     unreadable ledger shows a line."""
@@ -291,8 +312,10 @@ def real_section(D,tr,now):
     try:
         if D.get("live_error"): raise RuntimeError(D["live_error"])
         orders,events=D.get("live_orders") or [],D.get("live_events") or []
-        if not any(o.get("env")=="prod" for o in orders) and not any(v.get("env")=="prod" and v.get("kind")!="setup" for v in events): return ""
-        return RV.section(orders,events,tr,now,killed(),STOP,table,read_account())
+        acct=read_account()
+        prod_snap=isinstance(acct,dict) and acct.get("env")=="prod" and acct.get("cash") is not None
+        if not prod_snap and not any(o.get("env")=="prod" for o in orders) and not any(v.get("env")=="prod" and v.get("kind")!="setup" for v in events): return ""
+        return RV.section(orders,events,tr,now,killed(),STOP,table,acct,read_account_history())
     except Exception as ex:
         print("real-money view failed:",ex)
         return '<section class=panel><h2>Real money on Kalshi</h2><p class=neg>The real-money ledger could not be read (%s). <code>.\\run live status</code> shows the account.</p></section>'%e(str(ex))
@@ -797,6 +820,39 @@ def build_page(D,live=False):
                              # entrance animation was still running when the tooltip check hovered it (test_ui.py)
     return ('<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover">'
           '<title>Tradebot Dashboard</title><style>'+CSS+(AV.ACCT_CSS if AV else "")+(RV.CSS if RV else "")+(CV.CSS if CV else "")+'</style></head><body'+(' data-live=1' if live else '')+'>'+body+'<script>'+JS+(AV.ACCT_JS if AV else "")+(RV.JS if RV else "")+'</script></body></html>')
+# ---- Latest report (added 2026-11-27; ops/README.md "When Claude is unavailable"): presentation only. Reads the text file
+# that ops/pc_report.py writes after each settle and evening job, escapes every line, and shows it right under the header
+# (as a div: no menu link). No database, no network. Kept as one block so build_page is untouched. The file: PC_REPORT_PATH
+# when set, else the TRADEBOT_PC_REPORT environment variable (empty = read nothing; the tests and golden.py set it so),
+# else logs/report_latest.md next to the paper database (so a test database never reads the real logs).
+PC_REPORT_PATH=None
+def pc_report_path():
+    if PC_REPORT_PATH is not None: return PC_REPORT_PATH
+    if "TRADEBOT_PC_REPORT" in os.environ: return os.environ["TRADEBOT_PC_REPORT"]
+    return os.path.join(os.path.dirname(os.path.abspath(DB)),"logs","report_latest.md")
+def pc_report_section(path=None):
+    p=pc_report_path() if path is None else path
+    head='<div class=panel id=pcreport role=region aria-labelledby=pcreport-h style="overflow-wrap:anywhere"><h2 id=pcreport-h>Latest report <span>written by this PC after each settle and evening run</span></h2>'
+    try:
+        if not p: raise OSError("no report file configured")
+        with open(p,encoding="utf-8",errors="replace") as f: txt=f.read(40000)
+        mt=datetime.fromtimestamp(os.path.getmtime(p),BOT_TZ)
+    except (OSError,ValueError):
+        return head+'<p class=note>No PC report yet. The PC writes one after the afternoon settle and the evening run (ops/pc_report.py).</p></div>'
+    top,_,facts_=txt.partition("\n## Facts")
+    lines=top.splitlines()
+    status=next((l for l in lines if l.startswith("Status:")),"Status: unknown")
+    wording=next((l for l in lines if l.startswith("Wording:")),"")
+    body_=("## Problems"+top.partition("## Problems")[2]).strip() if "## Problems" in top else top.partition("## Summary")[2].strip()
+    br=lambda s:"<br>".join(("<b>%s</b>"%e(l[3:]) if l.startswith("## ") else e(l)) for l in s.splitlines() if l.strip())
+    return (head+'<p class="note %s"><b>%s</b> &middot; %s &middot; %s</p><p class=note>%s</p>'
+            '<details><summary>Facts from the log</summary><p class=note>%s</p></details></div>')%(
+            "neg" if "PROBLEMS" in status else "pos",e(status),e(when(mt))+" (UTC-4)",e(wording),br(body_),br(facts_.partition("\n")[2].strip()))
+_build_page_core=build_page
+def build_page(D,live=False):
+    """build_page() with the Latest report panel under the header (the page's only </header>)."""
+    page=_build_page_core(D,live); head,sep,body=page.partition("<body")
+    return head+sep+body.replace("</header>","</header>"+pc_report_section(),1) if sep else page
 def main():
     live="--live" in sys.argv
     out=write_page(build_page(read_db(),live),live)

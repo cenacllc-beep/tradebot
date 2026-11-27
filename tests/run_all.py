@@ -54,8 +54,10 @@ TESTS=[("test_fix.py",[],"daily loss stop, migration, clear margin, single-look 
        ("test_learn.py",[],"learning report: pattern screen, read-only"),
        ("test_attribution.py",[],"win/loss attribution: Brier decomposition, luck vs skill vs fees, read-only"),
        ("test_real_view.py",[],"dashboard real-money section: same numbers as live.py, markers, read-only"),
+       ("test_account_live.py",[],"real-money headline = Kalshi's account total, account history, run dashboard live (localhost only, snapshot only)"),
        ("test_markets.py",[],"Kalshi vs Polymarket research: retries, fees, prices"),
        ("test_settings.py",[],"settings page: NVIDIA key sent to GitHub's encrypted secret on stdin; localhost, one-time path, never stored"),
+       ("test_pc_report.py",[],"PC report when Claude is unavailable: facts from tasks.log, AI wording checked, DPAPI key, toast, never an exit code"),
        ("test_backup_ai.py",[],"backup AI (NVIDIA, GitHub): check, report, rerun; fixes proposed, tested with no secrets, published as a PR only; never orders"),
        ("test_ui.py",[],"every dashboard button and tab (needs Playwright)")]
 def main():

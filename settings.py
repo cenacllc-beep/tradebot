@@ -2,16 +2,26 @@
 
 Opens a page in the browser where the user types the NVIDIA API key for the backup AI. The key goes straight to
 GitHub's encrypted repository secret NVIDIA_API_KEY through GitHub's own command-line tool (`gh secret set`, key on
-standard input, never on a command line), so the GitHub jobs can use it. The key is never written to disk, a log, the
-page, the dashboard or this folder, and it is never shown again.
+standard input, never on a command line), so the GitHub jobs can use it. The key is never written to a log, the
+page, the dashboard or this folder, and it is never shown again; it is written to disk only, encrypted and outside this
+folder, when the user ticks the box described below.
 
 Safety: the page is served only on 127.0.0.1 (this PC), on a random port, under a random one-time path; a form post must
 carry that path's token and come from the same page (Origin check); the helper stops after a successful save, after 10
 minutes, or when the window is closed with Ctrl+C. It never touches live.py, paper.db, live.db or the Kalshi key.
 Standard library only. Needs GitHub's tool installed and signed in once (`gh auth login`); the page says so if not.
+
+Optional (added 2026-11-27): a checkbox, unticked by default (KEEP_LABEL below). Ticked, the key is also stored by
+ops/pc_key.py with Windows DPAPI (machine scope, so it works in signed-out scheduled runs) in
+%USERPROFILE%\\.tradebot\\nvidia.key, outside this folder, with file permissions for the current user only, so
+ops/pc_report.py can word the PC's own reports when Claude is unavailable. Unticked, nothing is kept on the PC. "Remove the key from this PC" deletes that file. The key is still never shown, logged or put in this folder.
 """
 import html, http.server, os, secrets, shutil, socket, subprocess, sys, threading, time, webbrowser
 from urllib.parse import parse_qs
+try:
+    from ops import pc_key as PCKEY   # DPAPI key file outside the folder (only when the box is ticked)
+except Exception:  # noqa: BLE001
+    PCKEY = None
 
 REPO = "cenacllc-beep/tradebot"
 SECRET = "NVIDIA_API_KEY"
@@ -75,20 +85,36 @@ button{margin-top:12px;padding:10px 16px;border:0;border-radius:6px;background:v
 small{opacity:.8}</style></head><body><main><h1>Tradebot settings</h1><div class=card>
 <h2>Backup AI: NVIDIA API key</h2><p class="%(cls)s">%(status)s</p>%(msg)s
 <form method=post action="/%(tok)s/key" autocomplete=off>
-<label for=k>Paste the key (it is sent to GitHub's encrypted secrets, not saved on this PC, and not shown again)</label>
+<label for=k>Paste the key. It is sent to GitHub's encrypted secrets and not shown again. It is saved on this PC only if you tick the box below; unticked, nothing is saved here.</label>
 <input id=k name=key type=text autocomplete=off autocapitalize=off spellcheck=false required minlength=20 maxlength=512 style="-webkit-text-security:disc">
 <p><small>If the browser offers to save it as a password, choose Never.</small></p>
-<button type=submit %(dis)s>Save to GitHub</button></form>
+<p><label><input type=checkbox name=keep value=1 style="width:auto" %(kdis)s> %(keeplabel)s</label></p>
+<button type=submit %(dis)s>Save</button></form>
+<form method=post action="/%(tok)s/remove"><input type=hidden name=remove value=1><p><small>%(pcstate)s</small></p>
+<button type=submit %(rdis)s>Remove the key from this PC</button></form>
 <p><small>This page works only on this PC and stops after a save or after 10 minutes. Close it with Ctrl+C in the window
 that opened it. To change the key later, run <code>.\\run settings</code> again.</small></p></div></main></body></html>"""
 
 
-def page(tok, msg="", ok=None, status=None):
+KEEP_LABEL = ("Also keep the key on this PC, encrypted, in a file only my Windows account can open (administrators on this PC "
+              "could still decrypt it). When Claude is unavailable, the PC then sends NVIDIA its scheduled job's status "
+              "lines (settle and scan counts, problems, the stored gate verdict, the freshness line) to word its report. "
+              "It never sends money figures, Kalshi account lines, keys or e-mail addresses.")
+
+
+def page(tok, msg="", ok=None, status=None, keystore=None):
     gok, gtext = status or gh_status()
+    ks = keystore if keystore is not None else PCKEY
+    local = bool(ks is not None and ks.supported())
+    kept = bool(ks is not None and ks.exists())
     m = ""
     if msg:
         m = '<p class="%s"><b>%s</b></p>' % ("ok" if ok else "bad", html.escape(msg))
-    return PAGE % dict(cls="ok" if gok else "bad", status=html.escape(gtext), msg=m, tok=tok, dis="" if gok else "disabled")
+    pcstate = ("A key is kept on this PC, encrypted for your Windows account only." if kept else
+               "No key is kept on this PC." + ("" if local else " (Keeping one here needs Windows.)"))
+    return PAGE % dict(cls="ok" if gok else "bad", status=html.escape(gtext), msg=m, tok=tok,
+                       dis="" if (gok or local) else "disabled", kdis="" if local else "disabled",
+                       pcstate=html.escape(pcstate), rdis="" if kept else "disabled", keeplabel=html.escape(KEEP_LABEL))
 
 
 class Server(http.server.ThreadingHTTPServer):
@@ -103,8 +129,12 @@ class Server(http.server.ThreadingHTTPServer):
         http.server.HTTPServer.server_bind(self)
 
 
-def make_handler(tok, done, status=None):
+def make_handler(tok, done, status=None, keystore=None):
     st = {"v": status}
+    ks = keystore if keystore is not None else PCKEY
+
+    def pg(msg="", ok=None):
+        return page(tok, msg, ok, gh_state(), ks)
 
     def gh_state():
         if st["v"] is None:
@@ -133,7 +163,7 @@ def make_handler(tok, done, status=None):
         def do_GET(self):
             if not secrets.compare_digest(self.path, "/%s/" % tok) or not self._host_ok():
                 return self._send(404, "Not found")
-            self._send(200, page(tok, status=gh_state()))
+            self._send(200, pg())
 
         def _host_ok(self):
             return self.headers.get("Host", "") == "127.0.0.1:%d" % self.server.server_address[1]
@@ -141,23 +171,40 @@ def make_handler(tok, done, status=None):
         def do_POST(self):
             here = "127.0.0.1:%d" % self.server.server_address[1]
             origin = self.headers.get("Origin")
-            if (not secrets.compare_digest(self.path, "/%s/key" % tok) or not self._host_ok()
+            is_key = secrets.compare_digest(self.path, "/%s/key" % tok)
+            is_rm = secrets.compare_digest(self.path, "/%s/remove" % tok)
+            if (not (is_key or is_rm) or not self._host_ok()
                     or (origin is not None and origin != "http://" + here)):   # "null" and other sites refused
                 return self._send(403, "Refused")
+            if is_rm:
+                if ks is None:
+                    return self._send(400, pg("Keeping a key on this PC is not available here.", False))
+                ok, msg = ks.remove()
+                return self._send(200 if ok else 500, pg(msg, ok))
             try:
                 n = int(self.headers.get("Content-Length") or 0)
             except ValueError:
                 n = 0
             if n <= 0 or n > 4096:
-                return self._send(400, page(tok, "Nothing usable was sent.", False, gh_state()))
-            raw = self.rfile.read(n).decode("utf-8", "replace")
-            key = valid_key((parse_qs(raw).get("key") or [""])[0])
-            raw = None
+                return self._send(400, pg("Nothing usable was sent.", False))
+            form = parse_qs(self.rfile.read(n).decode("utf-8", "replace"))
+            key = valid_key((form.get("key") or [""])[0])
+            keep = (form.get("keep") or [""])[0] == "1"
+            form = None
             if not key:
-                return self._send(400, page(tok, "That does not look like a key (one line, 20-512 characters).", False, gh_state()))
-            ok, msg = set_secret(key)
+                return self._send(400, pg("That does not look like a key (one line, 20-512 characters).", False))
+            gok, gtext = gh_state()
+            results = []
+            if gok or not keep:   # GitHub as before; skipped only when the user asked for this PC and gh is not ready
+                results.append(set_secret(key))
+            else:
+                results.append((None, "GitHub was not updated: " + gtext))
+            if keep:
+                results.append(ks.store(key) if ks is not None else (False, "Keeping the key on this PC is not available here."))
             key = None
-            self._send(200 if ok else 502, page(tok, msg, ok, gh_state()))
+            tried = [r for r in results if r[0] is not None]
+            ok = bool(tried) and all(r[0] for r in tried)
+            self._send(200 if any(r[0] for r in tried) else 502, pg(" ".join(r[1] for r in results), ok))
             if ok:
                 done.set()
     return H
@@ -184,7 +231,7 @@ def main(open_browser=True):
     except KeyboardInterrupt:
         pass
     srv.shutdown()
-    print("Settings closed." + (" The key was saved to GitHub." if done.is_set() else ""))
+    print("Settings closed." + (" The key was saved." if done.is_set() else ""))
     return 0
 
 

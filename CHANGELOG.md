@@ -2524,3 +2524,67 @@ unfamiliar codebase ... do not change functionality. only upgrade the code quali
 - PLAN11 download: the first run (03:52Z) saved candles, METAR and about a third of the radar frames, then stopped on a
   dropped connection (http.client.IncompleteRead, not caught as a network error). The download is resumable and the
   data were committed; it was started again. plan11.py is not changed (its hash is in the identity record).
+
+## 2026-11-27 (about 09:00 La Paz) - real-money panel shows Kalshi's own account total; `.\run dashboard live`
+- User: the panel's headline showed $26.37 (the bot's own value: $25 + settled net of its bets, live.db) while the real
+  account holds about $9.47 (cash $8.60 + positions $0.87); the gap is trades placed by hand. Presentation and read-only only.
+- real_view.py: the headline is Kalshi's total (cash + portfolio_value from logs/account.json, live.py snapshot) with its
+  read time and the stale/failed warnings; the bot's own value is a labelled second figure (live.py's stops use it), with
+  a line on why they differ. No real-exchange snapshot (missing, demo, damaged): today's display with a note. The chart
+  plots the account total from logs/account_history.jsonl (bot bet markers kept); under two readings it shows the bot's
+  chart with a note. Past points were NOT seeded from the 14 days of fills and settlements: deposits, withdrawals and
+  past position marks are unknown, so a reconstructed history could not be honest.
+- live.py, snapshot() only: after writing account.json it appends {ts, env, cash, portfolio_value, ok} to
+  account_history.jsonl next to it (a failed read appends ok=false with no figures). Append only, a ts already present is
+  skipped, any error is swallowed. No lock, limit, order, mirror or sync code changed. `env` was added to the requested
+  fields so demo readings never enter the real chart.
+- New dashboard_server.py and `.\run dashboard live` (run.bat, CRLF kept): 127.0.0.1 only, random port, one-time path,
+  settings.py's hardening (Host and Origin checks, ThreadingHTTPServer, exclusive port, no request logging, plus CSP and
+  a Sec-Fetch-Site check). Every 2 minutes it runs only `live.py snapshot` (stdin empty) and rebuilds with dashboard.py's
+  read_db/build_page; the page polls every 20 s and reloads only after a successful rebuild. Stops after 12 hours or when
+  the window closes. The hourly snapshot is unchanged.
+- dashboard.py: read_account_history(); the panel also shows when only a real-exchange snapshot exists.
+- Tests: tests/test_account_live.py (fake data, injected runner, no network), added to tests/run_all.py.
+
+## 2026-11-27 (local) - PC backup reporter when Claude is unavailable (user request; ops/README.md)
+- Why: the three cloud report tasks (3:21 PM, 9:25 PM, 11:41 PM) fail when Claude hits its usage limit (last night's
+  evening report: USAGE_LIMIT_REACHED), and the GitHub backup AI cannot see the PC's logs.
+- New ops/pc_report.py: reads only logs\tasks.log (the latest settle or evening block) and writes logs\report_latest.md
+  plus logs\reports\YYYY-MM-DD-<job>.md (newest 30): trades settled, markets logged and paper trades, Brier, the gate
+  verdict as stored, FRESHNESS, Kalshi demo/prod lines, every problem line; `latenight` (11 PM to 1 AM) reports only when
+  tonight's scan is missing or still waiting. Optional AI wording through ops/backup_ai.py's own client and model picker
+  (imported, not copied), facts redacted first; the AI text is used only if every number in it is in the facts,
+  otherwise the plain text; the report says which. A Windows toast on problems (PowerShell, never waited for). Never
+  opens paper.db or live.db, never imports live.py, trades nothing.
+- New ops/pc_key.py: the NVIDIA key on the PC only when the user ticks the new settings.py checkbox (unticked by
+  default): Windows DPAPI, user scope, %USERPROFILE%\.tradebot\nvidia.key (outside the folder; a path inside it is
+  refused); "Remove the key from this PC" button. settings.py: the checkbox, the remove form, an injectable key store.
+- jobs.py: a final step after the settle and evening jobs' done line (own process, 4-minute timeout, one `PC REPORT:`
+  log line; never changes the exit code, the lock or a scan) and, in the hourly job between 11 PM and 1 AM only, the
+  late-night check first. No other jobs.py behaviour changed.
+- dashboard.py: one block, a "Latest report" panel under the header, escaped, read only from logs\report_latest.md
+  (build_page wrapped; its body untouched).
+- Tests: tests/test_pc_report.py (fake logs, fake NVIDIA transport, fake DPAPI) added to tests/run_all.py;
+  tests/test_settings.py extended for the checkbox. Not done: the optional GitHub-side note of a missing trial scan
+  (backup_ai's check already flags the trial data as stale after 30 hours).
+- No rule, limit, lock, threshold, live.py, strategy, config, gate or frozen research file changed. Not yet reviewed by
+  an independent code reviewer (CLAUDE.md section 6).
+- Code review applied (no blocker found): account.json temp file per process with 3 retries on a refused replace, and a
+  failed write no longer skips the history line; history rolls over to account_history.1.jsonl above about 2 MB and the
+  dashboard reads only the last 4 MB from the end; env must be "prod" (missing = not prod); the live server waits in
+  1-second slices, compares paths as bytes, shows the kill switch's state (the read-only snapshot still runs) and says
+  open paper-trade prices are as of its start; a note that Kalshi's portfolio_value is taken to exclude cash (to confirm).
+
+## 2026-11-27 (local) - PC backup reporter: code review fixes
+- Blocker fixed: jobs.step() writes `----- <job> step: <args>` / `----- <job> step end (exit N)`; pc_report attributes
+  lines by those markers (jobs.py's own lines by their text; old logs fall back to the latest open job). Test: hourly
+  jobs during the evening scan and its retry pause, settle overlapping the 15:20 hourly: no false "scan missing".
+- Key: DPAPI machine scope (S4U runs), file permissions cut to the user with icacls and checked before each use; missing,
+  decrypt and permission failures named on the Wording line. Trade-off and "confirm with one real scheduled run" in
+  ops/README.md. ctypes with declared types, get_last_error, the plain buffer zeroed, realpath, pid in temp names.
+- AI: signed number check (dates, times, exit codes, tickers excluded), rejects "clear" or a missing problem while
+  problems exist; the problem list always first; nothing about money or the Kalshi account is sent; plain report
+  written first, AI in a thread with a join timeout; the script's AI budget reported. Narrow problem list (retried
+  per-market errors raise no toast). Late-night: skipped or timeless evening blocks are problems with their reason.
+- settings.py labels: "saved on this PC only if you tick the box"; the box says exactly what is sent.
+- dashboard.py panel path: PC_REPORT_PATH, TRADEBOT_PC_REPORT (tests and golden.py set it empty), else next to the DB.
