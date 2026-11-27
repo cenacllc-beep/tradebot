@@ -2500,3 +2500,14 @@ unfamiliar codebase ... do not change functionality. only upgrade the code quali
   and P cannot pass that run.
 - Next: copy the workflow to .github/workflows and run the probe stage first; the bulk download (about 6-17 GB over
   2-3 runs, about 30 MB kept) starts only if the probe confirms the radar grid and the METAR format.
+
+## 2026-11-27 (about 00:30 La Paz) - PROBE22 (PLAN22's pre-freeze probe) built and switched on
+- research/probe22.py, tests/test_probe22.py, cloud/workflows/probe22.yml (+ .github copy after the review). Counts and
+  hashes only from Deribit's public get_volatility_index_data (approved 2026-11-26): history depth per month, paging,
+  the hour-label convention (Oct 15 hourly vs 1-minute candles, in memory only) and a revision hash of 2026-10-01..08;
+  never a DVOL value in files, stdout or errors; nothing dated 2026-11-01..12-31 requested, even as a count (PLAN22
+  section 1). The revision check needs a second run at least 24 hours after the first.
+- Independent code review: no blocker; 10 findings fixed (redirects refused, strict candle shape and timestamp checks,
+  errors print only their type, Retry-After and Deribit error 10028 retried within a 75-minute budget, hash of
+  normalised full weeks only, explicit record checks, incomplete-history marking, minute history depth, a workflow
+  guard against a hand-edited record, a body-size cap). All tests passed (one unrelated flaky run of test_settings).

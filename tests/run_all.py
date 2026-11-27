@@ -47,6 +47,7 @@ TESTS=[("test_fix.py",[],"daily loss stop, migration, clear margin, single-look 
        ("test_plan19.py",[],"PLAN19: liquidity-reward quotes on all rewarded markets, weight drift, fills, ladder marks, single score"),
        ("test_plan20.py",[],"PLAN20: cheap sides of every 15-minute series, groups, frozen ridge model, scored once, never an order"),
        ("test_live20.py",[],"PLAN20 forward logger: snapshots, gaps, settle, paper replay, never an order"),
+       ("test_probe22.py",[],"PROBE22: Deribit DVOL history, counts and hashes only, never a value, nothing from Nov-Dec 2026"),
        ("test_manifest.py",[],"code manifest: the same code on the PC, in the repository and in the working copy"),
        ("test_plan4launch.py",[],"PLAN4 chains started from a flag by the hourly job: once, detached, never while running"),
        ("test_moves.py",[],"renamed temperature series; PLAN5 L sampled on GitHub and the PC, merged once before the score"),
