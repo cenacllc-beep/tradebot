@@ -2478,4 +2478,4 @@ unfamiliar codebase ... do not change functionality. only upgrade the code quali
   (research/plan21.py) is written, code-reviewed and frozen before the first freeze date. Research and paper only;
   never real money directly. Expected result: no edge shown.
 - attribution.py (descriptive win/loss attribution; read-only; `run attribution`, also after learn.py in the settle
-  step; dashboard section "Win/loss attribution"; tests/test_attribution.py). Code review pending; not deployed to the PC.
+  step; dashboard section "Win/loss attribution"; tests/test_attribution.py). Code-reviewed (no blockers; 10 findings, all fixed: bot/mixed/you grouping and env shown, the bet-level model labelled the 50/50 blend with a raw-v3 Brier row, scalar/void kept so net matches the ledger, absolute results path, pooled rolling gap stated, zero-contract and dateless rows skipped, atomic md write, escaping tested, luck SE marked not clustered). All tests passed. Not yet deployed to the PC.

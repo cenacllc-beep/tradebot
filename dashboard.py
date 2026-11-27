@@ -316,6 +316,40 @@ def backup_ai_section():
       '<p class=note><a href="%s/actions/workflows/backup-ai.yml" target=_blank rel=noopener>Backup AI runs</a> &middot; '
       '<a href="%s/blob/main/ops/status/status.md" target=_blank rel=noopener>latest status report</a> &middot; '
       '<a href="%s/issues?q=label%%3Abackup-ai" target=_blank rel=noopener>alerts</a></p></div>')%(sec,REPO_URL,REPO_URL,REPO_URL)
+def attribution_section():
+    """Win/loss attribution (attribution.py's research/results/attribution.json, read-only; added 2026-11-26): per bet source the
+    profit split into claimed edge, the market's view, luck and costs, and the Brier scores. Presentation only; descriptive.
+    Shown only once the report exists; an unreadable file shows one line."""
+    p=os.path.join(os.environ.get("TRADEBOT_RESULTS") or os.path.join(os.path.dirname(os.path.abspath(__file__)),"research","results"),"attribution.json")
+    if not os.path.exists(p): return ""
+    head='<section class="panel" id=attribution><h2>Win/loss attribution <span>every settled bet: skill, luck or cost? descriptive only</span></h2>'
+    try:
+        with open(p,encoding="utf-8") as fh: A=json.load(fh)
+        S=A.get("sources") or {}; lab=A.get("labels") or {}; mlab=A.get("model_labels") or {}; rows=[]; words=[]
+        for k in ("paper_v3","shadow_maker","v4_taker","v4_maker","live15","live20"):
+            a=S.get(k) or {}
+            if not a.get("bets"): continue
+            sp=a["split"]; cm=((a.get("calibration") or {}).get("model") or {}).get("parts") or {}; ck=((a.get("calibration") or {}).get("market") or {}).get("parts") or {}
+            z=sp.get("luck_z")
+            who=str(a.get("model_label") or mlab.get(k) or "model")
+            rows.append(["%s<br><small>bets on: %s</small>"%(e(str(lab.get(k,k))),e(who)),str(a["bets"]),str(a["days"]),(plus(sp["pnl"]),"pos" if sp["pnl"]>0.004 else ("neg" if sp["pnl"]<-0.004 else "")),
+                         plus(sp["claimed_edge"]),plus(sp["spread_vs_market"]),"%s%s"%(plus(sp["luck"]),"" if z is None else " (%+.1f SE)"%z),
+                         usd(sp["fees"]+sp["execution"]),"%.3f / %.3f"%(cm.get("brier") or 0,ck.get("brier") or 0) if cm and ck else "–"])
+            words.append("<li><b>%s.</b> %s</li>"%(e(str(lab.get(k,k))),e(str(a.get("verdict") or ""))))
+        when_=e(str(A.get("generated") or ""))
+        ac=A.get("account") if isinstance(A.get("account"),dict) else None; acct=""
+        if ac and isinstance(ac.get("groups"),dict):
+            acct='<p class=note>Kalshi account (%s exchange, last %s days, descriptive): %s. Trades outside the bot are not in the rows above.</p>'%(
+                e(str(ac.get("env") or "unknown")),e(str(ac.get("days") or "?")),
+                "; ".join("%s %d fills, %d settlements"%(e(str(w)),int(g.get("fills") or 0),int(g.get("settlements") or 0)) for w,g in ac["groups"].items() if isinstance(g,dict)))
+        return (head+'<p class=note>For each source of settled bets: the edge the model claimed (for the weather ledgers the model is the blend (50/50 model+market), not the raw forecast), what the same bets were worth at the market&#8217;s own chances '
+          '(the spread paid), luck (outcomes against the market&#8217;s chances, in standard errors) and fees. A loss within about 2 standard errors of luck is what chance alone gives. '
+          'Report of %s; full detail, calibration tables and rolling 14-day windows in <code>research\\results\\attribution.md</code> (<code>.\\run attribution</code>). '
+          'It changes no rule.</p>%s%s%s</section>')%(when_,
+          table(["Source","Bets","Days","Net","Edge claimed","Worth at market chances","Luck, SE (not clustered)","Fees and execution","Brier model / market"],rows,"No settled bets found yet.",num=(1,2,3,4,5,6,7,8)),
+          ("<details><summary>In words</summary><ul>%s</ul></details>"%"".join(words)) if words else "",acct)
+    except Exception as ex:
+        return head+'<p class=note>The attribution report could not be read (%s).</p></section>'%e(str(ex))
 def live15_section(now=None):
     """PLAN15F's live paper bets on the 15-minute BTC/ETH markets (research/live15.py's own ledger, read-only;
     descriptive). Before the job's first run, a short "not started yet" note; an unreadable ledger shows a line."""
@@ -748,7 +782,7 @@ def build_page(D,live=False):
       '<section class=panel><h2>Score <span>%s rain, resolved markets</span></h2>%s</section>%s%s'
       '<section class="panel records"><h2>Calibration <span>%s rain</span></h2><p class=note>When the forecast says X%%, how often did it rain, and what did the market say?</p>%s'
       '<h2>Open paper positions</h2>%s<h2>Recent settled trades</h2>%s'
-      '<details><summary>Data by estimator version</summary>%s</details></section>'
+      '<details><summary>Data by estimator version</summary>%s</details></section>%s'
       '<p class=fine><b>Read with caution.</b> Early samples are noise. Cities share weather systems, so the effective sample is far smaller than the market count. Paper results ignore slippage and use approximate fees. The shadow tests are research only and never count toward the gate. Not financial advice. Data before Oct 13, 2026 was lost when the project folder was deleted; the test restarted that day.</p>'
       '%s</div><div id=tip role=tooltip></div>')%(
       chips,when(datetime.now(BOT_TZ))+" (UTC-4)",real,acct+live15_section(),verdict(rg,bf,bm,rain,passed,mg,look),e(GV),npass,gate,calendar(rain,nd,tr),
@@ -759,7 +793,7 @@ def build_page(D,live=False):
       table(["Market","Ver","Side","Contracts","Price","Fair","Cost incl. fee"],open_rows,"No open paper positions.",num=(3,4,5,6)),
       table(["Market","Ver","Side","Result","Outcome","P&amp;L"],done_rows,"No settled trades yet.",num=(5,)),
       table(["Version and type","Role","Logged","Resolved","Brier forecast","Brier market","Settled trades","P&amp;L"],ver_rows,"Nothing yet.",num=(2,3,4,5,6,7)),
-      backup_ai_section())   # last on the page: placed above the verdict it pushed it below the fold, so its
+      attribution_section(),backup_ai_section())   # last on the page: placed above the verdict it pushed it below the fold, so its
                              # entrance animation was still running when the tooltip check hovered it (test_ui.py)
     return ('<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover">'
           '<title>Tradebot Dashboard</title><style>'+CSS+(AV.ACCT_CSS if AV else "")+(RV.CSS if RV else "")+(CV.CSS if CV else "")+'</style></head><body'+(' data-live=1' if live else '')+'>'+body+'<script>'+JS+(AV.ACCT_JS if AV else "")+(RV.JS if RV else "")+'</script></body></html>')

@@ -23,6 +23,7 @@ rem   run check      did the evening scan log the next market day? (exit code 3 
 rem   run export     write backups\paper_latest.json, a copy of every table for the off-laptop backup
 rem   run test       run the automated tests (fake data in a temporary folder; never touches paper.db)
 rem   run learn      learning report: wins and losses by pattern (read-only; add --past for the past rain data)
+rem   run attribution  win/loss attribution: calibration, luck vs skill vs fees, edge decay (read-only; descriptive)
 rem   run kill       kill switch ON: scans stop trading (no paper trades, no shadow orders, no Kalshi orders)
 rem   run unkill     kill switch off (typed by you); "run kill status" shows it
 rem   run settings   settings page on this PC: save the backup AI's NVIDIA key to GitHub's encrypted secret (needs gh)
@@ -56,10 +57,11 @@ if /i "%~1"=="export" goto export
 if /i "%~1"=="test" goto test
 if /i "%~1"=="live" goto live
 if /i "%~1"=="learn" goto learn
+if /i "%~1"=="attribution" goto attribution
 if /i "%~1"=="kill" goto kill
 if /i "%~1"=="unkill" goto unkill
 if /i "%~1"=="settings" goto settings
-echo Usage: run scan ^| run settle ^| run report ^| run dashboard ^| run watch ^| run marks ^| run hourly ^| run structure ^| run discover ^| run freshness ^| run ohlc ^| run micro ^| run combo ^| run backup ^| run check ^| run export ^| run test ^| run live ^| run learn ^| run kill ^| run unkill ^| run settings
+echo Usage: run scan ^| run settle ^| run report ^| run dashboard ^| run watch ^| run marks ^| run hourly ^| run structure ^| run discover ^| run freshness ^| run ohlc ^| run micro ^| run combo ^| run backup ^| run check ^| run export ^| run test ^| run live ^| run learn ^| run attribution ^| run kill ^| run unkill ^| run settings
 exit /b 1
 
 :scan
@@ -115,6 +117,7 @@ if errorlevel 1 (
 "%PY%" live.py snapshot
 "%PY%" shadow.py settle
 "%PY%" learn.py
+"%PY%" attribution.py
 "%PY%" research\plan7.py auto
 "%PY%" research\plan8.py auto
 "%PY%" research\plan9.py auto
@@ -226,6 +229,10 @@ exit /b %errorlevel%
 
 :learn
 "%PY%" learn.py %2
+exit /b %errorlevel%
+
+:attribution
+"%PY%" attribution.py
 exit /b %errorlevel%
 
 :kill
