@@ -2460,3 +2460,11 @@ unfamiliar codebase ... do not change functionality. only upgrade the code quali
   scan window (scheduled), since strategy.py logs the registry's states during the scan.
 - Noted, not changed: PLAN7's daily "unreadable; moved aside" line is printed for a day file that does not exist yet
   (nothing is moved or lost); research/plan7.py is frozen and pinned by PLAN8.
+
+## 2026-11-26 20:20 (La Paz) - user: "use multi agents to implement your recommendations"
+- Recommendations offered just before (1 walk-forward learning engine, 2 win/loss attribution, 3 options-implied
+  volatility for the 15-minute chart targets, 4 PLAN11 radar/gauge, 5 PLAN19 already running). Deribit's public data
+  approved by the user in so many words for #3 (CLAUDE.md section 3).
+- Started: PLAN21 (walk-forward engine) and PLAN22 (Deribit implied volatility) as plans written before any of their
+  data, each to be statistics-reviewed and frozen before code; attribution.py (descriptive report, code review);
+  research/plan11.py built to the frozen PLAN11.md (code review before its first download).
