@@ -2511,3 +2511,16 @@ unfamiliar codebase ... do not change functionality. only upgrade the code quali
   errors print only their type, Retry-After and Deribit error 10028 retried within a 75-minute budget, hash of
   normalised full weeks only, explicit record checks, incomplete-history marking, minute history depth, a workflow
   guard against a hand-edited record, a body-size cap). All tests passed (one unrelated flaky run of test_settings).
+
+## 2026-11-27 08:45 (La Paz) - r97 and r98 deployed to the PC
+- r97: registry.py (audit 2026-11-26; display only) and docs/AUDIT_2026-11-26.md. The PC's registry.py equalled the
+  repository's version before the change; backed up to backups\code_pre_r97.
+- r98: attribution.py, tests/test_attribution.py, dashboard.py and run.bat (from commit bd91782; the PC's dashboard.py
+  and run.bat equalled their versions before it), backed up to backups\code_pre_r98. tests/run_all.py: the PC's own copy
+  plus the attribution line only (the PC does not hold the cloud-only tests). run.bat CRLF kept. First run on the PC:
+  `attribution.py` and `dashboard.py --no-open` succeeded. Reading (descriptive only): v3 paper -$10.97 over 82 bets is
+  mostly chance plus $4.40 of fees, and the blend's chances were too high (2.3 SE); the 15-minute paper bets' -$63.33 is
+  mostly fees and the price paid over the market's chance ($76.25), the model far too confident (11.1 SE). No rule changed.
+- PLAN11 download: the first run (03:52Z) saved candles, METAR and about a third of the radar frames, then stopped on a
+  dropped connection (http.client.IncompleteRead, not caught as a network error). The download is resumable and the
+  data were committed; it was started again. plan11.py is not changed (its hash is in the identity record).
