@@ -2449,7 +2449,7 @@ unfamiliar codebase ... do not change functionality. only upgrade the code quali
 - From the freeze on, live20's paper replay writes forward paper bets with this model (stage_c false: descriptive
   until a group passes).
 
-## 2026-11-26 20:45 (La Paz) - audit of the research, detection and calibration system (docs/AUDIT_2026-11-26.md)
+## 2026-11-26 20:15 (La Paz) - audit of the research, detection and calibration system (docs/AUDIT_2026-11-26.md)
 - User: "investigate/ audit our research, detection and calibration system to ensure the system is learning in
   real-time and making accurate, intelligent suggestions". Read-only analysis of copies of the PC's paper.db, live15.db
   and logs, plus the GitHub jobs. Every job current; models are frozen and judged at pre-registered looks on purpose;
