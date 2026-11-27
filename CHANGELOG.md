@@ -2588,3 +2588,19 @@ unfamiliar codebase ... do not change functionality. only upgrade the code quali
   per-market errors raise no toast). Late-night: skipped or timeless evening blocks are problems with their reason.
 - settings.py labels: "saved on this PC only if you tick the box"; the box says exactly what is sent.
 - dashboard.py panel path: PC_REPORT_PATH, TRADEBOT_PC_REPORT (tests and golden.py set it empty), else next to the DB.
+
+## 2026-11-27 09:35 (La Paz) - r99 deployed to the PC: real account on the dashboard, PC backup reports
+- User (08:31): "this dashboard needs to show real-time data from kalshi, even when i manually place orders ... scheduled
+  task still don't automatically route to the other ai provider when claude is unavailable. fix that also."
+- Files (commit f7b45b3): dashboard.py, real_view.py, dashboard_server.py (`.\run dashboard live`), live.py (snapshot
+  writes logs\account_history.jsonl only; no order, lock, limit or sync code touched), jobs.py (step markers and the PC
+  report step, outside the lock, never changing an exit code), settings.py (opt-in key on the PC, off by default),
+  ops/pc_report.py, ops/pc_key.py, ops/backup_ai.py and ops/README.md (new on the PC), run.bat (CRLF), tests. Each PC
+  file equalled its repository version before the change; backed up to backups\code_pre_r99. tests/run_all.py: the
+  PC's copy plus two lines.
+- Checked on the PC: test_account_live, test_pc_report, test_real_view and test_live pass; `live.py snapshot` (cash
+  $8.60, positions $0.92) wrote the first history line; the dashboard rebuilt; a deterministic settle report was written.
+- Code reviews: real-account work, no blocker, 9 findings fixed; PC report, one blocker (log lines of overlapping jobs
+  given to the wrong job) and 9 findings fixed.
+- Open: CLAUDE.md is not yet updated for the opt-in NVIDIA key on the PC (a rule change the user confirms himself);
+  Kalshi's portfolio_value excluding cash is unverified; one real signed-out scheduled run must show the key decrypts.
